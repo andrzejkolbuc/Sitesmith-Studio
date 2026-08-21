@@ -7,12 +7,12 @@ export const env = createEnv({
 	 * isn't built with invalid env vars.
 	 */
 	server: {
-		AUTH_SECRET:
-			process.env.NODE_ENV === "production"
-				? z.string()
-				: z.string().optional(),
-		AUTH_DISCORD_ID: z.string(),
-		AUTH_DISCORD_SECRET: z.string(),
+		/**
+		 * Required in every environment, not just production: sessions are JWTs and
+		 * this secret signs them. Left optional, a missing value would surface as a
+		 * runtime failure on the sign-in path rather than a startup error.
+		 */
+		AUTH_SECRET: z.string().min(1),
 		DATABASE_URL: z.string().url(),
 		NODE_ENV: z
 			.enum(["development", "test", "production"])
@@ -34,8 +34,6 @@ export const env = createEnv({
 	 */
 	runtimeEnv: {
 		AUTH_SECRET: process.env.AUTH_SECRET,
-		AUTH_DISCORD_ID: process.env.AUTH_DISCORD_ID,
-		AUTH_DISCORD_SECRET: process.env.AUTH_DISCORD_SECRET,
 		DATABASE_URL: process.env.DATABASE_URL,
 		NODE_ENV: process.env.NODE_ENV,
 	},

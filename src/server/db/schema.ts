@@ -8,9 +8,7 @@ import type { AdapterAccount } from "next-auth/adapters";
  *
  * @see https://orm.drizzle.team/docs/goodies#multi-project-schema
  */
-export const createTable = pgTableCreator(
-	(name) => `sitesmith-studio_${name}`,
-);
+export const createTable = pgTableCreator((name) => `sitesmith-studio_${name}`);
 
 export const posts = createTable(
 	"post",
@@ -40,7 +38,11 @@ export const users = createTable("user", (d) => ({
 		.primaryKey()
 		.$defaultFn(() => crypto.randomUUID()),
 	name: d.varchar({ length: 255 }),
-	email: d.varchar({ length: 255 }).notNull(),
+	/**
+	 * Unique because sign-in resolves an account by email. Without the constraint
+	 * two rows could share an address and the lookup would be non-deterministic.
+	 */
+	email: d.varchar({ length: 255 }).notNull().unique(),
 	emailVerified: d
 		.timestamp({
 			mode: "date",
@@ -48,6 +50,12 @@ export const users = createTable("user", (d) => ({
 		})
 		.$defaultFn(() => /* @__PURE__ */ new Date()),
 	image: d.varchar({ length: 255 }),
+	/**
+	 * Encoded scrypt digest — see `~/server/auth/password`. Nullable: a user
+	 * invited but who has not yet set a password has none, and any federated
+	 * provider added later would not use one.
+	 */
+	passwordHash: d.varchar({ length: 255 }),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({

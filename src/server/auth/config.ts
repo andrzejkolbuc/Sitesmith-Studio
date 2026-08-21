@@ -1,6 +1,8 @@
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
+import { eq } from "drizzle-orm";
 import type { DefaultSession, NextAuthConfig } from "next-auth";
-import DiscordProvider from "next-auth/providers/discord";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { z } from "zod";
 
 import { db } from "~/server/db";
 import {
@@ -9,6 +11,7 @@ import {
 	users,
 	verificationTokens,
 } from "~/server/db/schema";
+import { burnPasswordTime, verifyPassword } from "./password";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -24,12 +27,12 @@ declare module "next-auth" {
 			// role: UserRole;
 		} & DefaultSession["user"];
 	}
-
-	// interface User {
-	//   // ...other properties
-	//   // role: UserRole;
-	// }
 }
+
+const credentialsSchema = z.object({
+	email: z.string().email(),
+	password: z.string().min(1),
+});
 
 /**
  * Options for NextAuth.js used to configure adapters, providers, callbacks, etc.
@@ -38,16 +41,48 @@ declare module "next-auth" {
  */
 export const authConfig = {
 	providers: [
-		DiscordProvider,
-		/**
-		 * ...add more providers here.
-		 *
-		 * Most other providers require a bit more work than the Discord provider. For example, the
-		 * GitHub provider requires you to add the `refresh_token_expires_in` field to the Account
-		 * model. Refer to the NextAuth.js docs for the provider you want to use. Example:
-		 *
-		 * @see https://next-auth.js.org/providers/github
-		 */
+		CredentialsProvider({
+			name: "Email and password",
+			credentials: {
+				email: { label: "Email", type: "email" },
+				password: { label: "Password", type: "password" },
+			},
+			/**
+			 * Returning `null` is the only failure signal Auth.js accepts here, and every
+			 * rejection path below returns exactly that — an unknown address, an account
+			 * with no password set, and a wrong password are indistinguishable to the
+			 * caller. Telling them apart would confirm which addresses hold accounts.
+			 */
+			authorize: async (raw) => {
+				const parsed = credentialsSchema.safeParse(raw);
+				if (!parsed.success) return null;
+
+				const email = parsed.data.email.trim().toLowerCase();
+
+				const user = await db.query.users.findFirst({
+					where: eq(users.email, email),
+				});
+
+				if (!user?.passwordHash) {
+					// Spend comparable time so a missing account is not measurably faster.
+					await burnPasswordTime(parsed.data.password);
+					return null;
+				}
+
+				const ok = await verifyPassword(
+					parsed.data.password,
+					user.passwordHash,
+				);
+				if (!ok) return null;
+
+				return {
+					id: user.id,
+					email: user.email,
+					name: user.name,
+					image: user.image,
+				};
+			},
+		}),
 	],
 	adapter: DrizzleAdapter(db, {
 		usersTable: users,
@@ -55,12 +90,25 @@ export const authConfig = {
 		sessionsTable: sessions,
 		verificationTokensTable: verificationTokens,
 	}),
+	/**
+	 * Credentials sign-in requires JWT sessions — Auth.js will not issue a database
+	 * session for it. Consequence worth knowing: sessions can no longer be revoked
+	 * server-side by deleting a row. A token stays valid until it expires, so
+	 * removing someone's access is not immediate. If instant revocation becomes a
+	 * requirement, the usual answer is a token version on the user row that the
+	 * `jwt` callback checks.
+	 */
+	session: { strategy: "jwt" },
 	callbacks: {
-		session: ({ session, user }) => ({
+		jwt: ({ token, user }) => {
+			if (user) token.id = user.id;
+			return token;
+		},
+		session: ({ session, token }) => ({
 			...session,
 			user: {
 				...session.user,
-				id: user.id,
+				id: token.id as string,
 			},
 		}),
 	},
