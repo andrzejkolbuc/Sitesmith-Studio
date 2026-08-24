@@ -503,30 +503,30 @@ corrected schema.
 
 #### Automated
 
-- [x] 3.1 Type checking passes: `npm run typecheck`
-- [x] 3.2 Linting passes: `npm run check`
-- [x] 3.3 Seed runs without error against the local database
-- [x] 3.4 Re-running the seed with the same email does not error
+- [x] 3.1 Type checking passes: `npm run typecheck` — 82d8786
+- [x] 3.2 Linting passes: `npm run check` — 82d8786
+- [x] 3.3 Seed runs without error against the local database — 82d8786
+- [x] 3.4 Re-running the seed with the same email does not error — 82d8786
 
 #### Manual
 
-- [x] 3.5 A `tenants` row and a linked `users` row exist with a non-null `passwordHash`
-- [x] 3.6 Running the seed twice leaves exactly one user for that email
+- [x] 3.5 A `tenants` row and a linked `users` row exist with a non-null `passwordHash` — 82d8786
+- [x] 3.6 Running the seed twice leaves exactly one user for that email — 82d8786
 
 ### Phase 4: Sign-in and project list
 
 #### Automated
 
-- [ ] 4.1 Type checking passes: `npm run typecheck`
-- [ ] 4.2 Linting passes: `npm run check`
-- [ ] 4.3 Build succeeds: `npm run build`
+- [x] 4.1 Type checking passes: `npm run typecheck`
+- [x] 4.2 Linting passes: `npm run check`
+- [x] 4.3 Build succeeds: `npm run build`
 
 #### Manual
 
-- [ ] 4.4 Signing in with the seeded Owner succeeds and lands on the projects list
-- [ ] 4.5 A wrong password shows one generic failure message, not a specific one
-- [ ] 4.6 Visiting the projects list while signed out redirects to sign-in
-- [ ] 4.7 The projects list shows only the signed-in tenant's projects
+- [x] 4.4 Signing in with the seeded Owner succeeds and lands on the projects list
+- [x] 4.5 A wrong password shows one generic failure message, not a specific one
+- [x] 4.6 Visiting the projects list while signed out redirects to sign-in
+- [x] 4.7 The projects list shows only the signed-in tenant's projects
 
 ### Phase 5: Cross-tenant isolation test
 
