@@ -66,7 +66,11 @@ async function seedTenant(label: string) {
 
 	const [project] = await db
 		.insert(projects)
-		.values({ tenantId: tenant.id, name: `${label} client site` })
+		.values({
+			tenantId: tenant.id,
+			name: `${label} client site`,
+			startUrl: `https://${label}.isolation.test/`,
+		})
 		.returning();
 	if (!project) throw new Error("project insert returned nothing");
 

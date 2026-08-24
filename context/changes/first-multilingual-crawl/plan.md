@@ -527,16 +527,16 @@ deployment exists, so rollback is re-pushing a corrected schema.
 
 #### Automated
 
-- [ ] 1.1 Schema pushes cleanly: `npm run db:push`
-- [ ] 1.2 Type checking passes: `npm run typecheck`
-- [ ] 1.3 Linting passes: `npm run check`
-- [ ] 1.4 Existing isolation test still passes: `npm run test`
+- [x] 1.1 Schema pushes cleanly: `npm run db:push`
+- [x] 1.2 Type checking passes: `npm run typecheck`
+- [x] 1.3 Linting passes: `npm run check`
+- [x] 1.4 Existing isolation test still passes: `npm run test`
 
 #### Manual
 
-- [ ] 1.5 `runs`, `pages` and `findings` exist with the `sitesmith-studio_` prefix
-- [ ] 1.6 Every new table has a `tenantId` column and a foreign key to `tenants`
-- [ ] 1.7 `tenantScope(runs, …)` compiles
+- [x] 1.5 `runs`, `pages` and `findings` exist with the `sitesmith-studio_` prefix
+- [x] 1.6 Every new table has a `tenantId` column and a foreign key to `tenants`
+- [x] 1.7 `tenantScope(runs, …)` compiles
 
 ### Phase 2: Crawl engine and fixture site
 

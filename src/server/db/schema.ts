@@ -142,6 +142,42 @@ export const projects = createTable(
 			.notNull()
 			.references(() => tenants.id),
 		name: d.varchar({ length: 255 }).notNull(),
+		/** Where a crawl begins. A project without one cannot be checked. */
+		startUrl: d.varchar({ length: 2048 }).notNull(),
+		/**
+		 * Crawl scope. Empty `includePaths` means "anything on the start URL's
+		 * origin"; `excludePaths` always wins over includes.
+		 */
+		includePaths: d
+			.text()
+			.array()
+			.notNull()
+			.$defaultFn(() => []),
+		excludePaths: d
+			.text()
+			.array()
+			.notNull()
+			.$defaultFn(() => []),
+		/**
+		 * The locales this site is expected to publish, as BCP-47 tags.
+		 *
+		 * This is the declared expectation that makes a missing variant detectable
+		 * at all — without it, a locale that vanished entirely would be
+		 * indistinguishable from one the site never had.
+		 */
+		locales: d
+			.text()
+			.array()
+			.notNull()
+			.$defaultFn(() => []),
+		/**
+		 * Politeness ceiling. Defaults are deliberately timid: an unconfigured
+		 * project must not be capable of stressing a client's site, because the
+		 * cost of being too slow is a slow run and the cost of being too fast is
+		 * someone else's outage.
+		 */
+		maxConcurrency: d.integer().notNull().default(2),
+		requestDelayMs: d.integer().notNull().default(500),
 		createdAt: d
 			.timestamp({ withTimezone: true })
 			.$defaultFn(() => /* @__PURE__ */ new Date())
@@ -151,11 +187,171 @@ export const projects = createTable(
 	(t) => [index("project_tenant_id_idx").on(t.tenantId)],
 );
 
-export const projectsRelations = relations(projects, ({ one }) => ({
+export const projectsRelations = relations(projects, ({ one, many }) => ({
 	tenant: one(tenants, {
 		fields: [projects.tenantId],
 		references: [tenants.id],
 	}),
+	runs: many(runs),
+}));
+
+/**
+ * One execution of a check against a project.
+ *
+ * The row is also the job's state. A trigger inserts it as `queued` and returns
+ * before any crawling starts; the crawler advances it. Because the work happens
+ * in-process, a run left in `queued` or `running` after a restart is by
+ * definition stale, and the boot sweep closes it as `interrupted`.
+ */
+export const runs = createTable(
+	"run",
+	(d) => ({
+		id: d
+			.varchar({ length: 255 })
+			.notNull()
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		tenantId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => tenants.id),
+		projectId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => projects.id),
+		/** queued | running | done | failed | interrupted */
+		status: d.varchar({ length: 32 }).notNull().default("queued"),
+		startedAt: d.timestamp({ withTimezone: true }),
+		finishedAt: d.timestamp({ withTimezone: true }),
+		pagesCrawled: d.integer().notNull().default(0),
+		findingsCount: d.integer().notNull().default(0),
+		/** Why the run aborted — the failure burst, a fetch error, or a crash. */
+		error: d.text(),
+		createdAt: d
+			.timestamp({ withTimezone: true })
+			.$defaultFn(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	}),
+	(t) => [
+		index("run_tenant_id_idx").on(t.tenantId),
+		index("run_project_id_idx").on(t.projectId),
+	],
+);
+
+export const runsRelations = relations(runs, ({ one, many }) => ({
+	tenant: one(tenants, { fields: [runs.tenantId], references: [tenants.id] }),
+	project: one(projects, {
+		fields: [runs.projectId],
+		references: [projects.id],
+	}),
+	pages: many(pages),
+	findings: many(findings),
+}));
+
+/**
+ * One URL as this run observed it.
+ *
+ * Written as the crawl proceeds rather than batched at the end, so memory stays
+ * flat across a 1,200-URL run and an aborted run still shows what it managed.
+ */
+export const pages = createTable(
+	"page",
+	(d) => ({
+		id: d
+			.varchar({ length: 255 })
+			.notNull()
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		tenantId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => tenants.id),
+		runId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => runs.id),
+		url: d.varchar({ length: 2048 }).notNull(),
+		/** Null when the request never produced a response — see `fetchError`. */
+		httpStatus: d.integer(),
+		/** Locale detected for this page, from hreflang or the URL. */
+		locale: d.varchar({ length: 32 }),
+		/**
+		 * Which variant family this page belongs to. Derived from the hreflang
+		 * graph rather than from any single URL, so the key is stable regardless
+		 * of which page the crawl reached first.
+		 */
+		variantGroupKey: d.varchar({ length: 255 }),
+		/** The hreflang targets this page declared, as locale → URL. */
+		hreflangTargets: d.jsonb().$type<Record<string, string>>(),
+		fetchError: d.text(),
+		createdAt: d
+			.timestamp({ withTimezone: true })
+			.$defaultFn(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	}),
+	(t) => [
+		index("page_tenant_id_idx").on(t.tenantId),
+		index("page_run_id_idx").on(t.runId),
+		index("page_variant_group_idx").on(t.runId, t.variantGroupKey),
+	],
+);
+
+export const pagesRelations = relations(pages, ({ one }) => ({
+	tenant: one(tenants, { fields: [pages.tenantId], references: [tenants.id] }),
+	run: one(runs, { fields: [pages.runId], references: [runs.id] }),
+}));
+
+/**
+ * Something the product concluded, as opposed to something it merely observed.
+ *
+ * First-class rows rather than derived at read time: later slices compare runs
+ * against each other, and a comparison needs what was concluded *then*, not what
+ * today's rules would conclude about yesterday's data.
+ */
+export const findings = createTable(
+	"finding",
+	(d) => ({
+		id: d
+			.varchar({ length: 255 })
+			.notNull()
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		tenantId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => tenants.id),
+		runId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => runs.id),
+		/** Discriminator, e.g. `missing_locale`, `hreflang_target_failed`. */
+		type: d.varchar({ length: 64 }).notNull(),
+		/** Null for findings about a group rather than a single page. */
+		pageId: d.varchar({ length: 255 }).references(() => pages.id),
+		/**
+		 * The evidence: which group, which locale, what was expected, what was
+		 * observed. A finding must be actionable without re-running the crawl.
+		 */
+		detail: d.jsonb().$type<Record<string, unknown>>().notNull(),
+		createdAt: d
+			.timestamp({ withTimezone: true })
+			.$defaultFn(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	}),
+	(t) => [
+		index("finding_tenant_id_idx").on(t.tenantId),
+		index("finding_run_id_idx").on(t.runId),
+		index("finding_type_idx").on(t.runId, t.type),
+	],
+);
+
+export const findingsRelations = relations(findings, ({ one }) => ({
+	tenant: one(tenants, {
+		fields: [findings.tenantId],
+		references: [tenants.id],
+	}),
+	run: one(runs, { fields: [findings.runId], references: [runs.id] }),
+	page: one(pages, { fields: [findings.pageId], references: [pages.id] }),
 }));
 
 export const tenantsRelations = relations(tenants, ({ many }) => ({

@@ -1,7 +1,7 @@
 ---
 change_id: first-multilingual-crawl
 title: "First multilingual crawl"
-status: planned
+status: implementing
 created: 2026-08-24
 updated: 2026-08-24
 roadmap_ref: S-01
