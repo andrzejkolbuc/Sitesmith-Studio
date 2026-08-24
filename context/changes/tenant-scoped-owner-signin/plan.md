@@ -517,28 +517,28 @@ corrected schema.
 
 #### Automated
 
-- [x] 4.1 Type checking passes: `npm run typecheck`
-- [x] 4.2 Linting passes: `npm run check`
-- [x] 4.3 Build succeeds: `npm run build`
+- [x] 4.1 Type checking passes: `npm run typecheck` — fc3a770
+- [x] 4.2 Linting passes: `npm run check` — fc3a770
+- [x] 4.3 Build succeeds: `npm run build` — fc3a770
 
 #### Manual
 
-- [x] 4.4 Signing in with the seeded Owner succeeds and lands on the projects list
-- [x] 4.5 A wrong password shows one generic failure message, not a specific one
-- [x] 4.6 Visiting the projects list while signed out redirects to sign-in
-- [x] 4.7 The projects list shows only the signed-in tenant's projects
+- [x] 4.4 Signing in with the seeded Owner succeeds and lands on the projects list — fc3a770
+- [x] 4.5 A wrong password shows one generic failure message, not a specific one — fc3a770
+- [x] 4.6 Visiting the projects list while signed out redirects to sign-in — fc3a770
+- [x] 4.7 The projects list shows only the signed-in tenant's projects — fc3a770
 
 ### Phase 5: Cross-tenant isolation test
 
 #### Automated
 
-- [ ] 5.1 Test suite runs: `npm run test`
-- [ ] 5.2 Cross-tenant isolation test passes
-- [ ] 5.3 Tenantless-session test passes
-- [ ] 5.4 Type checking passes: `npm run typecheck`
-- [ ] 5.5 Linting passes: `npm run check`
+- [x] 5.1 Test suite runs: `npm run test`
+- [x] 5.2 Cross-tenant isolation test passes
+- [x] 5.3 Tenantless-session test passes
+- [x] 5.4 Type checking passes: `npm run typecheck`
+- [x] 5.5 Linting passes: `npm run check`
 
 #### Manual
 
-- [ ] 5.6 Deliberately breaking the scoping in `project.list` makes the isolation test fail
-- [ ] 5.7 Test run leaves the development database usable
+- [x] 5.6 Deliberately breaking the scoping in `project.list` makes the isolation test fail
+- [x] 5.7 Test run leaves the development database usable

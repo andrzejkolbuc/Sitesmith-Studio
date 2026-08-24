@@ -1,7 +1,7 @@
 ---
 change_id: tenant-scoped-owner-signin
 title: "Tenant-scoped records and Owner sign-in"
-status: implementing
+status: implemented
 created: 2026-08-21
 updated: 2026-08-24
 roadmap_ref: F-01
