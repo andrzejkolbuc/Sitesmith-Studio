@@ -22,7 +22,7 @@ export const projectRouter = createTRPCRouter({
 	 */
 	list: tenantProcedure.query(async ({ ctx }) => {
 		return ctx.db.query.projects.findMany({
-			where: tenantScope(projects.tenantId, ctx.tenantId),
+			where: tenantScope(projects, ctx.tenantId),
 			orderBy: (project, { asc }) => [asc(project.name)],
 		});
 	}),

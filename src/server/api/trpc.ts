@@ -200,13 +200,21 @@ export const tenantProcedure = protectedProcedure.use(({ ctx, next }) => {
  *
  * ```ts
  * ctx.db.query.projects.findMany({
- *   where: tenantScope(projects.tenantId, ctx.tenantId),
+ *   where: tenantScope(projects, ctx.tenantId),
  * })
  * ```
  *
- * It is a thin wrapper over `eq` on purpose. The value is that scoping has one
- * name and one place to change — including if this ever moves down into
- * row-level security in the database.
+ * It takes the **table**, not a column, and reads `tenantId` itself. That is the
+ * load-bearing detail: a helper whose purpose is preventing a mistake should make
+ * that mistake fail to compile, not merely be easy to avoid. Passing a column
+ * would let `tenantScope(projects.name, …)` typecheck and silently match nothing,
+ * and a table with no tenant column would slip through entirely. Neither is
+ * expressible now.
+ *
+ * Beyond the type safety, scoping has one name and one place to change —
+ * including if it ever moves down into row-level security in the database.
  */
-export const tenantScope = (column: PgColumn, tenantId: string) =>
-	eq(column, tenantId);
+export const tenantScope = <T extends { tenantId: PgColumn }>(
+	table: T,
+	tenantId: string,
+) => eq(table.tenantId, tenantId);

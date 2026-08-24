@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
@@ -55,9 +56,13 @@ export default defineConfig({
 		env: {
 			...process.env,
 			DATABASE_URL: testUrl,
-			// The application validates env at import time; tests supply their own.
-			AUTH_SECRET:
-				process.env.AUTH_SECRET || "test-secret-not-used-for-signing",
+			/**
+			 * The application validates env at import time, so a value must exist.
+			 * Generated rather than hardcoded: a literal here is credential-shaped
+			 * and trips secret scanners, and the noise costs more than the line
+			 * saves. Nothing in the suite signs or verifies a session with it.
+			 */
+			AUTH_SECRET: process.env.AUTH_SECRET || randomBytes(32).toString("hex"),
 		},
 		// Integration tests share one database; parallel files would race on truncation.
 		fileParallelism: false,

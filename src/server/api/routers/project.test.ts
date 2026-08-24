@@ -18,7 +18,27 @@ import { projects, tenants, users } from "~/server/db/schema";
  * what should go red.
  */
 
-const connection = postgres(process.env.DATABASE_URL ?? "", { max: 1 });
+const databaseUrl = process.env.DATABASE_URL ?? "";
+
+/**
+ * Assert the target database before opening a connection to it.
+ *
+ * `test/global-setup.ts` performs the same check, and it has already earned its
+ * keep once — during implementation it caught a config in which the setup step
+ * still saw the development database. The check is repeated here because this is
+ * the file that actually truncates tables: anything that runs these tests without
+ * that global setup (a different config, an IDE runner, a future project split)
+ * would otherwise empty whatever database it happened to be pointed at.
+ *
+ * A destructive operation and its guard should live together.
+ */
+if (!new URL(databaseUrl).pathname.endsWith("-test")) {
+	throw new Error(
+		`Refusing to run: DATABASE_URL does not point at a "-test" database. These tests truncate tables.`,
+	);
+}
+
+const connection = postgres(databaseUrl, { max: 1 });
 const db = drizzle(connection, { schema: { projects, tenants, users } });
 
 /** Builds a context the same shape the real request path builds. */

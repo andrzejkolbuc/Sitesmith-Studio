@@ -336,6 +336,24 @@ than rendering a 403 or a not-found. Rationale: an invite-only product has no pu
 protect the existence of, and a redirect is the least confusing outcome for a client contact
 following a stale link. Gated routes are everything except the home page and the sign-in page.
 
+### Addendum (recorded 2026-08-24, after implementation)
+
+Three divergences from the phase as written above. All were agreed before implementing and are
+recorded in commit messages; noted here so the plan matches what exists.
+
+- **Change #3 (projects router) landed in Phase 2, not here.** An empty `appRouter` does not
+  typecheck — `createHydrationHelpers` rejects the empty record — so deleting the demo router
+  and adding its replacement could not be split across phases.
+- **The projects page is at `src/app/(app)/projects/page.tsx`**, inside a route group, rather
+  than `src/app/projects/page.tsx`.
+- **The gated-route guard is a route-group layout** (`src/app/(app)/layout.tsx`), not
+  `src/middleware.ts` and not a per-page check. Middleware was ruled out because the auth
+  configuration pulls in the Postgres driver, which does not run in Next's edge runtime. A
+  layout means a new gated page inherits the guard structurally rather than by remembering it.
+
+The layout gained a second responsibility during review: a session whose account has no tenant
+is shown an explanation rather than being allowed through to a page that would throw.
+
 ### Success Criteria:
 
 #### Automated Verification:

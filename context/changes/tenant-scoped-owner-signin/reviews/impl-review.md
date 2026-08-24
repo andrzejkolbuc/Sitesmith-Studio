@@ -4,7 +4,7 @@
 - **Plan**: `context/changes/tenant-scoped-owner-signin/plan.md`
 - **Scope**: Full plan — Phases 1–5 of 5
 - **Date**: 2026-08-24
-- **Verdict**: NEEDS ATTENTION
+- **Verdict**: NEEDS ATTENTION → **RESOLVED** (triaged 2026-08-24: 5 fixed, 1 accepted)
 - **Findings**: 0 critical, 2 warnings, 4 observations
 
 ## Verdicts
@@ -54,7 +54,7 @@ no residual demo-router references PASS.
     screen, just a nicer one, rather than being told what is wrong with their account.
   - Confidence: MEDIUM — needs care to distinguish `FORBIDDEN` from genuine faults.
   - Blind spot: Have not verified how the tRPC error surfaces through the RSC boundary.
-- **Decision**: PENDING
+- **Decision**: FIXED via Fix A — tenant resolved in the gated layout; a tenantless account now sees an explanation and a sign-out rather than a server error.
 
 ### F2 — `tenantScope` cannot tell a tenant column from any other column
 
@@ -79,7 +79,7 @@ no residual demo-router references PASS.
     been verified against this specific constraint.
   - Blind spot: Not verified whether the same constraint holds for tables where the column is
     nullable, such as `users`.
-- **Decision**: PENDING
+- **Decision**: FIXED — signature now takes the table and reads `tenantId` itself. Verified negatively: passing a column, or a table without a tenant column, both fail to compile (TS2345); the correct call is clean. The Drizzle-typing blind spot did not materialise.
 
 ### F3 — The plan no longer describes what was built
 
@@ -96,7 +96,7 @@ no residual demo-router references PASS.
   artifact future reviews read as ground truth, and it is now wrong in three places.
 - **Fix**: Add a short addendum to Phase 4 noting the router moved to Phase 2 and the two path
   changes.
-- **Decision**: PENDING
+- **Decision**: FIXED — addendum added to Phase 4 recording the router move and both path changes.
 
 ### F4 — Four file groups changed outside the plan
 
@@ -111,7 +111,7 @@ no residual demo-router references PASS.
   strategy" but not named. All are justified in their commits and none expand the product
   surface. Recorded so the divergence is visible rather than absorbed.
 - **Fix**: None needed — noted for the record.
-- **Decision**: PENDING
+- **Decision**: ACCEPTED — no action. The finding exists to make the divergence visible; all four are justified in their commits.
 
 ### F5 — The dev-database guard protects only one entry point
 
@@ -127,7 +127,7 @@ no residual demo-router references PASS.
   it is pointed at.
 - **Fix**: Repeat the `-test` assertion in the test file's setup, so the destructive operation
   and its guard live together.
-- **Decision**: PENDING
+- **Decision**: FIXED — the `-test` assertion is repeated in the test file, so the truncation and its guard live together.
 
 ### F6 — Fallback secret literal in the test config
 
@@ -140,4 +140,4 @@ no residual demo-router references PASS.
   a hardcoded credential-shaped string that a secret scanner will flag, and the noise costs
   more than the line saves.
 - **Fix**: Generate the fallback at config load instead of hardcoding it.
-- **Decision**: PENDING
+- **Decision**: FIXED — fallback is generated with randomBytes at config load instead of a hardcoded literal.
