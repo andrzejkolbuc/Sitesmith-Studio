@@ -532,13 +532,13 @@ corrected schema.
 
 #### Automated
 
-- [x] 5.1 Test suite runs: `npm run test`
-- [x] 5.2 Cross-tenant isolation test passes
-- [x] 5.3 Tenantless-session test passes
-- [x] 5.4 Type checking passes: `npm run typecheck`
-- [x] 5.5 Linting passes: `npm run check`
+- [x] 5.1 Test suite runs: `npm run test` — 8582dde
+- [x] 5.2 Cross-tenant isolation test passes — 8582dde
+- [x] 5.3 Tenantless-session test passes — 8582dde
+- [x] 5.4 Type checking passes: `npm run typecheck` — 8582dde
+- [x] 5.5 Linting passes: `npm run check` — 8582dde
 
 #### Manual
 
-- [x] 5.6 Deliberately breaking the scoping in `project.list` makes the isolation test fail
-- [x] 5.7 Test run leaves the development database usable
+- [x] 5.6 Deliberately breaking the scoping in `project.list` makes the isolation test fail — 8582dde
+- [x] 5.7 Test run leaves the development database usable — 8582dde
