@@ -527,29 +527,29 @@ deployment exists, so rollback is re-pushing a corrected schema.
 
 #### Automated
 
-- [x] 1.1 Schema pushes cleanly: `npm run db:push`
-- [x] 1.2 Type checking passes: `npm run typecheck`
-- [x] 1.3 Linting passes: `npm run check`
-- [x] 1.4 Existing isolation test still passes: `npm run test`
+- [x] 1.1 Schema pushes cleanly: `npm run db:push` — eefa5c0
+- [x] 1.2 Type checking passes: `npm run typecheck` — eefa5c0
+- [x] 1.3 Linting passes: `npm run check` — eefa5c0
+- [x] 1.4 Existing isolation test still passes: `npm run test` — eefa5c0
 
 #### Manual
 
-- [x] 1.5 `runs`, `pages` and `findings` exist with the `sitesmith-studio_` prefix
-- [x] 1.6 Every new table has a `tenantId` column and a foreign key to `tenants`
-- [x] 1.7 `tenantScope(runs, …)` compiles
+- [x] 1.5 `runs`, `pages` and `findings` exist with the `sitesmith-studio_` prefix — eefa5c0
+- [x] 1.6 Every new table has a `tenantId` column and a foreign key to `tenants` — eefa5c0
+- [x] 1.7 `tenantScope(runs, …)` compiles — eefa5c0
 
 ### Phase 2: Crawl engine and fixture site
 
 #### Automated
 
-- [ ] 2.1 Type checking passes: `npm run typecheck`
-- [ ] 2.2 Linting passes: `npm run check`
-- [ ] 2.3 Crawler reaches every in-scope fixture page and no out-of-scope page
-- [ ] 2.4 Excluded paths are not fetched
-- [ ] 2.5 Concurrency never exceeds the configured ceiling during a fixture crawl
-- [ ] 2.6 Inter-request delay is observed
-- [ ] 2.7 A fixture burst of 500s aborts the crawl rather than continuing
-- [ ] 2.8 A URL reachable by two spellings is crawled once
+- [x] 2.1 Type checking passes: `npm run typecheck`
+- [x] 2.2 Linting passes: `npm run check`
+- [x] 2.3 Crawler reaches every in-scope fixture page and no out-of-scope page
+- [x] 2.4 Excluded paths are not fetched
+- [x] 2.5 Concurrency never exceeds the configured ceiling during a fixture crawl
+- [x] 2.6 Inter-request delay is observed
+- [x] 2.7 A fixture burst of 500s aborts the crawl rather than continuing
+- [x] 2.8 A URL reachable by two spellings is crawled once
 
 #### Manual
 
