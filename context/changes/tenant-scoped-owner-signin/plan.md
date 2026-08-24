@@ -474,30 +474,30 @@ corrected schema.
 
 #### Automated
 
-- [x] 1.1 Schema pushes cleanly: `npm run db:push`
-- [x] 1.2 Type checking passes: `npm run typecheck`
-- [x] 1.3 Linting passes: `npm run check`
+- [x] 1.1 Schema pushes cleanly: `npm run db:push` — 42004ed
+- [x] 1.2 Type checking passes: `npm run typecheck` — 42004ed
+- [x] 1.3 Linting passes: `npm run check` — 42004ed
 
 #### Manual
 
-- [ ] 1.4 `tenants` and `projects` tables exist with the `sitesmith-studio_` prefix
-- [ ] 1.5 `users.tenantId` exists, is nullable, and has an index
-- [ ] 1.6 `projects.tenantId` is NOT NULL with a foreign key to `tenants.id`
+- [x] 1.4 `tenants` and `projects` tables exist with the `sitesmith-studio_` prefix — 42004ed
+- [x] 1.5 `users.tenantId` exists, is nullable, and has an index — 42004ed
+- [x] 1.6 `projects.tenantId` is NOT NULL with a foreign key to `tenants.id` — 42004ed
 
 ### Phase 2: Tenant-scoped access layer
 
 #### Automated
 
-- [ ] 2.1 Type checking passes: `npm run typecheck`
-- [ ] 2.2 Linting passes: `npm run check`
-- [ ] 2.3 Build succeeds: `npm run build`
-- [ ] 2.4 Schema pushes cleanly after the posts table is dropped: `npm run db:push`
-- [ ] 2.5 No reference to `postRouter` or `posts` remains in `src/`
+- [x] 2.1 Type checking passes: `npm run typecheck`
+- [x] 2.2 Linting passes: `npm run check`
+- [x] 2.3 Build succeeds: `npm run build`
+- [x] 2.4 Schema pushes cleanly after the posts table is dropped: `npm run db:push`
+- [x] 2.5 No reference to `postRouter` or `posts` remains in `src/`
 
 #### Manual
 
-- [ ] 2.6 Home page renders without errors after the demo component is removed
-- [ ] 2.7 A `tenantProcedure` refuses a session whose user has no tenant
+- [x] 2.6 Home page renders without errors after the demo component is removed
+- [x] 2.7 A `tenantProcedure` refuses a session whose user has no tenant
 
 ### Phase 3: Owner seed command
 
