@@ -9,6 +9,11 @@
 		"moduleDetection": "force",
 		"isolatedModules": true,
 		"verbatimModuleSyntax": true,
+		/* Node runs scripts/ directly via native type stripping, and its resolver
+		   requires the real .ts extension on relative imports. Safe here because
+		   noEmit is true — nothing is compiled, so the extension is never wrong
+		   at runtime. */
+		"allowImportingTsExtensions": true,
 		/* Strictness */
 		"strict": true,
 		"noUncheckedIndexedAccess": true,

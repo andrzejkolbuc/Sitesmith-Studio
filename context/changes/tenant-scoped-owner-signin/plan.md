@@ -488,30 +488,30 @@ corrected schema.
 
 #### Automated
 
-- [x] 2.1 Type checking passes: `npm run typecheck`
-- [x] 2.2 Linting passes: `npm run check`
-- [x] 2.3 Build succeeds: `npm run build`
-- [x] 2.4 Schema pushes cleanly after the posts table is dropped: `npm run db:push`
-- [x] 2.5 No reference to `postRouter` or `posts` remains in `src/`
+- [x] 2.1 Type checking passes: `npm run typecheck` — 299697a
+- [x] 2.2 Linting passes: `npm run check` — 299697a
+- [x] 2.3 Build succeeds: `npm run build` — 299697a
+- [x] 2.4 Schema pushes cleanly after the posts table is dropped: `npm run db:push` — 299697a
+- [x] 2.5 No reference to `postRouter` or `posts` remains in `src/` — 299697a
 
 #### Manual
 
-- [x] 2.6 Home page renders without errors after the demo component is removed
-- [x] 2.7 A `tenantProcedure` refuses a session whose user has no tenant
+- [x] 2.6 Home page renders without errors after the demo component is removed — 299697a
+- [x] 2.7 A `tenantProcedure` refuses a session whose user has no tenant — 299697a
 
 ### Phase 3: Owner seed command
 
 #### Automated
 
-- [ ] 3.1 Type checking passes: `npm run typecheck`
-- [ ] 3.2 Linting passes: `npm run check`
-- [ ] 3.3 Seed runs without error against the local database
-- [ ] 3.4 Re-running the seed with the same email does not error
+- [x] 3.1 Type checking passes: `npm run typecheck`
+- [x] 3.2 Linting passes: `npm run check`
+- [x] 3.3 Seed runs without error against the local database
+- [x] 3.4 Re-running the seed with the same email does not error
 
 #### Manual
 
-- [ ] 3.5 A `tenants` row and a linked `users` row exist with a non-null `passwordHash`
-- [ ] 3.6 Running the seed twice leaves exactly one user for that email
+- [x] 3.5 A `tenants` row and a linked `users` row exist with a non-null `passwordHash`
+- [x] 3.6 Running the seed twice leaves exactly one user for that email
 
 ### Phase 4: Sign-in and project list
 
