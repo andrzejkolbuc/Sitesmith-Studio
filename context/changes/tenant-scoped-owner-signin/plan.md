@@ -474,9 +474,9 @@ corrected schema.
 
 #### Automated
 
-- [ ] 1.1 Schema pushes cleanly: `npm run db:push`
-- [ ] 1.2 Type checking passes: `npm run typecheck`
-- [ ] 1.3 Linting passes: `npm run check`
+- [x] 1.1 Schema pushes cleanly: `npm run db:push`
+- [x] 1.2 Type checking passes: `npm run typecheck`
+- [x] 1.3 Linting passes: `npm run check`
 
 #### Manual
 
