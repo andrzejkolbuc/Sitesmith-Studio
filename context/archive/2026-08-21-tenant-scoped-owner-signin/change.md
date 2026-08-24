@@ -1,9 +1,10 @@
 ---
 change_id: tenant-scoped-owner-signin
 title: "Tenant-scoped records and Owner sign-in"
-status: impl_reviewed
+status: archived
 created: 2026-08-21
 updated: 2026-08-24
+archived_at: 2026-08-24T10:38:54Z
 roadmap_ref: F-01
 prd_refs: [FR-002, FR-006, FR-009, NFR-2]
 ---

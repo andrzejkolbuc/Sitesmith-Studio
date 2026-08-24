@@ -3,7 +3,7 @@ project: "Sitesmith-Studio"
 version: 1
 status: draft
 created: 2026-08-21
-updated: 2026-08-21
+updated: 2026-08-24
 prd_version: 1
 main_goal: market-feedback
 top_blocker: capacity
@@ -46,7 +46,7 @@ works.
 
 | ID   | Change ID                       | Outcome (user can …)                                                          | Prerequisites    | PRD refs                                                                             | Status   |
 | ---- | ------------------------------- | ----------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------ | -------- |
-| F-01 | tenant-scoped-owner-signin      | (foundation) records are tenant-scoped and an Owner can sign in                | —                | FR-002, FR-009, NFR-2                                                                | ready    |
+| F-01 | tenant-scoped-owner-signin      | (foundation) records are tenant-scoped and an Owner can sign in                | —                | FR-002, FR-009, NFR-2                                                                | done     |
 | F-02 | container-deploy-skeleton       | (foundation) the app runs as a container on a persistent host                  | —                | NFR-3                                                                                | ready    |
 | S-01 | first-multilingual-crawl        | define a project, crawl it, and see pages missing a language variant           | F-01             | US-01, FR-006, FR-007, FR-008, FR-011, FR-012, FR-013, FR-014, FR-024, FR-036, NFR-1 | proposed |
 | S-02 | hreflang-and-variant-parity     | see hreflang graph problems and variants that regressed while siblings did not | S-01             | US-01, FR-025, FR-026                                                                | proposed |
@@ -101,7 +101,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Blockers:** —
 - **Unknowns:** — (the sign-in path already exists and is verified; what is missing is the UI and the scoping)
 - **Risk:** Sequenced first because retrofitting tenant scoping onto existing domain tables is a migration, not an edit - and S-01 creates the first domain tables. Deliberately minimal: sign-in screen, tenant and project columns, an Owner able to see their own projects. Roles, invites and client access are S-10, not here. The failure mode to avoid is this expanding into the full account system the PRD warned would cost four weeks before the first page is ever checked.
-- **Status:** ready
+- **Status:** done
 
 ### F-02: Container deploy skeleton
 
@@ -348,4 +348,4 @@ Foundations below assume these are present and do NOT re-scaffold them.
 
 ## Done
 
-(Empty on first generation.)
+- **F-01: (foundation) every record carries the tenant and project it belongs to, and an Owner can sign in and reach their own data.** — Archived 2026-08-24 → `context/archive/2026-08-21-tenant-scoped-owner-signin/`. Lesson: —.
