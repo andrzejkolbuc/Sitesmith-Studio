@@ -218,6 +218,87 @@ describe("detectMissingVariants edge cases", () => {
 		expect(findings).toHaveLength(0);
 	});
 
+	/**
+	 * Regression guard, found by running the real interface rather than by a test.
+	 *
+	 * A page whose declared German variant 404s was reported twice: once as
+	 * "declared variant is broken", once as "no German version". One problem
+	 * wearing two names, on the very screen a user judges the product by.
+	 */
+	it("does not also report a locale as missing when its page merely failed", () => {
+		const healthy: CrawledPage = {
+			url: "https://x.test/about",
+			httpStatus: 200,
+			hreflangTargets: {
+				en: "https://x.test/about",
+				de: "https://x.test/ueber-uns",
+			},
+			links: [],
+			fetchError: null,
+		};
+		// The declared German page exists but is broken, and its URL carries no
+		// locale — so only the sibling's declaration identifies it.
+		const broken: CrawledPage = {
+			url: "https://x.test/ueber-uns",
+			httpStatus: 404,
+			hreflangTargets: {},
+			links: [],
+			fetchError: null,
+		};
+
+		const findings = detectMissingVariants({
+			pages: [healthy, broken],
+			expectedLocales: ["en", "de"],
+			inScope: allInScope,
+		});
+
+		// The breakage is reported...
+		expect(
+			findings.filter((f) => f.type === FINDING_TYPES.HREFLANG_TARGET_FAILED),
+		).toHaveLength(1);
+		// ...and not a second time as an absence.
+		expect(
+			findings.filter((f) => f.type === FINDING_TYPES.MISSING_LOCALE),
+		).toHaveLength(0);
+	});
+
+	it("still reports a locale no page claims at all", () => {
+		// The correction above must not silence a genuine gap: French is expected
+		// and nothing — working or broken — claims to be French.
+		const en: CrawledPage = {
+			url: "https://x.test/about",
+			httpStatus: 200,
+			hreflangTargets: {
+				en: "https://x.test/about",
+				de: "https://x.test/ueber-uns",
+			},
+			links: [],
+			fetchError: null,
+		};
+		const de: CrawledPage = {
+			url: "https://x.test/ueber-uns",
+			httpStatus: 200,
+			hreflangTargets: {
+				en: "https://x.test/about",
+				de: "https://x.test/ueber-uns",
+			},
+			links: [],
+			fetchError: null,
+		};
+
+		const findings = detectMissingVariants({
+			pages: [en, de],
+			expectedLocales: ["en", "de", "fr"],
+			inScope: allInScope,
+		});
+
+		const missing = findings.filter(
+			(f) => f.type === FINDING_TYPES.MISSING_LOCALE,
+		);
+		expect(missing).toHaveLength(1);
+		expect(missing[0]?.detail.missingLocale).toBe("fr");
+	});
+
 	it("ignores a family in which every member errored", () => {
 		const broken: CrawledPage = {
 			url: "https://x.test/de/gone",

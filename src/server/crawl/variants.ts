@@ -93,21 +93,50 @@ export function groupVariants(pages: CrawledPage[]): Map<string, PageVariant> {
 		}
 	}
 
+	/**
+	 * What every page says about every *other* page.
+	 *
+	 * This is what lets a broken variant still be recognised as the variant it was
+	 * meant to be. A page that 404s carries no hreflang of its own and may have no
+	 * locale in its URL, so without this it has no locale at all — and a family
+	 * containing it would be reported as missing that locale entirely, on top of
+	 * the separate finding that the variant is broken. One problem, reported twice
+	 * under two different names.
+	 *
+	 * The declaration is evidence about the target regardless of whether the
+	 * target loaded.
+	 */
+	const declaredBySiblings = new Map<string, string>();
+	for (const page of pages) {
+		for (const [locale, target] of Object.entries(page.hreflangTargets)) {
+			if (target === page.url) continue;
+			if (!declaredBySiblings.has(target)) {
+				declaredBySiblings.set(target, locale.toLowerCase());
+			}
+		}
+	}
+
 	const variants = new Map<string, PageVariant>();
 
 	for (const page of pages) {
 		/**
-		 * A page's own declaration wins over its URL shape: a site may serve
-		 * `/en/…` content under a bare path, and hreflang is the site telling us
-		 * directly rather than us inferring.
+		 * Precedence, strongest evidence first:
+		 *
+		 * 1. The page's own declaration — the site naming its own language.
+		 * 2. What a sibling declared it as — still the site speaking, just about
+		 *    this page rather than by it.
+		 * 3. The URL's shape — our inference, used only when the site said nothing.
 		 */
-		const declared = Object.entries(page.hreflangTargets).find(
+		const selfDeclared = Object.entries(page.hreflangTargets).find(
 			([, url]) => url === page.url,
 		)?.[0];
 
 		variants.set(page.url, {
 			url: page.url,
-			locale: declared?.toLowerCase() ?? localeFromUrl(page.url),
+			locale:
+				selfDeclared?.toLowerCase() ??
+				declaredBySiblings.get(page.url) ??
+				localeFromUrl(page.url),
 			groupKey: find(page.url),
 		});
 	}
