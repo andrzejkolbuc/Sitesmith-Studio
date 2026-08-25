@@ -400,15 +400,15 @@ when the run was made.
 
 #### Automated
 
-- [x] 1.1 The shapes table fails before the rule exists and passes after
-- [x] 1.2 A reciprocal family produces nothing
-- [x] 1.3 An `x-default` pointer never produces a reciprocity defect
-- [x] 1.4 A family of one produces nothing
-- [x] 1.5 One finding per family, regardless of how many members are defective
-- [x] 1.6 Mutation: removing the language-link narrowing fails the fallback-pointer case
-- [x] 1.7 Existing S-01 rule tests pass unchanged
-- [x] 1.8 Type checking passes: `npm run typecheck`
-- [x] 1.9 Linting passes: `npm run check`
+- [x] 1.1 The shapes table fails before the rule exists and passes after — 63887c5
+- [x] 1.2 A reciprocal family produces nothing — 63887c5
+- [x] 1.3 An `x-default` pointer never produces a reciprocity defect — 63887c5
+- [x] 1.4 A family of one produces nothing — 63887c5
+- [x] 1.5 One finding per family, regardless of how many members are defective — 63887c5
+- [x] 1.6 Mutation: removing the language-link narrowing fails the fallback-pointer case — 63887c5
+- [x] 1.7 Existing S-01 rule tests pass unchanged — 63887c5
+- [x] 1.8 Type checking passes: `npm run typecheck` — 63887c5
+- [x] 1.9 Linting passes: `npm run check` — 63887c5
 
 #### Manual
 
