@@ -21,6 +21,9 @@
 		"preview": "next build && next start",
 		"start": "next start",
 		"test": "npm run test:unit && npm run test:integration",
+		"test:all": "npm run test:unit && npm run test:integration && npm run test:e2e",
+		"test:e2e": "playwright test",
+		"test:e2e:ui": "playwright test --ui",
 		"test:integration": "vitest run --config vitest.integration.config.ts",
 		"test:unit": "vitest run --config vitest.unit.config.ts",
 		"test:watch": "vitest --config vitest.unit.config.ts",
@@ -45,6 +48,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.2.5",
+		"@playwright/test": "^1.62.1",
 		"@tailwindcss/postcss": "^4.0.15",
 		"@types/node": "^20.14.10",
 		"@types/react": "^19.0.0",

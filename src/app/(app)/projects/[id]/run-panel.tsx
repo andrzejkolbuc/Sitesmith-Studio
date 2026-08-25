@@ -79,9 +79,18 @@ export function RunPanel({ projectId }: { projectId: string }) {
 	return (
 		<section className="mt-8">
 			<div className="flex flex-wrap items-center gap-3">
+				{/*
+				 * Held until the latest run is known.
+				 *
+				 * Offering the control before the query settles offers an action whose
+				 * precondition is still unknown: a run may already be in progress, and
+				 * pressing it would earn a conflict error the user did nothing to
+				 * deserve. Server-rendered markup is also inert until hydration, so an
+				 * enabled button in that window silently swallows the press.
+				 */}
 				<button
 					className="rounded-md bg-neutral-100 px-4 py-2 font-medium text-neutral-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-					disabled={isActive || startRun.isPending}
+					disabled={latestRun.isPending || isActive || startRun.isPending}
 					onClick={() => startRun.mutate({ projectId })}
 					type="button"
 				>
@@ -134,7 +143,8 @@ export function RunPanel({ projectId }: { projectId: string }) {
 				/>
 			) : null}
 
-			{!run ? (
+			{/* Only once the absence of a run is a fact rather than a pending answer. */}
+			{!run && !latestRun.isPending ? (
 				<p className="mt-6 text-neutral-500 text-sm">
 					No checks have run yet. The first one will crawl the site and report
 					pages missing a language variant.

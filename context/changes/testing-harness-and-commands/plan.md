@@ -201,41 +201,71 @@ with an explanation, distinguishable from a failed run.
 
 #### Automated
 
-- [x] 1.1 `npm run test:unit` passes with the database container stopped
-- [x] 1.2 `npm run test:integration` passes and covers the database-dependent tests
-- [x] 1.3 `npm run test` runs every bucket and reports the combined result
-- [x] 1.4 Type checking passes: `npm run typecheck`
-- [x] 1.5 Linting passes: `npm run check`
+- [x] 1.1 `npm run test:unit` passes with the database container stopped — adea821
+- [x] 1.2 `npm run test:integration` passes and covers the database-dependent tests — adea821
+- [x] 1.3 `npm run test` runs every bucket and reports the combined result — adea821
+- [x] 1.4 Type checking passes: `npm run typecheck` — adea821
+- [x] 1.5 Linting passes: `npm run check` — adea821
 
 #### Manual
 
-- [x] 1.6 Test counts across buckets add up to the previous single-suite total
+- [x] 1.6 Test counts across buckets add up to the previous single-suite total — adea821
 
 ### Phase 2: Playwright harness
 
 #### Automated
 
-- [ ] 2.1 `npm run test:e2e` starts the app, runs, and exits cleanly
-- [ ] 2.2 The e2e database is created and is not the development one
-- [ ] 2.3 Type checking passes: `npm run typecheck`
-- [ ] 2.4 Linting passes: `npm run check`
+- [x] 2.1 `npm run test:e2e` starts the app, runs, and exits cleanly — 5 passed in 39s
+- [x] 2.2 The e2e database is created and is not the development one — `sitesmith-studio-e2e` created alongside `-test` and dev
+- [x] 2.3 Type checking passes: `npm run typecheck`
+- [x] 2.4 Linting passes: `npm run check` — 0 errors
 
 #### Manual
 
-- [ ] 2.5 The development database is untouched after an e2e run
+- [x] 2.5 The development database is untouched after an e2e run — tenant/user rows byte-identical to the pre-run snapshot
 
 ### Phase 3: The user journey
 
 #### Automated
 
-- [ ] 3.1 The journey passes: sign in, create, run, read a named finding
-- [ ] 3.2 The clean-run journey passes and asserts explanatory text
-- [ ] 3.3 Progress is observed changing without a page reload
-- [ ] 3.4 Both journeys pass when run twice without manual cleanup
-- [ ] 3.5 Type checking passes: `npm run typecheck`
-- [ ] 3.6 Linting passes: `npm run check`
+- [x] 3.1 The journey passes: sign in, create, run, read a named finding
+- [x] 3.2 The clean-run journey passes and asserts explanatory text
+- [x] 3.3 Progress is observed changing without a page reload — settles S-01 criterion 5.6
+- [x] 3.4 Both journeys pass when run twice without manual cleanup — three consecutive runs, no cleanup
+- [x] 3.5 Type checking passes: `npm run typecheck`
+- [x] 3.6 Linting passes: `npm run check`
 
 #### Manual
 
-- [ ] 3.7 A deliberate break in the create form fails the journey
-- [ ] 3.8 Trace output is usable when a journey fails
+- [x] 3.7 A deliberate break in the create form fails the journey — locales split on `;` — caught by the evidence-line assertion
+- [x] 3.8 Trace output is usable when a journey fails — the captured page state is how the 403 below was found
+
+## What the first browser run found
+
+Both of these were live defects, not test-harness friction. Neither was
+reachable from the unit or integration buckets, and neither was visible to the
+in-app browser pane used during S-01 — which is the case for adding this layer.
+
+**1. `next dev` 403s its own chunks when addressed as `127.0.0.1`.**
+The dev server serves build output only to origins it trusts, and the loopback
+IP is not one of them by default. Pages rendered, every chunk failed, React
+never hydrated, and the app silently ignored clicks. Fixed by addressing the
+server as `localhost` in `playwright.config.ts` rather than by adding
+`allowedDevOrigins` to shipped configuration. Worth knowing because the failure
+presents as a correct-looking page rather than as an error.
+
+**2. The run button was offered before its precondition was known.**
+`latestRun` is not prefetched, so server-rendered markup showed an enabled
+"Run a check" while the client still had no idea whether a run was already in
+progress — pressing it in that window earned a conflict error the user did
+nothing to cause. The button now holds until the query settles, which also
+removes the need for any wait in the tests: Playwright's actionability check
+already waits for enabled.
+
+## Known limit
+
+Criterion 3.7 broke locale parsing and only one of the three journey tests
+failed. The other two assert finding-category headings, which survive a garbled
+locale list because *something* is still reported missing. The evidence-line
+assertion — the one naming `fr` — is what actually pins behaviour. Category
+headings are a weaker class of assertion and should not be mistaken for one.
