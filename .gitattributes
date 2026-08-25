@@ -1,0 +1,34 @@
+# Line endings
+#
+# Without this, git guesses per file and — with core.autocrlf=true on Windows —
+# warns on every file of every commit. Worse, the same file can round-trip
+# differently on two machines, producing diffs that are pure line-ending churn.
+#
+# `text=auto eol=lf` normalises everything to LF in the repository while letting
+# Windows working copies keep CRLF. The repository stays consistent no matter
+# which machine or CI runner touches it.
+* text=auto eol=lf
+
+# Shell scripts must keep LF even in the working copy. A CRLF line ending makes
+# the shebang read as `/usr/bin/env bash\r`, which fails with a confusing
+# "bad interpreter" error inside a Linux container.
+*.sh text eol=lf
+
+# Windows-only scripts, conversely, want CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary — never touch, never diff.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+
+# Generated. Collapsed in diffs and excluded from language statistics; still
+# committed, still reviewable when you ask for it explicitly.
+package-lock.json linguist-generated=true -diff
