@@ -69,7 +69,7 @@ status values.
 |---|-------|----------------------------------|-------|------------|--------|---------------|
 | 1 | Harness and commands | A user can complete the whole journey in a real browser, and the suite can be run in useful slices rather than all-or-nothing | R4 | End-to-end (browser), test-command split | complete | `context/changes/testing-harness-and-commands/` |
 | 2 | Auth and abuse behaviours | Identity holds under misuse: wrong passwords fail, partial accounts are explained, another tenant's identifier opens nothing, and sign-in leaks nothing about who has an account | R3, R5, R6, R7 | Unit, integration, end-to-end | complete | `context/changes/auth-and-abuse-behaviours/` |
-| 3 | Detection-rule confidence | The rules agree with human judgement across site shapes they have never seen, and stay silent where a human would | R1 | Table-driven unit tests | not started | — |
+| 3 | Detection-rule confidence | The rules agree with human judgement across site shapes they have never seen, and stay silent where a human would | R1 | Table-driven unit tests | complete | `context/changes/detection-rule-confidence/` |
 | 4 | Politeness under stress | A slow, flapping or hostile site causes the run to stop rather than escalate, and every run terminates | R2 | Integration against an adversarial fixture | not started | — |
 
 **Order rationale.** Phase 1 first because it covers the widest untested surface
