@@ -14,6 +14,7 @@ import {
 	tenants,
 	users,
 } from "../src/server/db/schema";
+import { resetDatabase } from "../test/reset";
 
 /**
  * Brings up a known world before any browser opens.
@@ -33,6 +34,20 @@ export const E2E_OWNER = {
 	tenant: "E2E Agency",
 	email: "e2e-owner@sitesmith.test",
 	password: "e2e-password-not-a-secret",
+} as const;
+
+/**
+ * An account that authenticates but belongs to no workspace.
+ *
+ * Reachable by design rather than by accident: `users.tenantId` is nullable so
+ * the Auth.js adapter can create rows, and the invite flow on the roadmap will
+ * create more states like it. Seeded here so the journeys can sign in as a
+ * partial identity without building one through the interface, which there is
+ * currently no way to do.
+ */
+export const E2E_ORPHAN = {
+	email: "e2e-orphan@sitesmith.test",
+	password: "e2e-orphan-not-a-secret",
 } as const;
 
 export default async function globalSetup() {
@@ -87,13 +102,7 @@ export default async function globalSetup() {
 	});
 
 	try {
-		// Order matters: findings and pages reference runs, runs reference projects.
-		await db.delete(findings);
-		await db.delete(pages);
-		await db.delete(runs);
-		await db.delete(projects);
-		await db.delete(users);
-		await db.delete(tenants);
+		await resetDatabase(connection);
 
 		const [tenant] = await db
 			.insert(tenants)
@@ -105,6 +114,12 @@ export default async function globalSetup() {
 			email: E2E_OWNER.email,
 			tenantId: tenant.id,
 			passwordHash: await hashPassword(E2E_OWNER.password),
+		});
+
+		// Deliberately no tenantId: this is the partial state, not a broken seed.
+		await db.insert(users).values({
+			email: E2E_ORPHAN.email,
+			passwordHash: await hashPassword(E2E_ORPHAN.password),
 		});
 
 		// Prove the seeded account is reachable the way sign-in will look for it.

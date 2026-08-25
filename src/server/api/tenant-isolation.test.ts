@@ -1,7 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-
 import { appRouter, createCaller } from "~/server/api/root";
 import {
 	findings,
@@ -11,6 +10,7 @@ import {
 	tenants,
 	users,
 } from "~/server/db/schema";
+import { resetDatabase } from "../../../test/reset";
 
 /**
  * Tenant isolation, asserted against the router rather than against a list of
@@ -203,13 +203,7 @@ function fingerprints(victim: Seed): Array<[label: string, value: string]> {
 }
 
 beforeEach(async () => {
-	// Order matters: findings and pages reference runs, runs reference projects.
-	await db.delete(findings);
-	await db.delete(pages);
-	await db.delete(runs);
-	await db.delete(projects);
-	await db.delete(users);
-	await db.delete(tenants);
+	await resetDatabase(connection);
 });
 
 afterAll(async () => {
@@ -218,12 +212,7 @@ afterAll(async () => {
 	 * sequentially, and a leftover run row would make the next file's `delete
 	 * projects` fail on a foreign key rather than on anything it did wrong.
 	 */
-	await db.delete(findings);
-	await db.delete(pages);
-	await db.delete(runs);
-	await db.delete(projects);
-	await db.delete(users);
-	await db.delete(tenants);
+	await resetDatabase(connection);
 	await connection.end();
 });
 

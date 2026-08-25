@@ -1,8 +1,8 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-
 import { tenants, users } from "~/server/db/schema";
+import { resetDatabase } from "../../../test/reset";
 import { authConfig } from "./config";
 import { hashPassword } from "./password";
 
@@ -101,13 +101,11 @@ async function seedKnownUser(options: { withPassword: boolean }) {
 }
 
 beforeEach(async () => {
-	await db.delete(users);
-	await db.delete(tenants);
+	await resetDatabase(connection);
 });
 
 afterAll(async () => {
-	await db.delete(users);
-	await db.delete(tenants);
+	await resetDatabase(connection);
 	await connection.end();
 });
 

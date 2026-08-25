@@ -26,6 +26,9 @@ export default defineConfig({
 			"src/server/crawl/crawler.test.ts",
 			"src/server/crawl/findings.test.ts",
 			"src/server/auth/**/*.test.ts",
+			// The guard on the reset helper. Contacts no database: the connection is
+			// lazy and every case is refused before a query is issued.
+			"test/**/*.test.ts",
 		],
 		/**
 		 * The escape hatch for the include above: an auth test that needs a real

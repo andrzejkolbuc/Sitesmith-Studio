@@ -13,6 +13,7 @@ import {
 	users,
 } from "~/server/db/schema";
 import { type Fixture, startFixtureSite } from "../../../test/fixtures/site";
+import { resetDatabase } from "../../../test/reset";
 import { RUN_STATUS, runToCompletion, sweepStaleRuns } from "./run";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
@@ -39,13 +40,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-	// Order matters: findings and pages reference runs, runs reference projects.
-	await db.delete(findings);
-	await db.delete(pages);
-	await db.delete(runs);
-	await db.delete(projects);
-	await db.delete(users);
-	await db.delete(tenants);
+	await resetDatabase(connection);
 });
 
 async function seedProject(label: string) {

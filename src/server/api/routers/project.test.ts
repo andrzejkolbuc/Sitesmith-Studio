@@ -2,9 +2,9 @@ import { TRPCError } from "@trpc/server";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-
 import { createCaller } from "~/server/api/root";
 import { projects, tenants, users } from "~/server/db/schema";
+import { resetDatabase } from "../../../../test/reset";
 
 /**
  * The test this whole change exists to make possible.
@@ -78,10 +78,7 @@ async function seedTenant(label: string) {
 }
 
 beforeEach(async () => {
-	// Order matters: projects and users both reference tenants.
-	await db.delete(projects);
-	await db.delete(users);
-	await db.delete(tenants);
+	await resetDatabase(connection);
 });
 
 afterAll(async () => {
