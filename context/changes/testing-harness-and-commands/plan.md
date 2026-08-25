@@ -215,30 +215,30 @@ with an explanation, distinguishable from a failed run.
 
 #### Automated
 
-- [x] 2.1 `npm run test:e2e` starts the app, runs, and exits cleanly — 5 passed in 39s
-- [x] 2.2 The e2e database is created and is not the development one — `sitesmith-studio-e2e` created alongside `-test` and dev
-- [x] 2.3 Type checking passes: `npm run typecheck`
-- [x] 2.4 Linting passes: `npm run check` — 0 errors
+- [x] 2.1 `npm run test:e2e` starts the app, runs, and exits cleanly — 5 passed in 39s — 52563f8
+- [x] 2.2 The e2e database is created and is not the development one — `sitesmith-studio-e2e` created alongside `-test` and dev — 52563f8
+- [x] 2.3 Type checking passes: `npm run typecheck` — 52563f8
+- [x] 2.4 Linting passes: `npm run check` — 0 errors — 52563f8
 
 #### Manual
 
-- [x] 2.5 The development database is untouched after an e2e run — tenant/user rows byte-identical to the pre-run snapshot
+- [x] 2.5 The development database is untouched after an e2e run — tenant/user rows byte-identical to the pre-run snapshot — 52563f8
 
 ### Phase 3: The user journey
 
 #### Automated
 
-- [x] 3.1 The journey passes: sign in, create, run, read a named finding
-- [x] 3.2 The clean-run journey passes and asserts explanatory text
-- [x] 3.3 Progress is observed changing without a page reload — settles S-01 criterion 5.6
-- [x] 3.4 Both journeys pass when run twice without manual cleanup — three consecutive runs, no cleanup
-- [x] 3.5 Type checking passes: `npm run typecheck`
-- [x] 3.6 Linting passes: `npm run check`
+- [x] 3.1 The journey passes: sign in, create, run, read a named finding — 52563f8
+- [x] 3.2 The clean-run journey passes and asserts explanatory text — 52563f8
+- [x] 3.3 Progress is observed changing without a page reload — settles S-01 criterion 5.6 — 52563f8
+- [x] 3.4 Both journeys pass when run twice without manual cleanup — three consecutive runs, no cleanup — 52563f8
+- [x] 3.5 Type checking passes: `npm run typecheck` — 52563f8
+- [x] 3.6 Linting passes: `npm run check` — 52563f8
 
 #### Manual
 
-- [x] 3.7 A deliberate break in the create form fails the journey — locales split on `;` — caught by the evidence-line assertion
-- [x] 3.8 Trace output is usable when a journey fails — the captured page state is how the 403 below was found
+- [x] 3.7 A deliberate break in the create form fails the journey — locales split on `;` — caught by the evidence-line assertion — 52563f8
+- [x] 3.8 Trace output is usable when a journey fails — the captured page state is how the 403 below was found — 52563f8
 
 ## What the first browser run found
 
