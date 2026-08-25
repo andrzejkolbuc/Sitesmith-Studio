@@ -37,7 +37,13 @@ export default defineConfig({
 	resolve,
 	test: {
 		environment: "node",
-		include: ["src/server/api/**/*.test.ts", "src/server/crawl/run.test.ts"],
+		include: [
+			"src/server/api/**/*.test.ts",
+			"src/server/crawl/run.test.ts",
+			// Tests that live beside unit tests but need Postgres. See the exclude
+			// in vitest.unit.config.ts.
+			"src/server/**/*.integration.test.ts",
+		],
 		globalSetup: ["./test/global-setup.ts"],
 		env: {
 			...process.env,

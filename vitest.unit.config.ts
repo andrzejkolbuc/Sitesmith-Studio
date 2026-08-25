@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 import { inlineDeps, resolve } from "./vitest.shared";
 
@@ -27,6 +27,14 @@ export default defineConfig({
 			"src/server/crawl/findings.test.ts",
 			"src/server/auth/**/*.test.ts",
 		],
+		/**
+		 * The escape hatch for the include above: an auth test that needs a real
+		 * database names itself `*.integration.test.ts` and is picked up by the
+		 * other config instead. Without this, adding one database-backed test under
+		 * `src/server/auth/` would silently cost this bucket its no-dependencies
+		 * guarantee.
+		 */
+		exclude: [...configDefaults.exclude, "**/*.integration.test.ts"],
 		env: {
 			...process.env,
 			// The app validates env at import time; nothing here signs anything.

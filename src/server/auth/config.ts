@@ -30,7 +30,17 @@ declare module "next-auth" {
 }
 
 const credentialsSchema = z.object({
-	email: z.string().email(),
+	/**
+	 * Trimmed before validation, not after.
+	 *
+	 * The handler below lowercases and trims the address, which only ever
+	 * described half of what happens: a value with surrounding whitespace fails
+	 * `.email()` and is rejected here, so the trim downstream never saw it. The
+	 * user gets "invalid credentials" for a correct password because their
+	 * autofill appended a space — and, since the address is what identifies the
+	 * row, no amount of retyping the password fixes it.
+	 */
+	email: z.string().trim().email(),
 	password: z.string().min(1),
 });
 
