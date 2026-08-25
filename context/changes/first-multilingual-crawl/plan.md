@@ -542,14 +542,14 @@ deployment exists, so rollback is re-pushing a corrected schema.
 
 #### Automated
 
-- [x] 2.1 Type checking passes: `npm run typecheck`
-- [x] 2.2 Linting passes: `npm run check`
-- [x] 2.3 Crawler reaches every in-scope fixture page and no out-of-scope page
-- [x] 2.4 Excluded paths are not fetched
-- [x] 2.5 Concurrency never exceeds the configured ceiling during a fixture crawl
-- [x] 2.6 Inter-request delay is observed
-- [x] 2.7 A fixture burst of 500s aborts the crawl rather than continuing
-- [x] 2.8 A URL reachable by two spellings is crawled once
+- [x] 2.1 Type checking passes: `npm run typecheck` — 4a2dada
+- [x] 2.2 Linting passes: `npm run check` — 4a2dada
+- [x] 2.3 Crawler reaches every in-scope fixture page and no out-of-scope page — 4a2dada
+- [x] 2.4 Excluded paths are not fetched — 4a2dada
+- [x] 2.5 Concurrency never exceeds the configured ceiling during a fixture crawl — 4a2dada
+- [x] 2.6 Inter-request delay is observed — 4a2dada
+- [x] 2.7 A fixture burst of 500s aborts the crawl rather than continuing — 4a2dada
+- [x] 2.8 A URL reachable by two spellings is crawled once — 4a2dada
 
 #### Manual
 
@@ -560,13 +560,13 @@ deployment exists, so rollback is re-pushing a corrected schema.
 
 #### Automated
 
-- [ ] 3.1 Type checking passes: `npm run typecheck`
-- [ ] 3.2 Linting passes: `npm run check`
-- [ ] 3.3 Grouping is identical regardless of the order pages are supplied
-- [ ] 3.4 A one-directional hreflang declaration still groups both pages
-- [ ] 3.5 Each of the four rules fires exactly once on the fixture site
-- [ ] 3.6 The monolingual fixture page produces no finding
-- [ ] 3.7 The out-of-scope hreflang target does not fire rule 3
+- [x] 3.1 Type checking passes: `npm run typecheck`
+- [x] 3.2 Linting passes: `npm run check`
+- [x] 3.3 Grouping is identical regardless of the order pages are supplied
+- [x] 3.4 A one-directional hreflang declaration still groups both pages
+- [x] 3.5 Each of the four rules fires exactly once on the fixture site
+- [x] 3.6 The monolingual fixture page produces no finding
+- [x] 3.7 The out-of-scope hreflang target does not fire rule 3
 
 #### Manual
 

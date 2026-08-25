@@ -1,0 +1,240 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { type Fixture, startFixtureSite } from "../../../test/fixtures/site";
+import { type CrawledPage, crawl } from "./crawler";
+import { detectMissingVariants, FINDING_TYPES } from "./findings";
+import { groupVariants, localeFromUrl } from "./variants";
+
+let site: Fixture;
+
+beforeAll(async () => {
+	site = await startFixtureSite();
+});
+
+afterAll(async () => {
+	await site.close();
+});
+
+/** Minimal page record, for grouping tests that need no HTTP. */
+const page = (
+	url: string,
+	hreflangTargets: Record<string, string> = {},
+): CrawledPage => ({
+	url,
+	httpStatus: 200,
+	hreflangTargets,
+	links: [],
+	fetchError: null,
+});
+
+describe("localeFromUrl", () => {
+	it("recognises locale segments", () => {
+		expect(localeFromUrl("https://x.test/de/preise")).toBe("de");
+		expect(localeFromUrl("https://x.test/fr-ca/tarifs")).toBe("fr-ca");
+		expect(localeFromUrl("https://x.test/pt_BR/precos")).toBe("pt-br");
+	});
+
+	it("does not mistake ordinary path segments for locales", () => {
+		// The narrowing depends on this: a loose pattern would manufacture
+		// findings on monolingual sites.
+		expect(localeFromUrl("https://x.test/design/system")).toBeNull();
+		expect(localeFromUrl("https://x.test/blog/post")).toBeNull();
+		expect(localeFromUrl("https://x.test/")).toBeNull();
+	});
+});
+
+describe("groupVariants", () => {
+	it("produces the same grouping regardless of page order", () => {
+		const a = page("https://x.test/a", {
+			en: "https://x.test/a",
+			de: "https://x.test/b",
+		});
+		const b = page("https://x.test/b", {
+			en: "https://x.test/a",
+			de: "https://x.test/b",
+		});
+		const c = page("https://x.test/c");
+
+		const forward = groupVariants([a, b, c]);
+		const reversed = groupVariants([c, b, a]);
+
+		expect(forward.get(a.url)?.groupKey).toBe(reversed.get(a.url)?.groupKey);
+		expect(forward.get(b.url)?.groupKey).toBe(reversed.get(b.url)?.groupKey);
+		expect(forward.get(a.url)?.groupKey).toBe(forward.get(b.url)?.groupKey);
+	});
+
+	it("treats a one-directional declaration as a relationship", () => {
+		// Real sites frequently declare hreflang on only one side of a pair.
+		const a = page("https://x.test/a", { de: "https://x.test/b" });
+		const b = page("https://x.test/b");
+
+		const groups = groupVariants([a, b]);
+
+		expect(groups.get(a.url)?.groupKey).toBe(groups.get(b.url)?.groupKey);
+	});
+
+	it("does not group a declared sibling the crawl never reached", () => {
+		// An unreachable URL must stay a finding, not silently satisfy a locale.
+		const a = page("https://x.test/a", { de: "https://x.test/never-crawled" });
+
+		const groups = groupVariants([a]);
+
+		expect(groups.size).toBe(1);
+		expect(groups.get(a.url)?.groupKey).toBe(a.url);
+	});
+
+	it("leaves an unrelated page in its own group", () => {
+		const groups = groupVariants([page("https://x.test/solo")]);
+
+		expect(groups.get("https://x.test/solo")?.groupKey).toBe(
+			"https://x.test/solo",
+		);
+	});
+});
+
+describe("detectMissingVariants against the fixture site", () => {
+	async function detect() {
+		const result = await crawl({
+			startUrl: site.baseUrl,
+			includePaths: [],
+			excludePaths: ["/private", "/flaky"],
+			maxConcurrency: 2,
+			requestDelayMs: 0,
+			maxPages: 50,
+		});
+
+		const inScope = (url: string) => {
+			const path = new URL(url).pathname;
+			return !path.startsWith("/private") && !path.startsWith("/flaky");
+		};
+
+		return {
+			pages: result.pages,
+			findings: detectMissingVariants({
+				pages: result.pages,
+				expectedLocales: ["en", "de", "fr"],
+				inScope,
+			}),
+		};
+	}
+
+	it("reports families that publish only two of three expected locales", async () => {
+		const { findings } = await detect();
+		const missing = findings.filter(
+			(f) => f.type === FINDING_TYPES.MISSING_LOCALE,
+		);
+
+		/**
+		 * Two families qualify, both missing French:
+		 *   /pricing + /de/preise  — en and de both healthy
+		 *   /contact + /de/kontakt — de present but broken, which rule 2 reports
+		 *
+		 * The single-page families (/about, /de/blog-post) are deliberately absent:
+		 * one page is not evidence the site translates that content.
+		 */
+		expect(missing).toHaveLength(2);
+		expect(missing.every((f) => f.detail.missingLocale === "fr")).toBe(true);
+	});
+
+	it("does not report a lone locale-shaped page as missing its siblings", async () => {
+		const { findings } = await detect();
+
+		// /de/blog-post has no family. It should produce a no-hreflang finding
+		// and nothing about absent English or French versions.
+		const aboutBlogPost = findings.filter(
+			(f) => f.detail.groupKey === `${site.baseUrl}/de/blog-post`,
+		);
+
+		expect(aboutBlogPost).toHaveLength(0);
+	});
+
+	it("reports a declared sibling that returned an error", async () => {
+		const { findings } = await detect();
+		const failed = findings.filter(
+			(f) => f.type === FINDING_TYPES.HREFLANG_TARGET_FAILED,
+		);
+
+		// /contact declares /de/kontakt, which 404s.
+		expect(failed).toHaveLength(1);
+		expect(failed[0]?.detail.target).toBe(`${site.baseUrl}/de/kontakt`);
+		expect(failed[0]?.detail.httpStatus).toBe(404);
+	});
+
+	it("does not report a declared sibling that is out of scope", async () => {
+		const { findings } = await detect();
+		const unreached = findings.filter(
+			(f) => f.type === FINDING_TYPES.HREFLANG_TARGET_UNREACHED,
+		);
+
+		// /about declares /private/ueber-uns, which the scope excludes.
+		expect(unreached).toHaveLength(0);
+	});
+
+	it("reports a locale-shaped URL that declares nothing", async () => {
+		const { findings } = await detect();
+		const silent = findings.filter((f) => f.type === FINDING_TYPES.NO_HREFLANG);
+
+		expect(silent).toHaveLength(1);
+		expect(silent[0]?.url).toBe(`${site.baseUrl}/de/blog-post`);
+		expect(silent[0]?.detail.impliedLocale).toBe("de");
+	});
+
+	/**
+	 * The single most important assertion in this change.
+	 *
+	 * Rule 4 was narrowed specifically so an ordinary monolingual page stays
+	 * silent. If this ever fails, the narrowing has regressed and the first run
+	 * anyone looks at will be mostly noise.
+	 */
+	it("says nothing about a monolingual page with no hreflang", async () => {
+		const { findings } = await detect();
+		const monolingual = `${site.baseUrl}/blog/monolingual`;
+
+		expect(findings.filter((f) => f.url === monolingual)).toHaveLength(0);
+	});
+
+	it("produces identical output across two runs of the same site", async () => {
+		const first = await detect();
+		const second = await detect();
+
+		expect(JSON.stringify(second.findings)).toBe(
+			JSON.stringify(first.findings),
+		);
+	});
+});
+
+describe("detectMissingVariants edge cases", () => {
+	const allInScope = () => true;
+
+	it("does not report missing locales for a family with no locale evidence", async () => {
+		// Two unrelated pages, neither declaring anything. Expecting three locales
+		// must not turn each into three findings.
+		const findings = detectMissingVariants({
+			pages: [page("https://x.test/a"), page("https://x.test/b")],
+			expectedLocales: ["en", "de", "fr"],
+			inScope: allInScope,
+		});
+
+		expect(findings).toHaveLength(0);
+	});
+
+	it("ignores a family in which every member errored", () => {
+		const broken: CrawledPage = {
+			url: "https://x.test/de/gone",
+			httpStatus: 500,
+			hreflangTargets: {},
+			links: [],
+			fetchError: null,
+		};
+
+		const findings = detectMissingVariants({
+			pages: [broken],
+			expectedLocales: ["en", "de"],
+			inScope: allInScope,
+		});
+
+		expect(
+			findings.filter((f) => f.type === FINDING_TYPES.MISSING_LOCALE),
+		).toHaveLength(0);
+	});
+});

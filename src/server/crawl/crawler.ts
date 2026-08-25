@@ -252,7 +252,21 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 				return;
 			}
 
-			for (const link of page.links) {
+			/**
+			 * Declared variants are enqueued alongside ordinary links.
+			 *
+			 * Without this, an hreflang target that nothing links to is never
+			 * fetched, and the product cannot distinguish a variant that is broken
+			 * from one that merely isn't in the navigation — which is most of what
+			 * it exists to tell you. A site declaring `/de/kontakt` is asserting
+			 * that page exists; checking the assertion is the job.
+			 */
+			const candidates = [
+				...page.links,
+				...Object.values(page.hreflangTargets),
+			];
+
+			for (const link of candidates) {
 				if (seen.has(link)) continue;
 				if (!inScope(link, origin, includePaths, excludePaths)) continue;
 				seen.add(link);
