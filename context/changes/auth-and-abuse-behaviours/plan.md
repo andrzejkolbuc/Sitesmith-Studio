@@ -62,19 +62,19 @@ original failure is.
 
 ### Partial accounts — R5
 
-- [x] 5.1 Every gated route derived from the filesystem, not listed
-- [x] 5.2 Each route explains itself and returns no 5xx
-- [x] 5.3 A partial account is not bounced back to sign in
-- [x] 5.4 Signing out from the notice actually ends the session
-- [x] 5.5 The route derivation is guarded against finding nothing
-- [x] 5.6 Mutation: disabling the tenant check fails all five behavioural tests
+- [x] 5.1 Every gated route derived from the filesystem, not listed — 4636bc5
+- [x] 5.2 Each route explains itself and returns no 5xx — 4636bc5
+- [x] 5.3 A partial account is not bounced back to sign in — 4636bc5
+- [x] 5.4 Signing out from the notice actually ends the session — 4636bc5
+- [x] 5.5 The route derivation is guarded against finding nothing — 4636bc5
+- [x] 5.6 Mutation: disabling the tenant check fails all five behavioural tests — 4636bc5
 
 ### Whole suite
 
-- [x] W.1 `npm run test:all` green — 62 unit, 28 integration, 11 end-to-end
-- [x] W.2 Type checking passes: `npm run typecheck`
-- [x] W.3 Linting passes: `npm run check`
-- [x] W.4 The unit bucket still needs no database
+- [x] W.1 `npm run test:all` green — 62 unit, 28 integration, 11 end-to-end — 4636bc5
+- [x] W.2 Type checking passes: `npm run typecheck` — 4636bc5
+- [x] W.3 Linting passes: `npm run check` — 4636bc5
+- [x] W.4 The unit bucket still needs no database — 4636bc5
 
 ## What this phase found
 
