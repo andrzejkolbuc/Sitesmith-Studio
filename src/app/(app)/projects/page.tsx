@@ -23,40 +23,60 @@ export default async function ProjectsPage() {
 						</p>
 					</div>
 
-					<form
-						action={async () => {
-							"use server";
-							await signOut({ redirectTo: "/" });
-						}}
-					>
-						<button
-							className="text-neutral-400 text-sm underline-offset-4 transition hover:text-neutral-100 hover:underline"
-							type="submit"
+					<div className="flex items-center gap-4">
+						<Link
+							className="rounded-md bg-neutral-100 px-3 py-1.5 font-medium text-neutral-950 text-sm transition hover:bg-white"
+							href="/projects/new"
 						>
-							Sign out
-						</button>
-					</form>
+							New project
+						</Link>
+
+						<form
+							action={async () => {
+								"use server";
+								await signOut({ redirectTo: "/" });
+							}}
+						>
+							<button
+								className="text-neutral-400 text-sm underline-offset-4 transition hover:text-neutral-100 hover:underline"
+								type="submit"
+							>
+								Sign out
+							</button>
+						</form>
+					</div>
 				</header>
 
 				{projects.length === 0 ? (
 					<div className="mt-10 rounded-lg border border-neutral-800 border-dashed p-8 text-center">
 						<p className="font-medium text-neutral-300">No projects yet</p>
 						<p className="mt-2 text-neutral-500 text-sm">
-							Creating and configuring projects arrives with the crawling work.
-							Until then, the seed command is what puts rows here.
+							Add a client site and run a check against it to see which pages
+							are missing a language variant.
 						</p>
 						<Link
-							className="mt-4 inline-block text-neutral-400 text-sm underline-offset-4 hover:text-neutral-100 hover:underline"
-							href="/"
+							className="mt-4 inline-block rounded-md bg-neutral-100 px-4 py-2 font-medium text-neutral-950 text-sm transition hover:bg-white"
+							href="/projects/new"
 						>
-							Back to home
+							Create your first project
 						</Link>
 					</div>
 				) : (
 					<ul className="mt-8 divide-y divide-neutral-800 border-neutral-800 border-y">
 						{projects.map((project) => (
-							<li className="py-4" key={project.id}>
-								<span className="font-medium">{project.name}</span>
+							<li key={project.id}>
+								<Link
+									className="flex flex-col gap-1 py-4 transition hover:bg-neutral-900/50"
+									href={`/projects/${project.id}`}
+								>
+									<span className="font-medium">{project.name}</span>
+									<span className="break-all text-neutral-500 text-sm">
+										{project.startUrl}
+										{project.locales.length > 0
+											? ` · ${project.locales.join(", ")}`
+											: null}
+									</span>
+								</Link>
 							</li>
 						))}
 					</ul>

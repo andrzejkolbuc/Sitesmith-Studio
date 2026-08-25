@@ -577,13 +577,13 @@ deployment exists, so rollback is re-pushing a corrected schema.
 
 #### Automated
 
-- [x] 4.1 Type checking passes: `npm run typecheck`
-- [x] 4.2 Linting passes: `npm run check`
-- [x] 4.3 A triggered run against the fixture site completes and reaches `done`
-- [x] 4.4 Pages and findings are persisted and readable through the API
-- [x] 4.5 A second trigger while a run is active is refused
-- [x] 4.6 Runs left `running` are closed as `interrupted` by the sweep
-- [x] 4.7 Another tenant cannot read a run, its pages or its findings through any procedure
+- [x] 4.1 Type checking passes: `npm run typecheck` — 4a452fd
+- [x] 4.2 Linting passes: `npm run check` — 4a452fd
+- [x] 4.3 A triggered run against the fixture site completes and reaches `done` — 4a452fd
+- [x] 4.4 Pages and findings are persisted and readable through the API — 4a452fd
+- [x] 4.5 A second trigger while a run is active is refused — 4a452fd
+- [x] 4.6 Runs left `running` are closed as `interrupted` by the sweep — 4a452fd
+- [x] 4.7 Another tenant cannot read a run, its pages or its findings through any procedure — 4a452fd
 
 #### Manual
 
@@ -594,15 +594,15 @@ deployment exists, so rollback is re-pushing a corrected schema.
 
 #### Automated
 
-- [ ] 5.1 Type checking passes: `npm run typecheck`
-- [ ] 5.2 Linting passes: `npm run check`
-- [ ] 5.3 Build succeeds: `npm run build`
-- [ ] 5.4 Full test suite passes: `npm run test`
+- [x] 5.1 Type checking passes: `npm run typecheck`
+- [x] 5.2 Linting passes: `npm run check`
+- [x] 5.3 Build succeeds: `npm run build`
+- [x] 5.4 Full test suite passes: `npm run test`
 
 #### Manual
 
-- [ ] 5.5 Creating a project through the form produces a crawlable project
+- [x] 5.5 Creating a project through the form produces a crawlable project
 - [ ] 5.6 Triggering a run shows progress and then findings without a manual reload
-- [ ] 5.7 The findings shown match what the site actually contains
-- [ ] 5.8 An Owner from another tenant cannot reach the project detail page by URL
-- [ ] 5.9 A clean run reads as "nothing found", not as an error or a blank page
+- [x] 5.7 The findings shown match what the site actually contains
+- [x] 5.8 An Owner from another tenant cannot reach the project detail page by URL
+- [x] 5.9 A clean run reads as "nothing found", not as an error or a blank page
