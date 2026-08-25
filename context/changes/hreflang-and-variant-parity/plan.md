@@ -120,11 +120,22 @@ never failed is not evidence.
 
 ## Critical Implementation Details
 
-**`x-default` and reciprocity.** A page declaring `x-default` pointing at a
-sibling is not declaring that sibling's language, and the sibling has nothing to
-declare back. Reciprocity must be computed over language-tag edges only, using
-the existing `isLanguageTag`. Without this, every site using a fallback pointer —
-which is most of them — reports a non-reciprocal edge that is not one.
+**`x-default` and reciprocity — corrected during Phase 1.** This originally
+claimed that counting a fallback pointer as an edge would report false
+non-reciprocity. That is wrong, and the mutation proving it was written and run:
+filtering by `isLanguageTag` makes the rule *stricter*, not more forgiving, so
+removing the filter fails nothing. The reasoning had been carried over from the
+Phase 3 locale-assignment defect, where `x-default` genuinely did corrupt a
+page's locale.
+
+The real defect sits one level up. `groupVariants` unions on every declared
+target, fallback pointers included, so a language-selector page named only by
+`x-default` arrives as a family member. On a site with entirely correct hreflang
+that produced four defects: the selector blamed for naming no siblings, and
+every real variant blamed for not naming the selector. Rule 5 therefore judges
+only the members a family reaches by a language edge. Declaring itself does not
+count as a link — a page naming only its own language has said nothing about
+being related to anyone.
 
 **Self-declaration is not an inbound edge.** `declaredBySiblings` already skips
 `target === page.url`. The reciprocity comparison needs the same exclusion from
@@ -190,7 +201,7 @@ edge).
 - An `x-default` pointer never produces a reciprocity defect
 - A family of one produces nothing
 - One finding per family, regardless of how many members are defective
-- Mutation: removing the `isLanguageTag` gate fails the `x-default` case
+- Mutation: removing the language-link narrowing fails the fallback-pointer case
 - Existing S-01 rule tests pass unchanged: `npm run test:unit`
 - Type checking passes: `npm run typecheck`
 - Linting passes: `npm run check`
@@ -389,15 +400,15 @@ when the run was made.
 
 #### Automated
 
-- [ ] 1.1 The shapes table fails before the rule exists and passes after
-- [ ] 1.2 A reciprocal family produces nothing
-- [ ] 1.3 An `x-default` pointer never produces a reciprocity defect
-- [ ] 1.4 A family of one produces nothing
-- [ ] 1.5 One finding per family, regardless of how many members are defective
-- [ ] 1.6 Mutation: removing the `isLanguageTag` gate fails the `x-default` case
-- [ ] 1.7 Existing S-01 rule tests pass unchanged
-- [ ] 1.8 Type checking passes: `npm run typecheck`
-- [ ] 1.9 Linting passes: `npm run check`
+- [x] 1.1 The shapes table fails before the rule exists and passes after
+- [x] 1.2 A reciprocal family produces nothing
+- [x] 1.3 An `x-default` pointer never produces a reciprocity defect
+- [x] 1.4 A family of one produces nothing
+- [x] 1.5 One finding per family, regardless of how many members are defective
+- [x] 1.6 Mutation: removing the language-link narrowing fails the fallback-pointer case
+- [x] 1.7 Existing S-01 rule tests pass unchanged
+- [x] 1.8 Type checking passes: `npm run typecheck`
+- [x] 1.9 Linting passes: `npm run check`
 
 #### Manual
 

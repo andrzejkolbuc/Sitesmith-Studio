@@ -1,5 +1,10 @@
 import type { CrawledPage } from "./crawler";
-import { groupVariants, localeFromUrl, type PageVariant } from "./variants";
+import {
+	groupFamilies,
+	groupVariants,
+	localeFromUrl,
+	type PageVariant,
+} from "./variants";
 
 /**
  * Turning what the crawl observed into what the product concluded.
@@ -20,6 +25,8 @@ export const FINDING_TYPES = {
 	HREFLANG_TARGET_UNREACHED: "hreflang_target_unreached",
 	/** A locale-shaped URL declaring no alternates at all. */
 	NO_HREFLANG: "no_hreflang",
+	/** A family whose members' declarations disagree with each other. */
+	HREFLANG_FAMILY_INCONSISTENT: "hreflang_family_inconsistent",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -173,6 +180,122 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 				});
 			}
 		}
+	}
+
+	// ── Rule 5: a family whose declarations disagree with each other ──────────
+	//
+	// FR-025's remaining half. "Pointing at dead URLs" is rules 2 and 3; this is
+	// non-reciprocal and incomplete, plus the self-reference the hreflang
+	// guidance requires of every page in a set.
+	//
+	// One finding per family, never per page or per edge. A template emitting a
+	// partial alternate list breaks every page it renders, so per-edge reporting
+	// would make the worst sites the least readable — and the requirement asks
+	// for the same thing in its own words: the divergence itself is the finding.
+	for (const family of groupFamilies(pages)) {
+		/**
+		 * Judged among the members that actually loaded.
+		 *
+		 * A page returning 404 has no HTML and therefore no hreflang, so it cannot
+		 * declare anything back — reporting it for failing to would blame a page
+		 * for being broken in a second, less accurate way, when rule 2 already says
+		 * it plainly. A broken sibling is likewise not something the healthy members
+		 * should be told to link to.
+		 *
+		 * Found by the S-01 test that pins the broken-variant finding to exactly one
+		 * report; the first draft of this rule made it two.
+		 */
+		const reachable = family.members.filter((member) => {
+			const page = byUrl.get(member.url);
+			return page && !isError(page);
+		});
+
+		/**
+		 * Narrowed again to the members the family reaches by a *language* edge.
+		 *
+		 * Grouping unions on every declared target, fallback pointers included, so a
+		 * language-selector page named only by `x-default` arrives here as a family
+		 * member. It is not a translation of anything — it declares no language and
+		 * no language declares it — and leaving it in makes a correct site look
+		 * broken from both directions at once: the selector is blamed for naming no
+		 * siblings, and every real variant is blamed for not naming the selector.
+		 *
+		 * Declaring itself does not count as a link. A page that names only its own
+		 * language has said nothing about being related to anyone.
+		 */
+		const declaredTargets = new Set(
+			reachable.flatMap((member) => [...member.declares]),
+		);
+		const members = reachable.filter(
+			(member) => member.declares.size > 0 || declaredTargets.has(member.url),
+		);
+
+		/**
+		 * The same guard rule 1 carries, for the same reason. A page with no
+		 * siblings cannot disagree with them, and without this a site of
+		 * untranslated pages reports one finding each.
+		 */
+		if (members.length < 2) continue;
+
+		const defects: Array<Record<string, unknown>> = [];
+
+		for (const member of members) {
+			for (const sibling of members) {
+				if (sibling.url === member.url) continue;
+				if (member.declares.has(sibling.url)) continue;
+
+				/**
+				 * Classified exclusively, because the two describe the same omission
+				 * from different sides and the fix differs. If the sibling named this
+				 * member, the link back is what is missing. If neither named the other,
+				 * the two pages simply never knew about each other.
+				 *
+				 * Reporting both labels for one omission would be the double-report
+				 * S-01 already had to fix once, at a smaller scale.
+				 */
+				/**
+				 * The sibling's locale travels with the defect, because it is the part
+				 * the reader has to type. Knowing which page is missing a link is only
+				 * half an instruction: the fix is a tag naming a language, and making
+				 * someone open the sibling to find out which one defeats the point of
+				 * a finding being actionable without re-running the crawl.
+				 */
+				defects.push({
+					url: member.url,
+					kind: sibling.declares.has(member.url)
+						? "not_reciprocated"
+						: "incomplete",
+					sibling: sibling.url,
+					siblingLocale: sibling.locale,
+				});
+			}
+
+			/**
+			 * Only meaningful for a page that declares something. A member that
+			 * declares nothing at all is already fully described by the missing
+			 * sibling declarations above; adding "and it does not name itself" would
+			 * pad the finding without telling the reader anything new.
+			 */
+			if (!member.declaresSelf && member.declares.size > 0) {
+				defects.push({
+					url: member.url,
+					kind: "no_self_reference",
+					locale: member.locale,
+				});
+			}
+		}
+
+		if (defects.length === 0) continue;
+
+		findings.push({
+			type: FINDING_TYPES.HREFLANG_FAMILY_INCONSISTENT,
+			url: null,
+			detail: {
+				groupKey: family.groupKey,
+				memberUrls: members.map((m) => m.url),
+				defects,
+			},
+		});
 	}
 
 	// ── Rule 4: locale-shaped URL with no hreflang at all ─────────────────────

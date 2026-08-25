@@ -95,6 +95,73 @@ export function localeFromUrl(url: string): string | null {
 	return isLanguageTag(locale) ? locale : null;
 }
 
+/** One member of a family, with the declarations it actually makes. */
+export type FamilyMember = {
+	url: string;
+	locale: string | null;
+	/**
+	 * Sibling URLs this page declares under a language tag, excluding itself.
+	 *
+	 * Language tags only: a fallback pointer says where to send unmatched users,
+	 * not that its target is a translation, so counting it as an edge would
+	 * report a missing declaration on most real multilingual sites.
+	 */
+	declares: Set<string>;
+	/** Whether the page declares itself under a language tag, as the spec asks. */
+	declaresSelf: boolean;
+};
+
+export type VariantFamily = {
+	/** Stable across runs; the lexicographically smallest member URL. */
+	groupKey: string;
+	members: FamilyMember[];
+};
+
+/**
+ * The families a crawl found, with each member's outbound declarations.
+ *
+ * Exposes what `groupVariants` already traverses rather than walking the graph
+ * a second time. The rules that read this ask questions the grouping does not:
+ * whether a declaration is returned, and whether a member names everything its
+ * family publishes. Grouping deliberately ignores both — it treats a
+ * one-directional edge as a sibling relationship, which is right for deciding
+ * *who is related* and is exactly what leaves the asymmetry unreported.
+ *
+ * Members and families are returned in URL order so that findings built from
+ * them are stable between runs of the same site.
+ */
+export function groupFamilies(pages: CrawledPage[]): VariantFamily[] {
+	const variants = groupVariants(pages);
+	const byGroup = new Map<string, FamilyMember[]>();
+
+	for (const page of [...pages].sort((a, b) => a.url.localeCompare(b.url))) {
+		const variant = variants.get(page.url);
+		if (!variant) continue;
+
+		const declares = new Set<string>();
+		let declaresSelf = false;
+
+		for (const [locale, target] of Object.entries(page.hreflangTargets)) {
+			if (!isLanguageTag(locale)) continue;
+			if (target === page.url) declaresSelf = true;
+			else declares.add(target);
+		}
+
+		const members = byGroup.get(variant.groupKey) ?? [];
+		members.push({
+			url: page.url,
+			locale: variant.locale,
+			declares,
+			declaresSelf,
+		});
+		byGroup.set(variant.groupKey, members);
+	}
+
+	return [...byGroup.entries()]
+		.map(([groupKey, members]) => ({ groupKey, members }))
+		.sort((a, b) => a.groupKey.localeCompare(b.groupKey));
+}
+
 /**
  * Groups crawled pages into variant families.
  *

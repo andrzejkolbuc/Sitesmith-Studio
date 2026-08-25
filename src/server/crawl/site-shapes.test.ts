@@ -68,6 +68,25 @@ function findingsFor(options: {
 		);
 }
 
+/**
+ * The same call, keeping the evidence.
+ *
+ * Family-level findings carry their substance in `detail` — which members are
+ * wrong and how — so a summary of type and URL would assert almost nothing about
+ * them.
+ */
+function detailedFindingsFor(options: {
+	pages: CrawledPage[];
+	expectedLocales?: string[];
+	inScope?: (url: string) => boolean;
+}) {
+	return detectMissingVariants({
+		pages: options.pages,
+		expectedLocales: options.expectedLocales ?? [],
+		inScope: options.inScope ?? ((url) => url.startsWith(BASE)),
+	});
+}
+
 describe("shapes the rules should already handle", () => {
 	it("says nothing about a complete family", () => {
 		const alternates = { en: "/en", de: "/de", fr: "/fr" };
@@ -355,5 +374,266 @@ describe("shapes taken from how multilingual sites are actually built", () => {
 				pages: [page("/de/preise", { hreflang: { de: "/de/preise" } })],
 			}),
 		).toEqual([{ type: "no_hreflang", url: `${BASE}/de/preise` }]);
+	});
+});
+
+/**
+ * FR-025's remaining half: declarations that contradict each other.
+ *
+ * "Pointing at dead URLs" already ships as the broken-variant and unreached
+ * rules. What follows covers the other two terms — non-reciprocal and
+ * incomplete — plus the self-reference the hreflang guidance requires of every
+ * page in a set.
+ *
+ * Reported per family rather than per page or per edge. A template that emits a
+ * partial alternate list breaks every page it renders, and a finding per edge
+ * would bury the rest of the run under one defect. The requirement asks for the
+ * same thing in its own words: the divergence itself is the finding, not five
+ * independent per-URL reports.
+ */
+describe("a family whose declarations disagree with each other", () => {
+	const detailsOf = (findings: ReturnType<typeof detailedFindingsFor>) =>
+		findings.filter((f) => f.type === "hreflang_family_inconsistent");
+
+	it("says nothing about a family that declares itself correctly", () => {
+		/**
+		 * Every member names every member including itself. This is what correct
+		 * hreflang looks like, and it has to stay silent or the rule is worthless.
+		 */
+		const alternates = { en: "/en", de: "/de", fr: "/fr" };
+
+		expect(
+			findingsFor({
+				pages: [
+					page("/en", { hreflang: alternates }),
+					page("/de", { hreflang: alternates }),
+					page("/fr", { hreflang: alternates }),
+				],
+			}),
+		).toEqual([]);
+	});
+
+	it("reports a declaration that is not returned", () => {
+		/**
+		 * The asymmetry FR-025 names. `/en` points at `/de`; `/de` points only at
+		 * itself. Search engines treat an unreturned declaration as unconfirmed, so
+		 * the pair does not function as a set at all — and the page to edit is the
+		 * one that failed to point back.
+		 */
+		const findings = detailsOf(
+			detailedFindingsFor({
+				pages: [
+					page("/en", { hreflang: { en: "/en", de: "/de" } }),
+					page("/de", { hreflang: { de: "/de" } }),
+				],
+			}),
+		);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBeNull();
+
+		const defects = findings[0]?.detail.defects as Array<
+			Record<string, unknown>
+		>;
+
+		expect(defects).toEqual([
+			{
+				url: `${BASE}/de`,
+				kind: "not_reciprocated",
+				sibling: `${BASE}/en`,
+				// The tag to write, not just the page to write it on.
+				siblingLocale: "en",
+			},
+		]);
+	});
+
+	it("reports a member declaring fewer alternates than its family publishes", () => {
+		/**
+		 * `/fr` names English but not German, and German never named it either — so
+		 * this is an omission rather than an unreturned declaration. The distinction
+		 * is kept because the fix differs: one page is missing a link, versus two
+		 * pages that never knew about each other.
+		 */
+		const full = { en: "/en", de: "/de", fr: "/fr" };
+
+		const findings = detailsOf(
+			detailedFindingsFor({
+				pages: [
+					page("/en", { hreflang: full }),
+					page("/de", { hreflang: { en: "/en", de: "/de" } }),
+					page("/fr", { hreflang: { en: "/en", fr: "/fr" } }),
+				],
+			}),
+		);
+
+		expect(findings).toHaveLength(1);
+
+		const defects = findings[0]?.detail.defects as Array<
+			Record<string, unknown>
+		>;
+
+		// /de omits /fr and /fr omits /de; neither declared the other.
+		expect(defects).toContainEqual({
+			url: `${BASE}/de`,
+			kind: "incomplete",
+			sibling: `${BASE}/fr`,
+			siblingLocale: "fr",
+		});
+		expect(defects).toContainEqual({
+			url: `${BASE}/fr`,
+			kind: "incomplete",
+			sibling: `${BASE}/de`,
+			siblingLocale: "de",
+		});
+	});
+
+	it("reports a page that names its siblings but not itself", () => {
+		/**
+		 * The guidance requires every page in a set to include a self-referential
+		 * hreflang. Without it the set is ambiguous about which URL serves which
+		 * language, and the omission is invisible to anyone reading the page.
+		 */
+		const findings = detailsOf(
+			detailedFindingsFor({
+				pages: [
+					page("/en", { hreflang: { en: "/en", de: "/de" } }),
+					page("/de", { hreflang: { en: "/en" } }),
+				],
+			}),
+		);
+
+		expect(findings).toHaveLength(1);
+
+		const defects = findings[0]?.detail.defects as Array<
+			Record<string, unknown>
+		>;
+
+		expect(defects).toContainEqual({
+			url: `${BASE}/de`,
+			kind: "no_self_reference",
+			locale: "de",
+		});
+	});
+
+	it("produces one finding per family however many members are wrong", () => {
+		/**
+		 * The noise property, asserted directly. A template bug breaks every page it
+		 * renders; a finding per page or per edge would make the worst sites the
+		 * least readable, which is the failure the product calls fatal.
+		 */
+		const findings = detailsOf(
+			detailedFindingsFor({
+				pages: [
+					page("/en", { hreflang: { en: "/en", de: "/de", fr: "/fr" } }),
+					page("/de", { hreflang: { de: "/de" } }),
+					page("/fr", { hreflang: { fr: "/fr" } }),
+				],
+			}),
+		);
+
+		expect(findings).toHaveLength(1);
+
+		const defects = findings[0]?.detail.defects as unknown[];
+		expect(defects.length).toBeGreaterThan(1);
+	});
+
+	it("says nothing about a family of one", () => {
+		/**
+		 * The same guard rule 1 carries. A page with no siblings cannot disagree
+		 * with them, and without this a site of untranslated pages reports one
+		 * finding each — the shape that produced seven findings where two were
+		 * correct.
+		 */
+		expect(
+			findingsFor({
+				pages: [page("/de/preise", { hreflang: { de: "/de/preise" } })],
+			}).filter((f) => f.type === "hreflang_family_inconsistent"),
+		).toEqual([]);
+	});
+
+	it("does not ask a page that never loaded to declare anything", () => {
+		/**
+		 * A 404 has no HTML and therefore no hreflang. Reporting it for failing to
+		 * point back would blame a page for being broken in a second, vaguer way —
+		 * and the broken-variant rule already says it plainly, with the evidence.
+		 *
+		 * This is the shape that caught the first draft of the rule: it produced two
+		 * findings where one was correct, which is the failure S-01 had to fix once
+		 * already.
+		 */
+		expect(
+			findingsFor({
+				pages: [
+					page("/en", { hreflang: { en: "/en", de: "/de" } }),
+					page("/de", { status: 404 }),
+				],
+			}).filter((f) => f.type === "hreflang_family_inconsistent"),
+		).toEqual([]);
+	});
+
+	it("does not count an x-default pointer as a missing declaration", () => {
+		/**
+		 * The fallback pointer is not a language, so there is nothing for its target
+		 * to declare back. Counting it as an edge would report a defect on most real
+		 * multilingual sites, which is where this rule would have died.
+		 */
+		const alternates = { en: "/en", de: "/de", "x-default": "/en" };
+
+		expect(
+			findingsFor({
+				pages: [
+					page("/en", { hreflang: alternates }),
+					page("/de", { hreflang: alternates }),
+				],
+			}),
+		).toEqual([]);
+	});
+
+	it("ignores a page the family reaches only through its fallback pointer", () => {
+		/**
+		 * Grouping unions on every declared target, fallback pointers included, so a
+		 * language-selector page named by x-default is pulled into the family. It is
+		 * not a translation of anything: it declares no language and no language
+		 * declares it.
+		 *
+		 * Left in, it makes a correct site look broken from both directions — the
+		 * selector is blamed for naming no siblings, and every real variant is
+		 * blamed for not naming the selector. Four defects on a site with none.
+		 */
+		const alternates = { en: "/en", de: "/de", "x-default": "/choose" };
+
+		expect(
+			findingsFor({
+				pages: [
+					page("/en", { hreflang: alternates }),
+					page("/de", { hreflang: alternates }),
+					page("/choose"),
+				],
+			}).filter((f) => f.type === "hreflang_family_inconsistent"),
+		).toEqual([]);
+	});
+
+	it("measures completeness against the family, not the project's locales", () => {
+		/**
+		 * A family publishing only en and de, where the project also expects fr, is
+		 * internally consistent — every member names every member. The missing
+		 * French is rule 1's to report, and saying it here as well would be the
+		 * double-report that S-01 already had to fix once.
+		 */
+		const alternates = { en: "/en", de: "/de" };
+
+		const findings = findingsFor({
+			pages: [
+				page("/en", { hreflang: alternates }),
+				page("/de", { hreflang: alternates }),
+			],
+			expectedLocales: ["en", "de", "fr"],
+		});
+
+		expect(
+			findings.filter((f) => f.type === "hreflang_family_inconsistent"),
+		).toEqual([]);
+		// Rule 1 still speaks, exactly once.
+		expect(findings.filter((f) => f.type === "missing_locale")).toHaveLength(1);
 	});
 });
