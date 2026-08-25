@@ -588,7 +588,7 @@ deployment exists, so rollback is re-pushing a corrected schema.
 #### Manual
 
 - [ ] 4.8 A run against a real client site completes and its duration is recorded
-- [ ] 4.9 Restarting the process mid-run leaves the run marked `interrupted`
+- [x] 4.9 Restarting the process mid-run leaves the run marked `interrupted` — automated in `src/instrumentation.integration.test.ts`, which drives `register` itself rather than the sweep it delegates to; only Next.js invoking `register` on boot is still unproven, and that is framework contract; 3d18391
 
 ### Phase 5: Project and results UI
 
@@ -606,3 +606,26 @@ deployment exists, so rollback is re-pushing a corrected schema.
 - [x] 5.7 The findings shown match what the site actually contains — 66bbf21
 - [x] 5.8 An Owner from another tenant cannot reach the project detail page by URL — 66bbf21
 - [x] 5.9 A clean run reads as "nothing found", not as an error or a blank page — 66bbf21
+
+## What is left, and why it cannot be closed here
+
+Five criteria remain, and every one of them needs the same thing: one real
+client site. They are deliberately not automatable — the whole point of each is
+that a fixture cannot stand in for it.
+
+- **2.9, 2.10, 4.8** — that a real site crawls without appearing in its
+  monitoring, that the page count is plausible against a site whose size someone
+  knows, and that a real run completes in a duration worth recording.
+- **3.8, 3.9** — that the findings are recognisably true to someone who knows
+  the site, and that the volume of rule-4 findings is small enough to actually
+  read.
+
+3.9 is the one to watch. Phase 3 of the test rollout removed two large classes
+of false positive from that rule — `x-default` read as a language, and any
+two-letter path segment treated as a locale — so the volume against a real site
+should now be far lower than when this criterion was written. That is a
+prediction, not a result, and a real site is the only thing that settles it.
+
+Crawl scope is now settable from the creation form (3d18391), which is what
+these criteria were waiting on: pointing the crawler at a client site without a
+way to exclude its admin area was not something to do.
