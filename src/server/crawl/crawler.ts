@@ -25,6 +25,14 @@ export type CrawlOptions = {
 	requestTimeoutMs?: number;
 	/** Consecutive failures that abort the crawl. */
 	failureBurstThreshold?: number;
+	/**
+	 * Proportion of failed requests that aborts the crawl, for a site that fails
+	 * steadily rather than in bursts. Applied only once `failureRateSampleSize`
+	 * pages have been fetched.
+	 */
+	failureRateThreshold?: number;
+	/** Pages that must be fetched before the failure rate is judged at all. */
+	failureRateSampleSize?: number;
 	/** Called as each page completes, so callers can persist incrementally. */
 	onPage?: (page: CrawledPage) => Promise<void> | void;
 };
@@ -48,6 +56,22 @@ export type CrawlResult = {
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_FAILURE_BURST = 5;
+/**
+ * Where "this site is struggling" starts.
+ *
+ * Set well below half deliberately. Half was the first choice and it was wrong:
+ * a site alternating success and failure lands near 48% once the pages that
+ * worked are counted, so a threshold at 50% never fires against exactly the
+ * site it was written for. Chasing that with 0.49 would be fitting the number to
+ * one fixture.
+ *
+ * A healthy origin serves approximately zero 5xx. By the time a third of what we
+ * ask for is erroring, the operator's problem is not hreflang, and our requests
+ * have no business being part of it. Only 5xx and network errors count — 404s
+ * are findings, and a site full of dead links is what this product is for.
+ */
+const DEFAULT_FAILURE_RATE = 0.3;
+const DEFAULT_FAILURE_RATE_SAMPLE = 20;
 
 /**
  * Canonical form of a URL for deduplication.
@@ -160,6 +184,8 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 		maxPages,
 		requestTimeoutMs = DEFAULT_TIMEOUT_MS,
 		failureBurstThreshold = DEFAULT_FAILURE_BURST,
+		failureRateThreshold = DEFAULT_FAILURE_RATE,
+		failureRateSampleSize = DEFAULT_FAILURE_RATE_SAMPLE,
 		onPage,
 	} = options;
 
@@ -180,6 +206,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 	let abortedReason: string | null = null;
 	let reachedPageLimit = false;
 	let consecutiveFailures = 0;
+	let totalFailures = 0;
 	/** Serialises request *starts* so the delay applies across all workers. */
 	let nextSlotAt = 0;
 
@@ -247,8 +274,35 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 			 */
 			const failed = page.fetchError !== null || (page.httpStatus ?? 0) >= 500;
 			consecutiveFailures = failed ? consecutiveFailures + 1 : 0;
+			if (failed) totalFailures += 1;
+
 			if (consecutiveFailures >= failureBurstThreshold) {
 				abortedReason = `Aborted after ${consecutiveFailures} consecutive failures — the site appears to be struggling.`;
+				return;
+			}
+
+			/**
+			 * The failure a burst counter cannot see.
+			 *
+			 * A site that fails every other request never puts two failures in a row,
+			 * so the counter above resets forever and the crawl keeps going against a
+			 * site returning errors to half of everything it is asked for. That is
+			 * precisely the site least able to absorb the load, and continuing turns
+			 * observing a problem into contributing to one.
+			 *
+			 * Judged as a rate, and only once there are enough requests for a rate to
+			 * mean anything — over three requests it means nothing, and aborting there
+			 * would be its own false positive. Note that 404s are deliberately not
+			 * failures: a site full of dead links is what this product exists to
+			 * report, and treating that as "struggling" would abandon the runs with
+			 * the most to say.
+			 */
+			if (
+				pages.length >= failureRateSampleSize &&
+				totalFailures / pages.length >= failureRateThreshold
+			) {
+				const percent = Math.round((totalFailures / pages.length) * 100);
+				abortedReason = `Aborted after ${totalFailures} of ${pages.length} requests failed (${percent}%) — the site appears to be struggling.`;
 				return;
 			}
 
