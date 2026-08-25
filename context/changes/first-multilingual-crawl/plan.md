@@ -602,7 +602,7 @@ deployment exists, so rollback is re-pushing a corrected schema.
 #### Manual
 
 - [x] 5.5 Creating a project through the form produces a crawlable project — 66bbf21
-- [ ] 5.6 Triggering a run shows progress and then findings without a manual reload
+- [x] 5.6 Triggering a run shows progress and then findings without a manual reload — settled by `e2e/journeys/first-crawl.spec.ts`, which observes Crawling → Complete on one page load; 52563f8
 - [x] 5.7 The findings shown match what the site actually contains — 66bbf21
 - [x] 5.8 An Owner from another tenant cannot reach the project detail page by URL — 66bbf21
 - [x] 5.9 A clean run reads as "nothing found", not as an error or a blank page — 66bbf21
