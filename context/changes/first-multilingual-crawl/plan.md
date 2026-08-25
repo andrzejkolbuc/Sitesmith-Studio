@@ -560,13 +560,13 @@ deployment exists, so rollback is re-pushing a corrected schema.
 
 #### Automated
 
-- [x] 3.1 Type checking passes: `npm run typecheck`
-- [x] 3.2 Linting passes: `npm run check`
-- [x] 3.3 Grouping is identical regardless of the order pages are supplied
-- [x] 3.4 A one-directional hreflang declaration still groups both pages
-- [x] 3.5 Each of the four rules fires exactly once on the fixture site
-- [x] 3.6 The monolingual fixture page produces no finding
-- [x] 3.7 The out-of-scope hreflang target does not fire rule 3
+- [x] 3.1 Type checking passes: `npm run typecheck` — 6154344
+- [x] 3.2 Linting passes: `npm run check` — 6154344
+- [x] 3.3 Grouping is identical regardless of the order pages are supplied — 6154344
+- [x] 3.4 A one-directional hreflang declaration still groups both pages — 6154344
+- [x] 3.5 Each of the four rules fires exactly once on the fixture site — 6154344
+- [x] 3.6 The monolingual fixture page produces no finding — 6154344
+- [x] 3.7 The out-of-scope hreflang target does not fire rule 3 — 6154344
 
 #### Manual
 
@@ -577,13 +577,13 @@ deployment exists, so rollback is re-pushing a corrected schema.
 
 #### Automated
 
-- [ ] 4.1 Type checking passes: `npm run typecheck`
-- [ ] 4.2 Linting passes: `npm run check`
-- [ ] 4.3 A triggered run against the fixture site completes and reaches `done`
-- [ ] 4.4 Pages and findings are persisted and readable through the API
-- [ ] 4.5 A second trigger while a run is active is refused
-- [ ] 4.6 Runs left `running` are closed as `interrupted` by the sweep
-- [ ] 4.7 Another tenant cannot read a run, its pages or its findings through any procedure
+- [x] 4.1 Type checking passes: `npm run typecheck`
+- [x] 4.2 Linting passes: `npm run check`
+- [x] 4.3 A triggered run against the fixture site completes and reaches `done`
+- [x] 4.4 Pages and findings are persisted and readable through the API
+- [x] 4.5 A second trigger while a run is active is refused
+- [x] 4.6 Runs left `running` are closed as `interrupted` by the sweep
+- [x] 4.7 Another tenant cannot read a run, its pages or its findings through any procedure
 
 #### Manual
 
