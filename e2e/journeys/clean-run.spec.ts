@@ -56,3 +56,26 @@ test("a project with no expected locales says nothing can be reported missing", 
 		signedIn.getByText("nothing can be reported missing"),
 	).toBeVisible();
 });
+
+test("a path excluded on the form is recorded on the project", async ({
+	signedIn,
+	site,
+}) => {
+	/**
+	 * The form is where an operator protects a client's admin area, and a field
+	 * that silently fails to save would be worse than not offering one: they would
+	 * believe a path was off limits and start a run against it.
+	 */
+	const name = `Journey ${Date.now()}`;
+
+	await signedIn.goto("/projects/new");
+	await signedIn.getByLabel("Name").fill(name);
+	await signedIn.getByLabel("Start URL").fill(site.baseUrl);
+	await signedIn.getByLabel("Exclude paths").fill("/admin, /cart");
+	await signedIn.getByRole("button", { name: "Create project" }).click();
+
+	await expect(signedIn.getByRole("heading", { name })).toBeVisible();
+
+	// Shown back on the project, so the scope can be checked before a run starts.
+	await expect(signedIn.getByText("/admin, /cart")).toBeVisible();
+});

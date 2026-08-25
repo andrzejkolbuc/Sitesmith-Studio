@@ -267,3 +267,47 @@ describe("run procedures", () => {
 		).rejects.toThrow();
 	});
 });
+
+describe("crawl scope chosen at creation", () => {
+	it("never requests a path the project excluded", async () => {
+		/**
+		 * The chain this covers is the one that breaks: the crawler's own exclusion
+		 * is unit-tested, and the stored column is read correctly, but nothing
+		 * proved that a scope entered when the project was created survives the
+		 * trip into a run. It is worth proving because of what it protects — the
+		 * paths an operator excludes are the ones that do work when fetched, and
+		 * the requirement is explicit that causing a client incident is worse than
+		 * the regression being hunted.
+		 */
+		const { tenant, owner } = await seedProject("scoped");
+
+		const project = await callerFor(owner.id, tenant.id).project.create({
+			name: "scoped by the operator",
+			startUrl: site.baseUrl,
+			locales: ["en", "de"],
+			excludePaths: ["/private"],
+			includePaths: [],
+		});
+
+		expect(project.excludePaths).toEqual(["/private"]);
+
+		await runToCompletion(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+		});
+
+		/**
+		 * Asserted against what the server was actually asked for, not against what
+		 * was stored afterwards. A page that was fetched and then discarded would
+		 * still have hit the client's site, which is the thing being prevented.
+		 */
+		const forbidden = site.requests.filter((path) =>
+			path.startsWith("/private"),
+		);
+		expect(forbidden).toEqual([]);
+
+		// And the run still did its job, rather than passing by crawling nothing.
+		const crawled = await db.query.pages.findMany();
+		expect(crawled.length).toBeGreaterThan(1);
+	});
+});

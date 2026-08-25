@@ -34,9 +34,26 @@ export default async function NewProjectPage({
 			.map((locale) => locale.trim())
 			.filter(Boolean);
 
+		/**
+		 * Path prefixes, comma-separated. Excluded paths win over included ones in
+		 * the crawler, so an operator who is unsure can list both without having to
+		 * reason about the interaction.
+		 */
+		const paths = (field: string) =>
+			String(formData.get(field) ?? "")
+				.split(",")
+				.map((path) => path.trim())
+				.filter(Boolean);
+
 		let projectId: string;
 		try {
-			const project = await api.project.create({ name, startUrl, locales });
+			const project = await api.project.create({
+				name,
+				startUrl,
+				locales,
+				includePaths: paths("includePaths"),
+				excludePaths: paths("excludePaths"),
+			});
 			projectId = project.id;
 		} catch {
 			// The only realistic failure is a malformed start URL, which the input
@@ -112,6 +129,35 @@ export default async function NewProjectPage({
 						</span>
 					</label>
 
+					<label className="flex flex-col gap-1.5 text-sm">
+						<span className="text-neutral-300">Exclude paths</span>
+						<input
+							className="rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-neutral-100 outline-none focus:border-neutral-600"
+							name="excludePaths"
+							placeholder="/admin, /cart, /search"
+							type="text"
+						/>
+						<span className="text-neutral-500 text-xs">
+							Comma-separated path prefixes the check will never request. Worth
+							filling in before the first run against a live site — anything
+							that does work when fetched belongs here.
+						</span>
+					</label>
+
+					<label className="flex flex-col gap-1.5 text-sm">
+						<span className="text-neutral-300">Only these paths</span>
+						<input
+							className="rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-neutral-100 outline-none focus:border-neutral-600"
+							name="includePaths"
+							placeholder="leave empty for the whole site"
+							type="text"
+						/>
+						<span className="text-neutral-500 text-xs">
+							Comma-separated. Empty means the whole site. Excluded paths still
+							win, so listing a path in both leaves it excluded.
+						</span>
+					</label>
+
 					<button
 						className="mt-1 rounded-md bg-neutral-100 px-4 py-2 font-medium text-neutral-950 transition hover:bg-white"
 						type="submit"
@@ -121,9 +167,9 @@ export default async function NewProjectPage({
 				</form>
 
 				<p className="mt-6 text-neutral-500 text-xs">
-					Crawl scope and request limits default to something gentle. Adjust
-					them with{" "}
-					<code className="text-neutral-400">npm run db:seed-project</code>.
+					Request rate and concurrency default to something gentle. Adjust them
+					with <code className="text-neutral-400">npm run db:seed-project</code>
+					.
 				</p>
 			</div>
 		</main>

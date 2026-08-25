@@ -49,6 +49,16 @@ export const projectRouter = createTRPCRouter({
 				name: z.string().min(1).max(255),
 				startUrl: z.string().url(),
 				locales: z.array(z.string().min(2).max(32)).default([]),
+				/**
+				 * Scope, as path prefixes. Excluded paths are the safety-relevant half:
+				 * a client's admin area, checkout, or anything that does work on being
+				 * fetched has no business being crawled, and the requirement that
+				 * causing an incident is worse than the regression being hunted makes
+				 * this a control the operator needs before the first real run, not a
+				 * refinement afterwards.
+				 */
+				includePaths: z.array(z.string().min(1).max(255)).default([]),
+				excludePaths: z.array(z.string().min(1).max(255)).default([]),
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
@@ -59,6 +69,8 @@ export const projectRouter = createTRPCRouter({
 					name: input.name,
 					startUrl: input.startUrl,
 					locales: input.locales.map((l) => l.toLowerCase()),
+					includePaths: input.includePaths,
+					excludePaths: input.excludePaths,
 				})
 				.returning();
 
