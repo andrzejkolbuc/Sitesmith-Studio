@@ -594,15 +594,15 @@ deployment exists, so rollback is re-pushing a corrected schema.
 
 #### Automated
 
-- [x] 5.1 Type checking passes: `npm run typecheck`
-- [x] 5.2 Linting passes: `npm run check`
-- [x] 5.3 Build succeeds: `npm run build`
-- [x] 5.4 Full test suite passes: `npm run test`
+- [x] 5.1 Type checking passes: `npm run typecheck` — 66bbf21
+- [x] 5.2 Linting passes: `npm run check` — 66bbf21
+- [x] 5.3 Build succeeds: `npm run build` — 66bbf21
+- [x] 5.4 Full test suite passes: `npm run test` — 66bbf21
 
 #### Manual
 
-- [x] 5.5 Creating a project through the form produces a crawlable project
+- [x] 5.5 Creating a project through the form produces a crawlable project — 66bbf21
 - [ ] 5.6 Triggering a run shows progress and then findings without a manual reload
-- [x] 5.7 The findings shown match what the site actually contains
-- [x] 5.8 An Owner from another tenant cannot reach the project detail page by URL
-- [x] 5.9 A clean run reads as "nothing found", not as an error or a blank page
+- [x] 5.7 The findings shown match what the site actually contains — 66bbf21
+- [x] 5.8 An Owner from another tenant cannot reach the project detail page by URL — 66bbf21
+- [x] 5.9 A clean run reads as "nothing found", not as an error or a blank page — 66bbf21
