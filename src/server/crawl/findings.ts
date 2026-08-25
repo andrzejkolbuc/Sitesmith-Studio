@@ -40,6 +40,23 @@ export type DetectOptions = {
 	inScope: (url: string) => boolean;
 };
 
+/**
+ * Whether a family already publishes the language a project asked for.
+ *
+ * Deliberately one-directional. A site publishing `en-us` and `en-gb` publishes
+ * English, so a project expecting `en` is answered — reporting English missing
+ * from a family holding two English pages is a false positive carrying its own
+ * refutation.
+ *
+ * The reverse is not true and must not be: a project expecting `en-gb` has said
+ * it needs British English specifically, and accepting a generic `en` page would
+ * hide the very gap the project was configured to find.
+ */
+const satisfies = (present: Set<string>, expected: string): boolean => {
+	if (present.has(expected)) return true;
+	return [...present].some((locale) => locale.startsWith(`${expected}-`));
+};
+
 const isError = (page: CrawledPage): boolean =>
 	page.fetchError !== null ||
 	page.httpStatus === null ||
@@ -105,7 +122,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		if (present.size === 0) continue;
 
 		for (const locale of expected) {
-			if (present.has(locale)) continue;
+			if (satisfies(present, locale)) continue;
 			findings.push({
 				type: FINDING_TYPES.MISSING_LOCALE,
 				url: groupKey,
@@ -167,7 +184,18 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 	// silence about the others is a real omission.
 	for (const page of [...pages].sort((a, b) => a.url.localeCompare(b.url))) {
 		if (isError(page)) continue;
-		if (Object.keys(page.hreflangTargets).length > 0) continue;
+
+		/**
+		 * Alternates that point somewhere else. A self-referencing link is standard
+		 * practice and says nothing about translations, so a page whose only
+		 * alternate is itself has declared that it has no siblings — which is what
+		 * this rule reports, and is indistinguishable to a reader from declaring
+		 * nothing at all. Counting the raw entries let such a page go unreported.
+		 */
+		const alternates = Object.entries(page.hreflangTargets).filter(
+			([, target]) => target !== page.url,
+		);
+		if (alternates.length > 0) continue;
 
 		const impliedLocale = localeFromUrl(page.url);
 		if (!impliedLocale) continue;

@@ -35,6 +35,50 @@ export type PageVariant = {
  */
 const LOCALE_SEGMENT = /^\/([a-z]{2}(?:[-_][a-z]{2,4})?)(?:\/|$)/i;
 
+/**
+ * The two-letter language codes of ISO 639-1, in full.
+ *
+ * The shape of a segment is not enough to know it names a language. `/us/` is a
+ * market, `/go/` is a redirect path, `/ok/` is a status — all two letters, none
+ * of them languages. Without this list every such segment became a locale, and
+ * an ordinary English site reported one "no language variants declared" finding
+ * per section.
+ *
+ * Written out rather than derived at runtime: `Intl` will happily accept `us` as
+ * a well-formed tag, because well-formed and meaningful are different questions.
+ * The list is a closed standard and has not changed since 2002.
+ */
+const ISO_639_1 = new Set(
+	`aa ab ae af ak am an ar as av ay az ba be bg bh bi bm bn bo br bs ca ce ch co
+	 cr cs cu cv cy da de dv dz ee el en eo es et eu fa ff fi fj fo fr fy ga gd gl
+	 gn gu gv ha he hi ho hr ht hu hy hz ia id ie ig ii ik io is it iu ja jv ka kg
+	 ki kj kk kl km kn ko kr ks ku kv kw ky la lb lg li ln lo lt lu lv mg mh mi mk
+	 ml mn mr ms mt my na nb nd ne ng nl nn no nr nv ny oc oj om or os pa pi pl ps
+	 pt qu rm rn ro ru rw sa sc sd se sg si sk sl sm sn so sq sr ss st su sv sw ta
+	 te tg th ti tk tl tn to tr ts tt tw ty ug uk ur uz ve vi vo wa wo xh yi yo za
+	 zh zu`.split(/\s+/),
+);
+
+/**
+ * The fallback pointer defined by the hreflang guidance, for users whose
+ * language matches nothing on offer.
+ *
+ * It is not a language, and it usually points at the same URL as the site's
+ * primary one. Read as a language it renames that page — so a site publishing
+ * English at `/` was reported as missing English, with the finding pointing at
+ * the English page.
+ */
+const NOT_A_LANGUAGE = "x-default";
+
+/** Whether an hreflang value names a language at all. */
+export function isLanguageTag(value: string): boolean {
+	const tag = value.toLowerCase();
+	if (tag === NOT_A_LANGUAGE) return false;
+
+	const primary = tag.split(/[-_]/)[0] ?? "";
+	return ISO_639_1.has(primary);
+}
+
 /** The locale a URL's own path implies, if any. */
 export function localeFromUrl(url: string): string | null {
 	let pathname: string;
@@ -46,7 +90,9 @@ export function localeFromUrl(url: string): string | null {
 
 	const match = LOCALE_SEGMENT.exec(pathname);
 	if (!match?.[1]) return null;
-	return match[1].toLowerCase().replace("_", "-");
+
+	const locale = match[1].toLowerCase().replace("_", "-");
+	return isLanguageTag(locale) ? locale : null;
 }
 
 /**
@@ -110,6 +156,9 @@ export function groupVariants(pages: CrawledPage[]): Map<string, PageVariant> {
 	for (const page of pages) {
 		for (const [locale, target] of Object.entries(page.hreflangTargets)) {
 			if (target === page.url) continue;
+			// A fallback pointer says where to send unmatched users, not what
+			// language the target is in.
+			if (!isLanguageTag(locale)) continue;
 			if (!declaredBySiblings.has(target)) {
 				declaredBySiblings.set(target, locale.toLowerCase());
 			}
@@ -128,7 +177,7 @@ export function groupVariants(pages: CrawledPage[]): Map<string, PageVariant> {
 		 * 3. The URL's shape — our inference, used only when the site said nothing.
 		 */
 		const selfDeclared = Object.entries(page.hreflangTargets).find(
-			([, url]) => url === page.url,
+			([locale, url]) => url === page.url && isLanguageTag(locale),
 		)?.[0];
 
 		variants.set(page.url, {
