@@ -87,11 +87,28 @@ export async function verifyPassword(
 	} catch {
 		return false;
 	}
-	if (expected.length === 0 || salt.length === 0) return false;
+	/**
+	 * The stored digest must not choose how many bytes get compared.
+	 *
+	 * Deriving the key at `expected.length` looked harmless — the comparison is
+	 * still constant-time and still has to match. But it lets the digest set the
+	 * work: a value carrying a one-byte key would be checked one byte deep and
+	 * would accept roughly one password in 256. `Buffer.from(hex)` reaches the
+	 * same place quietly, since it stops at the first invalid pair and returns a
+	 * short buffer rather than throwing.
+	 *
+	 * Both lengths have been fixed since the first digest was written, so
+	 * anything else was not produced by `hashPassword`. Note that changing
+	 * `KEY_LENGTH` later means encoding it in the digest — the format records the
+	 * scrypt parameters, but not this.
+	 */
+	if (expected.length !== KEY_LENGTH || salt.length !== SALT_LENGTH) {
+		return false;
+	}
 
 	let actual: Buffer;
 	try {
-		actual = await scrypt(password.normalize("NFKC"), salt, expected.length, {
+		actual = await scrypt(password.normalize("NFKC"), salt, KEY_LENGTH, {
 			N,
 			r,
 			p,
