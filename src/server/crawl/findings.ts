@@ -27,6 +27,8 @@ export const FINDING_TYPES = {
 	NO_HREFLANG: "no_hreflang",
 	/** A family whose members' declarations disagree with each other. */
 	HREFLANG_FAMILY_INCONSISTENT: "hreflang_family_inconsistent",
+	/** One variant failing while its siblings are fine. */
+	VARIANT_DIVERGED: "variant_diverged",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -143,6 +145,73 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		}
 	}
 
+	// ── Rule 6: one variant failing while its siblings are fine ───────────────
+	//
+	// Computed before rules 2 and 3 because it decides what they are allowed to
+	// say. The requirement is specific about the shape of the answer: "where five
+	// language variants are healthy and one is not, the divergence itself is the
+	// finding, not five independent per-URL reports of which one happens to be
+	// bad" — and that is exactly what was measured before this rule existed. A
+	// six-variant family with one broken member produced five findings, one per
+	// declaring sibling, each saying the same thing.
+	//
+	// Collapsed only past two declarers. With a single declarer the per-URL
+	// finding already *is* one finding, so collapsing would rename a working
+	// report for no gain — and every fixture in the project is built on that
+	// shape.
+	const collapsed = new Map<string, Record<string, unknown>>();
+
+	for (const family of groupFamilies(pages)) {
+		const healthy = family.members.filter((member) => {
+			const page = byUrl.get(member.url);
+			return page && !isError(page);
+		});
+
+		/**
+		 * A uniformly broken family has not diverged; it is down. Naming it a
+		 * divergence would point the reader at a comparison when what they need to
+		 * know is that the whole section is failing.
+		 */
+		if (healthy.length === 0) continue;
+
+		for (const member of family.members) {
+			const page = byUrl.get(member.url);
+			if (!page || !isError(page)) continue;
+
+			const declaredBy = healthy
+				.filter((sibling) => sibling.declares.has(member.url))
+				.map((sibling) => sibling.url)
+				.sort();
+
+			if (declaredBy.length < 2) continue;
+
+			collapsed.set(member.url, {
+				groupKey: family.groupKey,
+				brokenUrl: member.url,
+				/**
+				 * Available even though the page served nothing, because a sibling
+				 * named its language — the same sibling-declaration precedence that
+				 * stopped a broken variant being reported twice in S-01.
+				 */
+				locale: member.locale,
+				httpStatus: page.httpStatus,
+				fetchError: page.fetchError,
+				declaredBy,
+				healthyUrls: healthy.map((sibling) => sibling.url).sort(),
+			});
+		}
+	}
+
+	for (const [, detail] of [...collapsed.entries()].sort(([a], [b]) =>
+		a.localeCompare(b),
+	)) {
+		findings.push({
+			type: FINDING_TYPES.VARIANT_DIVERGED,
+			url: null,
+			detail,
+		});
+	}
+
 	// ── Rules 2 and 3: declared siblings that failed or were never reached ────
 	for (const page of [...pages].sort((a, b) => a.url.localeCompare(b.url))) {
 		for (const [locale, target] of Object.entries(page.hreflangTargets).sort(
@@ -153,6 +222,13 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 			const targetPage = byUrl.get(target);
 
 			if (targetPage && isError(targetPage)) {
+				/**
+				 * Already said once, for the whole family. The divergence finding
+				 * carries this page among its declarers and the same status, so
+				 * emitting here as well would report one problem twice.
+				 */
+				if (collapsed.has(target)) continue;
+
 				findings.push({
 					type: FINDING_TYPES.HREFLANG_TARGET_FAILED,
 					url: page.url,

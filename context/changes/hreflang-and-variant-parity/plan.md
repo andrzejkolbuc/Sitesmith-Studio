@@ -219,9 +219,33 @@ verification passes, pause for confirmation before proceeding.
 
 ### Overview
 
-One finding per family where some members failed and others succeeded — the
-shape the requirement describes as "five language variants are healthy and one
-is not" — suppressed for any member an existing rule already reported.
+One finding per broken variant that two or more of its siblings declare,
+replacing the per-URL reports of the same fact — the shape the requirement
+describes as "five language variants are healthy and one is not, and the
+divergence itself is the finding, not five independent per-URL reports of which
+one happens to be bad".
+
+### Revised during implementation
+
+The plan originally said divergence should report only where no existing rule
+had spoken. Two facts found before writing the rule showed that to be wrong:
+
+1. **It would have been near-dead code.** A family is built from hreflang edges,
+   and a page that errors serves no HTML and so declares nobody. A failing family
+   member is therefore in the family *because a sibling declared it*, which is
+   exactly what makes rule 2 fire. "A failing member no rule spoke about" is an
+   exotic shape — an error page that still renders the site's hreflang head.
+
+2. **The noise it was meant to remove would have stayed.** Measured, not
+   reasoned: a six-variant family with one broken member produces five
+   `hreflang_target_failed` findings, one per declaring sibling, each saying the
+   same thing. That is the requirement's forbidden shape verbatim.
+
+The collapse is therefore threshold-based: two or more declarers become one
+divergence finding; a single declarer keeps today's per-URL finding, because
+with one declarer that finding already *is* one finding. This leaves every
+shipped S-01 test and journey untouched — that fixture always has exactly one
+declarer.
 
 ### Changes Required
 
@@ -229,42 +253,42 @@ is not" — suppressed for any member an existing rule already reported.
 
 **File**: `src/server/crawl/findings.ts`
 
-**Intent**: Report a family that is partly working as a single divergence,
-rather than leaving the operator to notice that one row in a list differs from
-its neighbours.
+**Intent**: Say once that a variant is broken, naming the pages that point at it,
+instead of once per page that points at it.
 
 **Contract**: A new `FINDING_TYPES.VARIANT_DIVERGED`. The finding's `url` is
-null; its `detail` carries the group key, the failing members with their status
-or fetch error, and the healthy members. Requires at least one failing and at
-least one healthy member, and `members.length >= 2`. A failing member already
-named by a `hreflang_target_failed` or `hreflang_target_unreached` finding in
-the same run is excluded; if that leaves no failing members, the family produces
-nothing.
+null; its `detail` carries the group key, the broken member with its locale and
+status or fetch error, the sibling pages declaring it, and the healthy members.
+Emitted when a broken family member has two or more declarers and at least one
+healthy sibling. When emitted, the `hreflang_target_failed` findings for that
+target are suppressed — the divergence carries the same evidence, so keeping both
+would be one problem reported twice.
 
 #### 2. Shapes covering the rule
 
 **File**: `src/server/crawl/site-shapes.test.ts`
 
-**Intent**: Pin both the rule and its silence, since the suppression is the part
-most likely to be wrong.
+**Intent**: Pin the collapse, the threshold, and the silences — the threshold
+being the part most likely to drift, since it is what protects shipped
+behaviour.
 
-**Contract**: Cases for a family with one failing and two healthy members where
-the failure was undeclared (reported), the same family where the failure was
-declared and so already reported by rule 2 (silent), a family where every member
-failed (silent — a different problem, consistent with rule 1's existing
-treatment), a wholly healthy family (silent), and a family of one (silent).
+**Contract**: Cases for a six-member family with one broken variant (one
+divergence, no per-URL findings), a two-member family with one broken variant
+(unchanged: the per-URL finding, no divergence), a family where every member
+failed (silent), a wholly healthy family (silent), and a family of one (silent).
 
 ### Success Criteria
 
 #### Automated Verification
 
 - The shapes table fails before the rule exists and passes after: `npm run test:unit`
-- A declared broken variant produces exactly one finding, not two
+- A broken variant declared by five siblings produces one finding, not five
+- A broken variant declared by one sibling keeps its existing per-URL finding
 - A family where every member failed produces no divergence finding
 - A wholly healthy family produces nothing
-- Mutation: removing the suppression re-introduces the double report and fails
+- Mutation: removing the suppression re-introduces the per-URL findings and fails
   the corresponding case
-- Existing S-01 rule tests pass unchanged: `npm run test:unit`
+- Existing S-01 rule tests and journeys pass unchanged: `npm run test:unit`
 - Integration suite passes: `npm run test:integration`
 - Type checking passes: `npm run typecheck`
 - Linting passes: `npm run check`
@@ -418,15 +442,16 @@ when the run was made.
 
 #### Automated
 
-- [ ] 2.1 The shapes table fails before the rule exists and passes after
-- [ ] 2.2 A declared broken variant produces exactly one finding, not two
-- [ ] 2.3 A family where every member failed produces no divergence finding
-- [ ] 2.4 A wholly healthy family produces nothing
-- [ ] 2.5 Mutation: removing the suppression re-introduces the double report
-- [ ] 2.6 Existing S-01 rule tests pass unchanged
-- [ ] 2.7 Integration suite passes: `npm run test:integration`
-- [ ] 2.8 Type checking passes: `npm run typecheck`
-- [ ] 2.9 Linting passes: `npm run check`
+- [x] 2.1 The shapes table fails before the rule exists and passes after
+- [x] 2.2 A broken variant declared by five siblings produces one finding, not five
+- [x] 2.3 A broken variant declared by one sibling keeps its per-URL finding
+- [x] 2.4 A family where every member failed produces no divergence finding
+- [x] 2.4b A wholly healthy family produces nothing
+- [x] 2.5 Mutation: removing the suppression re-introduces the per-URL findings
+- [x] 2.6 Existing S-01 rule tests pass unchanged
+- [x] 2.7 Integration suite passes: `npm run test:integration`
+- [x] 2.8 Type checking passes: `npm run typecheck`
+- [x] 2.9 Linting passes: `npm run check`
 
 #### Manual
 

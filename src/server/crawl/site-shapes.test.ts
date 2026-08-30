@@ -637,3 +637,135 @@ describe("a family whose declarations disagree with each other", () => {
 		expect(findings.filter((f) => f.type === "missing_locale")).toHaveLength(1);
 	});
 });
+
+/**
+ * FR-026: one variant failing while its siblings are not.
+ *
+ * The requirement is unusually specific about the shape of the answer — "where
+ * five language variants are healthy and one is not, the divergence itself is
+ * the finding, not five independent per-URL reports of which one happens to be
+ * bad" — and measurement showed the product doing exactly the forbidden thing:
+ * a six-variant family with one broken member produced five findings, one per
+ * declaring sibling, each saying the same thing.
+ *
+ * So the collapse is threshold-based rather than universal. Two or more
+ * declarers become one finding; a single declarer keeps the per-URL report,
+ * because with one declarer that report already is one finding. The threshold is
+ * what makes this safe to add to shipped behaviour.
+ */
+describe("a variant that failed while its siblings did not", () => {
+	/** Every member declares every member, including itself. */
+	const fullSet = {
+		en: "/en",
+		de: "/de",
+		fr: "/fr",
+		es: "/es",
+		it: "/it",
+	};
+
+	it("says once that a variant is broken, not once per page pointing at it", () => {
+		const findings = findingsFor({
+			pages: [
+				page("/en", { hreflang: fullSet }),
+				page("/de", { hreflang: fullSet }),
+				page("/es", { hreflang: fullSet }),
+				page("/it", { hreflang: fullSet }),
+				page("/fr", { status: 404 }),
+			],
+		});
+
+		expect(findings.filter((f) => f.type === "variant_diverged")).toHaveLength(
+			1,
+		);
+
+		/**
+		 * The per-URL reports are replaced rather than accompanied. Keeping both
+		 * would describe one problem twice — the failure S-01 already had to fix
+		 * once, and the reason the divergence exists at all.
+		 */
+		expect(findings.filter((f) => f.type === "hreflang_target_failed")).toEqual(
+			[],
+		);
+	});
+
+	it("names the broken page, its status, and who points at it", () => {
+		/**
+		 * A collapsed finding has to carry everything the four it replaced carried,
+		 * or the collapse trades noise for ignorance.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/en", { hreflang: fullSet }),
+				page("/de", { hreflang: fullSet }),
+				page("/es", { hreflang: fullSet }),
+				page("/it", { hreflang: fullSet }),
+				page("/fr", { status: 404 }),
+			],
+		}).filter((f) => f.type === "variant_diverged");
+
+		const detail = findings[0]?.detail as {
+			brokenUrl: string;
+			locale: string | null;
+			httpStatus: number | null;
+			declaredBy: string[];
+			healthyUrls: string[];
+		};
+
+		expect(detail.brokenUrl).toBe(`${BASE}/fr`);
+		expect(detail.locale).toBe("fr");
+		expect(detail.httpStatus).toBe(404);
+		expect(detail.declaredBy).toHaveLength(4);
+		expect(detail.healthyUrls).toHaveLength(4);
+	});
+
+	it("leaves a variant with a single declarer reported as it always was", () => {
+		/**
+		 * The threshold, and the reason this rule can be added to shipped behaviour
+		 * without rewriting it. One page declaring a broken sibling already produces
+		 * exactly one finding; collapsing it would rename a working report for no
+		 * gain and break every fixture built on that shape.
+		 */
+		const findings = findingsFor({
+			pages: [
+				page("/en", { hreflang: { en: "/en", de: "/de" } }),
+				page("/de", { status: 404 }),
+			],
+		});
+
+		expect(findings.filter((f) => f.type === "variant_diverged")).toEqual([]);
+		expect(
+			findings.filter((f) => f.type === "hreflang_target_failed"),
+		).toHaveLength(1);
+	});
+
+	it("says nothing when the whole family failed", () => {
+		/**
+		 * Nothing diverged — the family is uniformly broken, which is a different
+		 * problem and a bigger one. Calling it a divergence would point the reader
+		 * at a comparison when what they need is that the section is down.
+		 */
+		expect(
+			findingsFor({
+				pages: [
+					page("/en", { hreflang: fullSet, status: 500 }),
+					page("/de", { status: 500 }),
+					page("/fr", { status: 500 }),
+				],
+			}).filter((f) => f.type === "variant_diverged"),
+		).toEqual([]);
+	});
+
+	it("says nothing about a family where every variant works", () => {
+		expect(
+			findingsFor({
+				pages: [
+					page("/en", { hreflang: fullSet }),
+					page("/de", { hreflang: fullSet }),
+					page("/fr", { hreflang: fullSet }),
+					page("/es", { hreflang: fullSet }),
+					page("/it", { hreflang: fullSet }),
+				],
+			}).filter((f) => f.type === "variant_diverged"),
+		).toEqual([]);
+	});
+});
