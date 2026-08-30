@@ -442,16 +442,16 @@ when the run was made.
 
 #### Automated
 
-- [x] 2.1 The shapes table fails before the rule exists and passes after
-- [x] 2.2 A broken variant declared by five siblings produces one finding, not five
-- [x] 2.3 A broken variant declared by one sibling keeps its per-URL finding
-- [x] 2.4 A family where every member failed produces no divergence finding
-- [x] 2.4b A wholly healthy family produces nothing
-- [x] 2.5 Mutation: removing the suppression re-introduces the per-URL findings
-- [x] 2.6 Existing S-01 rule tests pass unchanged
-- [x] 2.7 Integration suite passes: `npm run test:integration`
-- [x] 2.8 Type checking passes: `npm run typecheck`
-- [x] 2.9 Linting passes: `npm run check`
+- [x] 2.1 The shapes table fails before the rule exists and passes after — 5ff3f73
+- [x] 2.2 A broken variant declared by five siblings produces one finding, not five — 5ff3f73
+- [x] 2.3 A broken variant declared by one sibling keeps its per-URL finding — 5ff3f73
+- [x] 2.4 A family where every member failed produces no divergence finding — 5ff3f73
+- [x] 2.4b A wholly healthy family produces nothing — 5ff3f73
+- [x] 2.5 Mutation: removing the suppression re-introduces the per-URL findings — 5ff3f73
+- [x] 2.6 Existing S-01 rule tests pass unchanged — 5ff3f73
+- [x] 2.7 Integration suite passes: `npm run test:integration` — 5ff3f73
+- [x] 2.8 Type checking passes: `npm run typecheck` — 5ff3f73
+- [x] 2.9 Linting passes: `npm run check` — 5ff3f73
 
 #### Manual
 
