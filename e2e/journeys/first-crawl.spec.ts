@@ -134,6 +134,17 @@ test("a family whose language links disagree is reported once, naming the pages"
 			exact: false,
 		}),
 	).toBeVisible();
+
+	/**
+	 * How much of the site a problem touches, which a count of findings alone
+	 * understates: this is one finding about three pages, and reading "1" would
+	 * suggest a single page needs attention.
+	 */
+	await expect(
+		signedIn.getByRole("heading", {
+			name: EXPECTED.inconsistentLinks.heading,
+		}),
+	).toContainText("3 pages");
 });
 
 test("a variant failing while its siblings work is stated as one comparison", async ({

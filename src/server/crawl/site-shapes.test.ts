@@ -613,6 +613,40 @@ describe("a family whose declarations disagree with each other", () => {
 		).toEqual([]);
 	});
 
+	it("does not also call a page silent when its family already named it", () => {
+		/**
+		 * One fact, one finding. `/de` declares nothing, and that shows up two ways:
+		 * as a page with no alternates, and as a member that does not link back to
+		 * the sibling declaring it.
+		 *
+		 * The family finding wins because it is strictly more useful — it names the
+		 * page to link to and the language to use, where the other only observes
+		 * that something is absent. Saying both would be one problem under two
+		 * names, which is the failure this project has now fixed three times.
+		 */
+		const findings = findingsFor({
+			pages: [page("/en", { hreflang: { en: "/en", de: "/de" } }), page("/de")],
+		});
+
+		expect(
+			findings.filter((f) => f.type === "hreflang_family_inconsistent"),
+		).toHaveLength(1);
+		expect(findings.filter((f) => f.type === "no_hreflang")).toEqual([]);
+	});
+
+	it("still calls a page silent when no family speaks for it", () => {
+		/**
+		 * The guard on the deferral: a locale-shaped page nobody declares has no
+		 * family to describe it, so suppressing rule 4 here would lose the finding
+		 * entirely rather than replace it.
+		 */
+		expect(
+			findingsFor({ pages: [page("/de/preise")] }).filter(
+				(f) => f.type === "no_hreflang",
+			),
+		).toHaveLength(1);
+	});
+
 	it("measures completeness against the family, not the project's locales", () => {
 		/**
 		 * A family publishing only en and de, where the project also expects fr, is

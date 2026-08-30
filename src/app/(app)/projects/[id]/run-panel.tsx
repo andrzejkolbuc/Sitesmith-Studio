@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { api } from "~/trpc/react";
-import { summariseList } from "./summarise";
+import { countPages, summariseList } from "./summarise";
 
 /**
  * Triggering a run and watching it finish.
@@ -242,9 +242,20 @@ function Findings({
 		<div className="mt-6 flex flex-col gap-6">
 			{[...byType.entries()].map(([type, rows]) => (
 				<div key={type}>
-					<h3 className="font-medium text-neutral-200 text-sm">
+					{/*
+					 * Two numbers, because neither answers the question alone. The count
+					 * of findings says how many separate problems of this kind there
+					 * are; the count of pages says how much of the site they touch — and
+					 * a family-level finding can be one problem across six pages, which
+					 * a finding count on its own would understate as one.
+					 */}
+					<h3 className="flex flex-wrap items-baseline gap-x-2 font-medium text-neutral-200 text-sm">
 						{FINDING_LABEL[type] ?? type}
-						<span className="ml-2 text-neutral-500">{rows.length}</span>
+						<span className="font-normal text-neutral-500 text-xs">
+							{rows.length} {rows.length === 1 ? "finding" : "findings"}
+							{" · "}
+							{countPages(rows)} {countPages(rows) === 1 ? "page" : "pages"}
+						</span>
 					</h3>
 
 					<ul className="mt-2 divide-y divide-neutral-800 border-neutral-800 border-y">

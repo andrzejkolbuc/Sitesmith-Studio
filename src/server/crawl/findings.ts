@@ -161,6 +161,16 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 	// shape.
 	const collapsed = new Map<string, Record<string, unknown>>();
 
+	/**
+	 * Pages a family finding already speaks for.
+	 *
+	 * Read by rule 4 below, which otherwise reports the same fact a second time
+	 * and less usefully: a page that declares nothing is both "silent" and "not
+	 * linking back to the sibling that declares it", and only the second names
+	 * what to add.
+	 */
+	const describedByFamily = new Set<string>();
+
 	for (const family of groupFamilies(pages)) {
 		const healthy = family.members.filter((member) => {
 			const page = byUrl.get(member.url);
@@ -363,6 +373,10 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 
 		if (defects.length === 0) continue;
 
+		for (const defect of defects) {
+			if (typeof defect.url === "string") describedByFamily.add(defect.url);
+		}
+
 		findings.push({
 			type: FINDING_TYPES.HREFLANG_FAMILY_INCONSISTENT,
 			url: null,
@@ -395,6 +409,14 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 			([, target]) => target !== page.url,
 		);
 		if (alternates.length > 0) continue;
+
+		/**
+		 * Deferred to the family finding when one already names this page. That
+		 * finding says the same thing and says it better — which sibling, and in
+		 * which language — so repeating it here would be one problem under two
+		 * names.
+		 */
+		if (describedByFamily.has(page.url)) continue;
 
 		const impliedLocale = localeFromUrl(page.url);
 		if (!impliedLocale) continue;

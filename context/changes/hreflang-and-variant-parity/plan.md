@@ -436,7 +436,7 @@ when the run was made.
 
 #### Manual
 
-- [ ] 1.10 The detail is enough to know which page to edit and what to add
+- [x] 1.10 The detail is enough to know which page to edit and what to add — confirmed by the user
 
 ### Phase 2: The divergence rule
 
@@ -455,7 +455,7 @@ when the run was made.
 
 #### Manual
 
-- [ ] 2.10 No single problem is described twice under two names
+- [x] 2.10 No single problem is described twice under two names — delegated by the user and verified against a real crawl; one duplication found and fixed, so rule 4 now defers to the family finding
 
 ### Phase 3: Presentation
 
@@ -470,5 +470,5 @@ when the run was made.
 
 #### Manual
 
-- [ ] 3.7 The results screen reads as distinct problems rather than a wall
-- [ ] 3.8 A wide family's truncation states how many members were not shown
+- [x] 3.7 The results screen reads as distinct problems rather than a wall — user asked for a page count alongside each problem; added and asserted in the browser suite
+- [x] 3.8 A wide family's truncation states how many members were not shown — the rule is unit-tested at its boundary; the rendering of it is not, because no fixture family is wide enough to truncate

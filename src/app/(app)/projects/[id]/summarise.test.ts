@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_LISTED, summariseList } from "./summarise";
+import {
+	countPages,
+	MAX_LISTED,
+	pagesInvolved,
+	summariseList,
+} from "./summarise";
 
 /**
  * The truncation rule, made checkable.
@@ -66,5 +71,100 @@ describe("summariseList", () => {
 
 		expect(shown).toHaveLength(1);
 		expect(hidden).toBe(3);
+	});
+});
+
+describe("pagesInvolved", () => {
+	const B = "https://shop.test";
+
+	it("counts every member of a family-level finding", () => {
+		/**
+		 * The reason this exists. One finding, six pages — a count of findings
+		 * alone would tell the reader this problem touches one page.
+		 */
+		expect(
+			pagesInvolved({
+				type: "hreflang_family_inconsistent",
+				url: null,
+				detail: { memberUrls: [`${B}/a`, `${B}/b`, `${B}/c`] },
+			}),
+		).toHaveLength(3);
+	});
+
+	it("counts both ends of a broken declaration", () => {
+		/**
+		 * Two pages are implicated: the one carrying the link, which is where the
+		 * fix goes, and the one it points at.
+		 */
+		expect(
+			pagesInvolved({
+				type: "hreflang_target_failed",
+				url: `${B}/en`,
+				detail: { declaredBy: `${B}/en`, target: `${B}/de` },
+			}),
+		).toEqual([`${B}/en`, `${B}/de`]);
+	});
+
+	it("counts the declarers and the broken page of a divergence", () => {
+		expect(
+			pagesInvolved({
+				type: "variant_diverged",
+				url: null,
+				detail: {
+					declaredBy: [`${B}/en`, `${B}/de`],
+					brokenUrl: `${B}/fr`,
+				},
+			}),
+		).toHaveLength(3);
+	});
+
+	it("falls back to the page a finding names when its type is unknown", () => {
+		/**
+		 * A rule added later and not listed here would otherwise report as
+		 * affecting no pages, which reads as a problem that touches nothing.
+		 */
+		expect(
+			pagesInvolved({ type: "something_new", url: `${B}/x`, detail: {} }),
+		).toEqual([`${B}/x`]);
+	});
+
+	it("survives a detail that is missing or the wrong shape", () => {
+		/**
+		 * Detail is jsonb written by whatever produced the run, including runs
+		 * recorded before a field existed. A crash here would take down the whole
+		 * results screen over one malformed row.
+		 */
+		expect(
+			pagesInvolved({ type: "missing_locale", url: null, detail: {} }),
+		).toEqual([]);
+		expect(
+			pagesInvolved({
+				type: "missing_locale",
+				url: null,
+				detail: { memberUrls: "not an array" },
+			}),
+		).toEqual([]);
+	});
+});
+
+describe("countPages", () => {
+	const B = "https://shop.test";
+
+	it("counts a page once however many findings name it", () => {
+		/**
+		 * Two problems on overlapping pages is three pages affected, not four. The
+		 * number is meant to answer "how much of my site is this", so double
+		 * counting would overstate it.
+		 */
+		expect(
+			countPages([
+				{ type: "no_hreflang", url: null, detail: { url: `${B}/a` } },
+				{
+					type: "hreflang_family_inconsistent",
+					url: null,
+					detail: { memberUrls: [`${B}/a`, `${B}/b`, `${B}/c`] },
+				},
+			]),
+		).toBe(3);
 	});
 });
