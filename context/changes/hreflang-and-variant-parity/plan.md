@@ -461,12 +461,12 @@ when the run was made.
 
 #### Automated
 
-- [x] 3.1 Both new types render with a human label, never as a JSON dump
-- [x] 3.2 The browser journey passes: `npm run test:e2e`
-- [x] 3.3 Existing journeys pass unchanged
-- [x] 3.4 The whole suite passes: `npm run test:all`
-- [x] 3.5 Type checking passes: `npm run typecheck`
-- [x] 3.6 Linting passes: `npm run check`
+- [x] 3.1 Both new types render with a human label, never as a JSON dump — 463b328
+- [x] 3.2 The browser journey passes: `npm run test:e2e` — 463b328
+- [x] 3.3 Existing journeys pass unchanged — 463b328
+- [x] 3.4 The whole suite passes: `npm run test:all` — 463b328
+- [x] 3.5 Type checking passes: `npm run typecheck` — 463b328
+- [x] 3.6 Linting passes: `npm run check` — 463b328
 
 #### Manual
 
