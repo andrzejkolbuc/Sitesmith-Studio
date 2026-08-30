@@ -39,6 +39,28 @@ export const EXPECTED = {
 		heading: "No language variants declared",
 	},
 	/**
+	 * `/support`, `/de/hilfe` and `/fr/aide` do not all point at each other —
+	 * each is declared by a sibling it does not declare back.
+	 */
+	inconsistentLinks: {
+		heading: "Language links that disagree",
+		/**
+		 * The line the finding must produce, asserted whole rather than by page
+		 * name: a page name appears both as the page to fix and as a sibling, and
+		 * matching either would pass on output that named the page without saying
+		 * what to do about it.
+		 */
+		instruction: "does not link back to /support",
+	},
+	/**
+	 * `/careers` and `/de/karriere` both declare a French page that 404s. Two
+	 * declarers is the threshold at which the per-URL reports collapse into one.
+	 */
+	divergedVariant: {
+		heading: "One variant broken, its siblings fine",
+		locale: "fr",
+	},
+	/**
 	 * The negative case. `/blog/monolingual` has no hreflang and no locale in its
 	 * URL, and must produce nothing at all — this is the guard on the narrowing
 	 * that keeps ordinary single-language pages quiet.

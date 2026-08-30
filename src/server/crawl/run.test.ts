@@ -269,7 +269,19 @@ describe("run procedures", () => {
 });
 
 describe("crawl scope chosen at creation", () => {
-	it("never requests a path the project excluded", async () => {
+	/**
+	 * Slower than its neighbours on purpose, and given room to be.
+	 *
+	 * Every other test here seeds a project row directly with no request delay.
+	 * This one goes through `project.create`, so it inherits the real politeness
+	 * defaults — two at a time, 500ms apart — which is the point: it proves the
+	 * row the creation form produces behaves correctly, pacing included. It also
+	 * means the wall-clock cost grows with the fixture, and it was already at
+	 * 5017ms against a 5000ms limit before this slice added pages to the site.
+	 */
+	it("never requests a path the project excluded", {
+		timeout: 30_000,
+	}, async () => {
 		/**
 		 * The chain this covers is the one that breaks: the crawler's own exclusion
 		 * is unit-tested, and the stored column is read correctly, but nothing

@@ -34,6 +34,10 @@ type Page = {
  * - `/de/blog-post` — locale-shaped URL, no hreflang at all. Fires rule 4.
  * - `/blog/monolingual` — no hreflang, no locale in the URL. Must fire NOTHING;
  *   this is the negative assertion that guards the rule-4 narrowing.
+ * - `/support`, `/de/hilfe`, `/fr/aide` — a family whose members disagree about
+ *   each other. Fires rule 5 (declarations not returned).
+ * - `/careers`, `/de/karriere` — two healthy siblings both declaring a French
+ *   variant that 404s. Fires rule 6 (one variant failing while siblings are fine).
  * - `/private/secret` — only reachable if excludePaths is ignored.
  * - `/slow`, `/flaky` — timing and abort behaviour.
  */
@@ -48,6 +52,8 @@ const SITE: Record<string, Page> = {
 			"/de/",
 			"/fr/",
 			"/de/blog-post",
+			"/support",
+			"/careers",
 			"/private/secret",
 			"/?utm_source=nav",
 		],
@@ -67,6 +73,39 @@ const SITE: Record<string, Page> = {
 
 	// Rule 3: the declared sibling is outside the crawl scope.
 	"/about": { alternates: { en: "/about", de: "/private/ueber-uns" } },
+
+	/**
+	 * Rule 5: declarations that are not returned.
+	 *
+	 * `/support` names all three members. `/de/hilfe` names French but not
+	 * English, and `/fr/aide` names English but not German — so each is declared
+	 * by a sibling it does not declare back, which is the non-reciprocal shape
+	 * FR-025 names.
+	 *
+	 * Every member still declares one non-self alternate, deliberately: a member
+	 * whose only alternate was itself would fire rule 4 as well, and this family
+	 * exists to exercise one rule at a time.
+	 */
+	"/support": {
+		alternates: { en: "/support", de: "/de/hilfe", fr: "/fr/aide" },
+	},
+	"/de/hilfe": { alternates: { de: "/de/hilfe", fr: "/fr/aide" } },
+	"/fr/aide": { alternates: { fr: "/fr/aide", en: "/support" } },
+
+	/**
+	 * Rule 6: one variant failing while its siblings are fine.
+	 *
+	 * Both healthy members declare `/fr/carrieres`, which is absent and so 404s.
+	 * Two declarers is exactly the threshold at which the per-URL reports collapse
+	 * into a single divergence finding — with one declarer the existing per-URL
+	 * finding is left alone, which is what `/contact` covers.
+	 */
+	"/careers": {
+		alternates: { en: "/careers", de: "/de/karriere", fr: "/fr/carrieres" },
+	},
+	"/de/karriere": {
+		alternates: { en: "/careers", de: "/de/karriere", fr: "/fr/carrieres" },
+	},
 
 	// Rule 4: locale-shaped URL with no hreflang.
 	"/de/blog-post": { body: "<p>Ein Beitrag ohne hreflang.</p>" },

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { api } from "~/trpc/react";
+import { summariseList } from "./summarise";
 
 /**
  * Triggering a run and watching it finish.
@@ -38,7 +39,38 @@ const FINDING_LABEL: Record<string, string> = {
 	hreflang_target_failed: "Declared variant is broken",
 	hreflang_target_unreached: "Declared variant was never reached",
 	no_hreflang: "No language variants declared",
+	hreflang_family_inconsistent: "Language links that disagree",
+	variant_diverged: "One variant broken, its siblings fine",
 };
+
+function Listed({ items }: { items: string[] }) {
+	const { shown, hidden } = summariseList(items);
+
+	return (
+		<ul className="mt-1 flex flex-col gap-0.5">
+			{shown.map((item) => (
+				<li className="break-all text-neutral-500" key={item}>
+					{item}
+				</li>
+			))}
+			{hidden > 0 ? (
+				<li className="text-neutral-500 italic">
+					and {hidden} more {hidden === 1 ? "page" : "pages"}
+				</li>
+			) : null}
+		</ul>
+	);
+}
+
+/** A URL shortened to its path, since every member shares the same host. */
+function pathOf(url: unknown): string {
+	if (typeof url !== "string") return "?";
+	try {
+		return new URL(url).pathname;
+	} catch {
+		return url;
+	}
+}
 
 export function RunPanel({ projectId }: { projectId: string }) {
 	const [startError, setStartError] = useState<string | null>(null);
@@ -303,6 +335,82 @@ function Evidence({
 					<div className="mt-1 break-all text-neutral-500">{str("url")}</div>
 				</>
 			);
+
+		case "hreflang_family_inconsistent": {
+			/**
+			 * Each line is meant to read as an instruction: on this page, add a link
+			 * for that language pointing at that page. Naming the page alone would be
+			 * half an instruction, since the fix is a tag naming a language.
+			 */
+			const defects = Array.isArray(detail.defects)
+				? (detail.defects as Array<Record<string, unknown>>)
+				: [];
+
+			const lines = defects.map((defect) => {
+				const page = pathOf(defect.url);
+				const sibling = pathOf(defect.sibling);
+
+				if (defect.kind === "no_self_reference") {
+					return `${page} — does not name itself as ${String(defect.locale ?? "?")}`;
+				}
+				const verb =
+					defect.kind === "not_reciprocated"
+						? "does not link back to"
+						: "does not link to";
+				return `${page} — ${verb} ${sibling} (${String(defect.siblingLocale ?? "?")})`;
+			});
+
+			const members = Array.isArray(detail.memberUrls)
+				? (detail.memberUrls as string[])
+				: [];
+
+			return (
+				<>
+					<span className="text-neutral-100">
+						{members.length} pages in this set do not all point at each other
+					</span>
+					<div className="mt-1 text-sm">
+						<Listed items={lines} />
+					</div>
+				</>
+			);
+		}
+
+		case "variant_diverged": {
+			/**
+			 * Stated as a comparison, because that is the finding: not that a page is
+			 * broken, but that it is broken while its siblings are not. The declaring
+			 * pages are named because each one carries a link that now points at an
+			 * error, and each is somewhere the fix has to be checked.
+			 */
+			const declaredBy = Array.isArray(detail.declaredBy)
+				? (detail.declaredBy as string[])
+				: [];
+			const healthy = Array.isArray(detail.healthyUrls)
+				? (detail.healthyUrls as string[])
+				: [];
+
+			const status = detail.httpStatus
+				? `returns ${String(detail.httpStatus)}`
+				: `failed: ${str("fetchError") ?? "no response"}`;
+
+			return (
+				<>
+					<span className="text-neutral-100">
+						The <Code>{str("locale") ?? "?"}</Code> version {status}, while{" "}
+						{healthy.length} {healthy.length === 1 ? "sibling" : "siblings"}{" "}
+						{healthy.length === 1 ? "works" : "work"}
+					</span>
+					<div className="mt-1 break-all text-neutral-500">
+						{str("brokenUrl")}
+					</div>
+					<div className="mt-1 text-sm">
+						<span className="text-neutral-500">Linked from:</span>
+						<Listed items={declaredBy.map(pathOf)} />
+					</div>
+				</>
+			);
+		}
 
 		default:
 			return (

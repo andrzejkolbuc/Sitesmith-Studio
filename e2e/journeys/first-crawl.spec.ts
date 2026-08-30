@@ -102,3 +102,78 @@ test("a second check cannot start while one is running", async ({
 		signedIn.getByRole("button", { name: "Check in progress" }),
 	).toBeDisabled();
 });
+
+test("a family whose language links disagree is reported once, naming the pages", async ({
+	signedIn,
+	site,
+	createProject,
+}) => {
+	/**
+	 * FR-025's remaining half, end to end. The rules were built against
+	 * hand-written page records; this is the first thing that proves a real crawl
+	 * produces them, persists them, and renders them as something readable.
+	 */
+	await createProject({ startUrl: site.baseUrl });
+
+	await signedIn.getByRole("button", { name: "Run a check" }).click();
+	await expect(signedIn.getByText("Complete")).toBeVisible({ timeout: 60_000 });
+
+	await expect(
+		signedIn.getByRole("heading", {
+			name: EXPECTED.inconsistentLinks.heading,
+		}),
+	).toBeVisible();
+
+	/**
+	 * The heading alone would pass on a finding nobody can act on. What makes it
+	 * useful is that each line reads as an instruction — this page, this language,
+	 * that target — so the whole line is what gets asserted.
+	 */
+	await expect(
+		signedIn.getByText(EXPECTED.inconsistentLinks.instruction, {
+			exact: false,
+		}),
+	).toBeVisible();
+});
+
+test("a variant failing while its siblings work is stated as one comparison", async ({
+	signedIn,
+	site,
+	createProject,
+}) => {
+	/**
+	 * Two healthy pages declare the same broken French page. Before this rule that
+	 * produced one finding per declaring page, saying the same thing twice — the
+	 * shape the requirement forbids in as many words.
+	 */
+	await createProject({ startUrl: site.baseUrl });
+
+	await signedIn.getByRole("button", { name: "Run a check" }).click();
+	await expect(signedIn.getByText("Complete")).toBeVisible({ timeout: 60_000 });
+
+	await expect(
+		signedIn.getByRole("heading", { name: EXPECTED.divergedVariant.heading }),
+	).toBeVisible();
+
+	// Said as a comparison — which locale broke, and that siblings did not.
+	await expect(signedIn.getByText("while 2 siblings work")).toBeVisible();
+});
+
+test("no finding renders as a raw payload", async ({
+	signedIn,
+	site,
+	createProject,
+}) => {
+	/**
+	 * The guard on every finding type at once, including ones added later. An
+	 * unmapped type falls through to a JSON dump, which is legible to nobody and
+	 * is the failure mode that would follow silently from adding a rule and
+	 * forgetting the label.
+	 */
+	await createProject({ startUrl: site.baseUrl });
+
+	await signedIn.getByRole("button", { name: "Run a check" }).click();
+	await expect(signedIn.getByText("Complete")).toBeVisible({ timeout: 60_000 });
+
+	await expect(signedIn.getByText(/^\{"/)).toHaveCount(0);
+});

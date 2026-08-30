@@ -31,6 +31,8 @@ export default defineConfig({
 			// The guard on the reset helper. Contacts no database: the connection is
 			// lazy and every case is refused before a query is issued.
 			"test/**/*.test.ts",
+			// Presentation logic that is pure enough to test without a browser.
+			"src/app/**/*.test.ts",
 		],
 		/**
 		 * The escape hatch for the include above: an auth test that needs a real
