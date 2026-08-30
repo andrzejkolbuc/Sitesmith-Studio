@@ -54,11 +54,14 @@ function findingsFor(options: {
 	pages: CrawledPage[];
 	expectedLocales?: string[];
 	inScope?: (url: string) => boolean;
+	/** Defaults to a finished crawl: every existing case describes one. */
+	crawlComplete?: boolean;
 }): Summary[] {
 	return detectMissingVariants({
 		pages: options.pages,
 		expectedLocales: options.expectedLocales ?? [],
 		inScope: options.inScope ?? ((url) => url.startsWith(BASE)),
+		crawlComplete: options.crawlComplete ?? true,
 	})
 		.map((finding) => ({ type: finding.type, url: finding.url }))
 		.sort(
@@ -79,11 +82,14 @@ function detailedFindingsFor(options: {
 	pages: CrawledPage[];
 	expectedLocales?: string[];
 	inScope?: (url: string) => boolean;
+	/** Defaults to a finished crawl: every existing case describes one. */
+	crawlComplete?: boolean;
 }) {
 	return detectMissingVariants({
 		pages: options.pages,
 		expectedLocales: options.expectedLocales ?? [],
 		inScope: options.inScope ?? ((url) => url.startsWith(BASE)),
+		crawlComplete: options.crawlComplete ?? true,
 	});
 }
 
@@ -801,5 +807,96 @@ describe("a variant that failed while its siblings did not", () => {
 				],
 			}).filter((f) => f.type === "variant_diverged"),
 		).toEqual([]);
+	});
+});
+
+/**
+ * A crawl that stopped early must not blame the site for where it did not go.
+ *
+ * Found against a real client site, and no fixture could have taught it: every
+ * fixture crawl finishes. Twenty pages into a site whose English section alone
+ * is larger than that, the page ceiling was reached before any German page —
+ * and the run reported eighteen findings, every one of them saying a German
+ * page "was never reached". All eighteen URLs return 200. The site was fine;
+ * the tool described its own limit as the client's defect, confidently and at
+ * volume.
+ *
+ * Two rules infer from absence. Rule 3 says a declared sibling that is missing
+ * from the crawl is broken; rule 1 says a locale absent from a family is not
+ * published. Both inferences are sound only when the crawl actually finished.
+ * When it stopped early — page ceiling, failure abort, or process restart —
+ * absence is evidence of nothing.
+ */
+describe("a crawl that did not finish", () => {
+	const declaresMissingSibling = [
+		page("/en", { hreflang: { en: "/en", de: "/de" } }),
+	];
+
+	it("does not report a declared sibling it may simply not have reached", () => {
+		expect(
+			findingsFor({ pages: declaresMissingSibling, crawlComplete: false }),
+		).toEqual([]);
+	});
+
+	it("still reports one when the crawl ran to completion", () => {
+		/**
+		 * The guard on the suppression. Silence on a truncated run is right; silence
+		 * on a finished one would delete the rule.
+		 */
+		expect(
+			findingsFor({ pages: declaresMissingSibling, crawlComplete: true }),
+		).toEqual([{ type: "hreflang_target_unreached", url: `${BASE}/en` }]);
+	});
+
+	it("does not report a locale that may be beyond where it stopped", () => {
+		/**
+		 * Rule 1's version of the same mistake, and the reason this fix is not
+		 * limited to rule 3. It scored zero against the real site only by accident:
+		 * truncation had left every family with a single member, so the
+		 * two-member guard caught it. A slightly higher ceiling would have produced
+		 * false "missing locale" findings alongside the false "never reached" ones.
+		 */
+		const alternates = { en: "/en", de: "/de" };
+
+		expect(
+			findingsFor({
+				pages: [
+					page("/en", { hreflang: alternates }),
+					page("/de", { hreflang: alternates }),
+				],
+				expectedLocales: ["en", "de", "fr"],
+				crawlComplete: false,
+			}),
+		).toEqual([]);
+	});
+
+	it("still reports a missing locale when the crawl ran to completion", () => {
+		const alternates = { en: "/en", de: "/de" };
+
+		expect(
+			findingsFor({
+				pages: [
+					page("/en", { hreflang: alternates }),
+					page("/de", { hreflang: alternates }),
+				],
+				expectedLocales: ["en", "de", "fr"],
+				crawlComplete: true,
+			}),
+		).toEqual([{ type: "missing_locale", url: `${BASE}/de` }]);
+	});
+
+	it("still reports what it saw with its own eyes", () => {
+		/**
+		 * The boundary of the suppression. Rules that read what a crawled page
+		 * actually said — rather than inferring from what is absent — remain valid
+		 * however early the crawl stopped, and silencing them would throw away real
+		 * findings for no reason.
+		 */
+		expect(
+			findingsFor({
+				pages: [page("/de/preise")],
+				crawlComplete: false,
+			}).filter((f) => f.type === "no_hreflang"),
+		).toHaveLength(1);
 	});
 });

@@ -114,6 +114,8 @@ describe("detectMissingVariants against the fixture site", () => {
 				pages: result.pages,
 				expectedLocales: ["en", "de", "fr"],
 				inScope,
+				// The fixture is small enough that every crawl here reaches the end.
+				crawlComplete: true,
 			}),
 		};
 	}
@@ -212,6 +214,7 @@ describe("detectMissingVariants edge cases", () => {
 		const findings = detectMissingVariants({
 			pages: [page("https://x.test/a"), page("https://x.test/b")],
 			expectedLocales: ["en", "de", "fr"],
+			crawlComplete: true,
 			inScope: allInScope,
 		});
 
@@ -249,6 +252,7 @@ describe("detectMissingVariants edge cases", () => {
 		const findings = detectMissingVariants({
 			pages: [healthy, broken],
 			expectedLocales: ["en", "de"],
+			crawlComplete: true,
 			inScope: allInScope,
 		});
 
@@ -289,6 +293,7 @@ describe("detectMissingVariants edge cases", () => {
 		const findings = detectMissingVariants({
 			pages: [en, de],
 			expectedLocales: ["en", "de", "fr"],
+			crawlComplete: true,
 			inScope: allInScope,
 		});
 
@@ -311,6 +316,7 @@ describe("detectMissingVariants edge cases", () => {
 		const findings = detectMissingVariants({
 			pages: [broken],
 			expectedLocales: ["en", "de"],
+			crawlComplete: true,
 			inScope: allInScope,
 		});
 

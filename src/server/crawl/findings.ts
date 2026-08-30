@@ -47,6 +47,17 @@ export type DetectOptions = {
 	expectedLocales: string[];
 	/** Used to avoid reporting a declared sibling that is legitimately out of scope. */
 	inScope: (url: string) => boolean;
+	/**
+	 * Whether the crawl reached the end of the site, rather than stopping at the
+	 * page ceiling, aborting on failures, or being interrupted.
+	 *
+	 * Two rules reason from absence — rule 1 from a locale missing in a family,
+	 * rule 3 from a declared sibling missing from the crawl — and both inferences
+	 * hold only if the crawl actually finished. Required rather than optional on
+	 * purpose: a caller that forgets would silently get the confident-and-wrong
+	 * behaviour rather than the safe one.
+	 */
+	crawlComplete: boolean;
 };
 
 /**
@@ -78,7 +89,7 @@ const isError = (page: CrawledPage): boolean =>
  * which matters because a later slice diffs runs against each other.
  */
 export function detectMissingVariants(options: DetectOptions): Finding[] {
-	const { pages, expectedLocales, inScope } = options;
+	const { pages, expectedLocales, inScope, crawlComplete } = options;
 
 	const variants = groupVariants(pages);
 
@@ -111,6 +122,12 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 	for (const [groupKey, members] of [...families.entries()].sort(([a], [b]) =>
 		a.localeCompare(b),
 	)) {
+		/**
+		 * A locale is only missing if we finished looking. On a truncated crawl the
+		 * page publishing it may sit beyond the ceiling, and reporting it absent
+		 * blames the site for where we stopped.
+		 */
+		if (!crawlComplete) break;
 		/**
 		 * A family of one is not evidence that translations are expected.
 		 *
@@ -268,7 +285,13 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 			 * scope — the crawl was told not to go there, so its absence is the
 			 * configuration working, not the site being broken.
 			 */
-			if (!targetPage && inScope(target)) {
+			/**
+			 * Only meaningful on a crawl that finished. Against a real site this rule
+			 * produced eighteen findings from a twenty-page run, every one naming a
+			 * page that returns 200 — the ceiling was reached before the German
+			 * section, and the tool reported its own limit as the client's defect.
+			 */
+			if (!targetPage && crawlComplete && inScope(target)) {
 				findings.push({
 					type: FINDING_TYPES.HREFLANG_TARGET_UNREACHED,
 					url: page.url,

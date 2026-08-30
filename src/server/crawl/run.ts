@@ -181,6 +181,11 @@ async function execute(
 
 	const detected = detectMissingVariants({
 		pages: result.pages,
+		/**
+		 * A run that stopped early cannot tell a missing page from an unvisited one,
+		 * so the rules that reason from absence stay quiet.
+		 */
+		crawlComplete: result.abortedReason === null && !result.reachedPageLimit,
 		expectedLocales: project.locales,
 		inScope,
 	});
