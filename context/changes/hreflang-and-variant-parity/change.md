@@ -1,7 +1,7 @@
 ---
 change_id: hreflang-and-variant-parity
 title: "hreflang graph and cross-variant parity"
-status: implemented
+status: impl_reviewed
 created: 2026-08-25
 updated: 2026-08-30
 roadmap_ref: S-02

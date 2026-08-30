@@ -81,6 +81,16 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 	const { pages, expectedLocales, inScope } = options;
 
 	const variants = groupVariants(pages);
+
+	/**
+	 * Built once and shared.
+	 *
+	 * `groupFamilies` walks the hreflang graph itself, so calling it per rule
+	 * meant the union-find ran three times over a crawl that can hold two
+	 * thousand pages. Nothing was wrong with the result — the rules simply grew
+	 * one at a time, each reaching for the graph as though it were free.
+	 */
+	const variantFamilies = groupFamilies(pages);
 	const byUrl = new Map(pages.map((page) => [page.url, page]));
 	const expected = expectedLocales.map((locale) => locale.toLowerCase());
 
@@ -171,7 +181,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 	 */
 	const describedByFamily = new Set<string>();
 
-	for (const family of groupFamilies(pages)) {
+	for (const family of variantFamilies) {
 		const healthy = family.members.filter((member) => {
 			const page = byUrl.get(member.url);
 			return page && !isError(page);
@@ -278,7 +288,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 	// partial alternate list breaks every page it renders, so per-edge reporting
 	// would make the worst sites the least readable — and the requirement asks
 	// for the same thing in its own words: the divergence itself is the finding.
-	for (const family of groupFamilies(pages)) {
+	for (const family of variantFamilies) {
 		/**
 		 * Judged among the members that actually loaded.
 		 *

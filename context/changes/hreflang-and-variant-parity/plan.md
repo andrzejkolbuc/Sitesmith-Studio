@@ -472,3 +472,37 @@ when the run was made.
 
 - [x] 3.7 The results screen reads as distinct problems rather than a wall — user asked for a page count alongside each problem; added and asserted in the browser suite
 - [x] 3.8 A wide family's truncation states how many members were not shown — the rule is unit-tested at its boundary; the rendering of it is not, because no fixture family is wide enough to truncate
+
+## Addendum: files changed that this plan did not name
+
+Recorded during implementation review, so that plan and diff agree for anyone
+reading them side by side later. None of these is unrequested feature work; each
+came from something the plan asked for but had not anticipated the shape of.
+
+- **`src/app/(app)/projects/[id]/summarise.ts`** and its test — created in Phase
+  3. Criterion 3.8 asks that truncation state how many members were hidden, and
+  no fixture family is wide enough to render that case, so the criterion could
+  not have been checked by inspection either. The rule was extracted to a pure
+  function and tested at its boundary instead. The same module later took the
+  finding-to-pages mapping behind the page counts.
+
+- **`src/server/crawl/run.test.ts`** — one timeout raised from 5s to 30s. That
+  test goes through `project.create` and so inherits the real politeness
+  defaults, and it was already running at 5017ms before this slice added pages to
+  the fixture. The pacing is the point of the test, so the limit moved rather
+  than the pacing. See the note in the file.
+
+- **`vitest.unit.config.ts`** — one include added, so the new presentation tests
+  run in the bucket that needs no database.
+
+**One deviation from a stated contract.** Phase 3 says the fixture change should
+leave "every existing path and its declarations untouched". Two links were added
+to `/` so the new pages are reachable by a crawl that starts there. The intent
+behind that wording — not disturbing the assertions built on the existing pages —
+was honoured and verified: `missing_locale` 2, `hreflang_target_failed` 1 and
+`no_hreflang` 1 are all unchanged, and the full suite passes.
+
+**One fix applied after review.** `groupFamilies` was being called once per rule,
+and it walks the hreflang graph itself, so the union-find ran three times per
+detection pass. It is now built once and shared. Hoisting it also surfaced a name
+shadow with rule 1's local `families`, now `variantFamilies`.

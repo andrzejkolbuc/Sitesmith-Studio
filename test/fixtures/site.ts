@@ -13,6 +13,15 @@ import type { AddressInfo } from "node:net";
  * worth protecting — concurrency ceiling, inter-request delay, abort on a
  * failure burst — only exists in the network path. A stub would leave exactly
  * the machinery that can damage a client's site untested.
+ *
+ * **Every page added here is paid for by every test that crawls this site.**
+ * Most of them run with no request delay and hardly notice. One does not:
+ * `run.test.ts`'s "never requests a path the project excluded" goes through
+ * `project.create` and so inherits the real politeness defaults — two at a time,
+ * 500ms apart — because that pacing is the thing it exists to prove. Adding six
+ * pages in S-02 pushed it from 5017ms past its 5000ms limit, which is how this
+ * note came to be written. Its budget is now 30s; if a future addition pushes it
+ * again, raise the budget rather than removing the pacing.
  */
 
 type Page = {
