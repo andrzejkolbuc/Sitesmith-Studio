@@ -166,7 +166,12 @@ export function RunPanel({
 			{run ? (
 				<dl className="mt-8 flex flex-wrap gap-x-14 gap-y-6">
 					<Stat label="Pages crawled" value={run.pagesCrawled} />
-					<Stat label="Findings" value={run.findingsCount} />
+					{/*
+					 * Findings are worked out in one pass after the crawl, so during it
+					 * there is no number to show. Displaying zero would be a claim, and
+					 * a wrong one — an em dash says "not yet", which is the truth.
+					 */}
+					<Stat label="Findings" value={isActive ? "—" : run.findingsCount} />
 					<Stat label="Started" value={formatTime(run.startedAt)} />
 					<Stat label="Duration" value={formatDuration(run)} />
 				</dl>

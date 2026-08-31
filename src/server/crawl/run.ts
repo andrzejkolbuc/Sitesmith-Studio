@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { db as database } from "~/server/db";
 import { findings, pages, projects, runs } from "~/server/db/schema";
@@ -168,6 +168,22 @@ async function execute(
 				hreflangTargets: page.hreflangTargets,
 				fetchError: page.fetchError,
 			});
+
+			/**
+			 * Counted as it happens, so the interface has something true to show.
+			 *
+			 * The count was written once, at the end. Meanwhile the panel polled
+			 * every 1.5s and displayed a duration computed against the current time —
+			 * so it ticked convincingly beside a page count frozen at zero, and a
+			 * long run was indistinguishable from a hung one.
+			 *
+			 * Incremented in SQL rather than read-then-written: workers run
+			 * concurrently and two finishing together would otherwise lose a count.
+			 */
+			await db
+				.update(runs)
+				.set({ pagesCrawled: sql`${runs.pagesCrawled} + 1` })
+				.where(eq(runs.id, runId));
 		},
 	});
 

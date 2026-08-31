@@ -14,7 +14,7 @@ import {
 } from "~/server/db/schema";
 import { type Fixture, startFixtureSite } from "../../../test/fixtures/site";
 import { resetDatabase } from "../../../test/reset";
-import { RUN_STATUS, runToCompletion, sweepStaleRuns } from "./run";
+import { RUN_STATUS, runToCompletion, startRun, sweepStaleRuns } from "./run";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
 
@@ -322,4 +322,54 @@ describe("crawl scope chosen at creation", () => {
 		const crawled = await db.query.pages.findMany();
 		expect(crawled.length).toBeGreaterThan(1);
 	});
+});
+
+describe("progress while a run is in flight", () => {
+	/**
+	 * Reported from the interface: a check shows "Crawling", the duration ticks,
+	 * and "Pages crawled" sits at zero until the whole thing finishes.
+	 *
+	 * The ticking is what makes it convincing — the duration is computed against
+	 * the current time on every poll, so the panel looks alive while the numbers
+	 * beside it are frozen. A run of two thousand pages would show nothing moving
+	 * for minutes and give an operator no way to tell it apart from a hang.
+	 */
+	it("raises the page count as the crawl proceeds, not only at the end", async () => {
+		const { tenant, owner } = await seedProject("progress");
+
+		/**
+		 * Paced slowly enough to observe. Every other test here runs with no delay,
+		 * which finishes before anything could poll it.
+		 */
+		const project = await callerFor(owner.id, tenant.id).project.create({
+			name: "paced",
+			startUrl: site.baseUrl,
+			locales: ["en"],
+			includePaths: [],
+			excludePaths: ["/private", "/flaky"],
+		});
+		await db
+			.update(projects)
+			.set({ requestDelayMs: 250, maxConcurrency: 1 })
+			.where(eq(projects.id, project.id));
+
+		const { runId } = await startRun(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+		});
+
+		// Poll the way the interface does, and record what it would have shown.
+		let seenWhileRunning = 0;
+		for (let i = 0; i < 40; i++) {
+			await new Promise((r) => setTimeout(r, 250));
+			const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
+			if (!run) continue;
+			if (run.status === RUN_STATUS.RUNNING) {
+				seenWhileRunning = Math.max(seenWhileRunning, run.pagesCrawled);
+			}
+			if (run.status === RUN_STATUS.DONE) break;
+		}
+
+		expect(seenWhileRunning).toBeGreaterThan(0);
+	}, 60_000);
 });
