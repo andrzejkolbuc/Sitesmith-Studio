@@ -485,13 +485,50 @@ during shaping and the model was confirmed anyway.
    legitimately differ in length; some languages run materially longer than others. The
    counter-argument was raised and the requirement retained as must-have without a resolution.
    Owner: user.
+
+   > **Resolved 2026-08-31.** Not one check but three, shipped as independent rules in
+   > ascending order of noise, each able to be trusted or distrusted on its own:
+   >
+   > 1. **Untranslated placeholder text** — `lorem ipsum`, `TODO`, unrendered interpolation
+   >    markers, or a variant whose body is substantially identical to its sibling's. A site
+   >    never means to publish these, so the false-positive rate is close to zero.
+   > 2. **Missing sections** — compared *structurally* (heading counts and depth, presence of a
+   >    form, table, or media block), never as prose. Structure is a translation-invariant the
+   >    way word count is not.
+   > 3. **Word count** — last, and only at the extreme: a member far below its family's median,
+   >    where the reading is "most of this page is absent", not "German runs longer than
+   >    English". Requires a family of three or more, so one short sibling cannot define the
+   >    baseline.
+   >
+   > This answers the noise objection by removing the coupling that caused it: the signal most
+   > likely to fire wrongly no longer decides whether the other two are believed. It is the same
+   > conservatism that fixed detection rules 1 and 6 — see `context/foundation/lessons.md`.
 4. **What bounds the cost of assisted prioritisation?** Token cost is the single accepted
    recurring cost in an otherwise zero-spend product, and the bounded-spend guardrail was
    explicitly declined. FR-044 is therefore an uncapped cost. Owner: user.
+
+   > **Resolved 2026-08-31.** The bound is structural rather than monetary, because a spend cap
+   > nobody can enforce is not a bound. One model call per run, over the correlated problems
+   > S-09 produces (tens) rather than raw findings (hundreds), with the result cached against
+   > the run so that re-reading it is free. Cost therefore scales with *runs*, not with pages: a
+   > 1,200-URL crawl costs the same to rank as a 20-URL one. A hard ceiling on calls per month
+   > sits behind that as a backstop, not as the primary defence.
 5. **Does bounded retention conflict with regression detection?** The bounded-footprint
    requirement expects runs and snapshots to expire, while trend history (FR-039) and baseline
    comparison require history to persist. The retention window that satisfies both is
    unresolved. Owner: user.
+
+   > **Resolved 2026-08-31.** The conflict came from treating runs and snapshots as one thing.
+   > They have footprints four orders of magnitude apart, so retention is defined per artifact
+   > class:
+   >
+   > - **Run metadata and findings** — kilobytes of rows. Kept indefinitely. This is what
+   >   FR-039's trend history reads, so the trend comes for free rather than needing a window.
+   > - **Snapshots** — the line item that would force a hosting bill. The baseline is pinned and
+   >   never expires; beyond it only the most recent three runs' images are kept.
+   >
+   > Bounded footprint and persistent history stop contradicting each other once the bound is
+   > applied to the bytes rather than to the history.
 6. **Is full-scope run time compatible with a go-live gate at all?** Checking up to 1,200 URLs,
    capturing a snapshot per page, and sampling performance may be structurally incompatible with
    a check the user runs casually before every launch - independent of question 1's threshold.

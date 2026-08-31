@@ -54,18 +54,18 @@ works.
 | F-02 | container-deploy-skeleton       | (foundation) the app runs as a container on a persistent host                  | —                | NFR-3                                                                                | ready    |
 | S-01 | first-multilingual-crawl        | define a project, crawl it, and see pages missing a language variant           | F-01             | US-01, FR-006, FR-007, FR-008, FR-011, FR-012, FR-013, FR-014, FR-024, FR-036, NFR-1 | built    |
 | S-02 | hreflang-and-variant-parity     | see hreflang graph problems and variants that regressed while siblings did not | S-01             | US-01, FR-025, FR-026                                                                | done     |
-| S-03 | cross-variant-content-drift     | see content drift between language variants                                    | S-02             | FR-027                                                                               | blocked  |
+| S-03 | cross-variant-content-drift     | see content drift between language variants                                    | S-02             | FR-027                                                                               | ready    |
 | S-04 | crawl-technical-checks          | see broken links, sitemap and robots problems, orphans, duplicates, TLS issues | S-01             | FR-016, FR-017, FR-018, FR-019, FR-020, FR-030                                       | proposed |
 | S-05 | seo-metadata-checks             | see title, meta, canonical and noindex problems                                | S-01             | FR-021, FR-022, FR-023                                                               | proposed |
 | S-06 | browser-observed-checks         | see console errors, sampled performance scores, and image weight problems      | S-01             | FR-015, FR-028, FR-029                                                               | proposed |
 | S-07 | run-history-and-comparison      | compare a run against the previous one and see only what changed               | S-01             | US-02, FR-037, FR-038                                                                | proposed |
-| S-08 | visual-regression-baselines     | set a baseline and see which pages changed visually, ignoring volatile regions | S-06, S-07       | US-02, FR-031, FR-032, FR-033, FR-034, FR-035                                        | blocked  |
+| S-08 | visual-regression-baselines     | set a baseline and see which pages changed visually, ignoring volatile regions | S-06, S-07       | US-02, FR-031, FR-032, FR-033, FR-034, FR-035                                        | proposed |
 | S-09 | correlated-findings             | see one explained problem per underlying cause instead of many symptoms        | S-02, S-04, S-05 | US-01, FR-040                                                                        | proposed |
 | S-10 | roles-invites-and-client-access | invite team members and client viewers, scoped to the right projects           | F-01             | FR-001, FR-003, FR-004, FR-005, FR-010, NFR-2                                        | proposed |
 | S-11 | client-readable-report          | generate a client-readable report from a stored run                            | S-09, S-10       | FR-041                                                                               | proposed |
-| S-12 | quality-trend-history           | see scores and issue counts over time                                          | S-07             | FR-039                                                                               | blocked  |
+| S-12 | quality-trend-history           | see scores and issue counts over time                                          | S-07             | FR-039                                                                               | proposed |
 | S-13 | scheduled-and-staging-runs      | schedule recurring runs and check protected or staging environments            | F-02, S-01       | FR-042, FR-043                                                                       | proposed |
-| S-14 | assisted-finding-prioritisation | have findings ranked by which matter most                                      | S-09             | FR-044                                                                               | blocked  |
+| S-14 | assisted-finding-prioritisation | have findings ranked by which matter most                                      | S-09             | FR-044                                                                               | proposed |
 
 ## Streams
 
@@ -157,10 +157,10 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Prerequisites:** S-02
 - **Parallel with:** S-04, S-05, S-06, S-07, S-10
 - **Blockers:** —
-- **Unknowns:**
-  - What counts as drift rather than an honest translation? Some languages legitimately run much longer than others, so a naive length comparison would fire on almost every page. — Owner: user. Block: yes.
-- **Risk:** Split out of S-02 precisely so this unknown does not block the parity work next to it. The PRD kept this requirement as must-have with the noise objection raised and unresolved (Open Question 3). Planning it before deciding what drift means would produce a check nobody trusts - which is the guardrail failure the PRD names as fatal.
-- **Status:** blocked
+- **Unknowns:** — (resolved 2026-08-31)
+  - ~~What counts as drift rather than an honest translation?~~ Answered in PRD Open Question 3: three independent rules in ascending order of noise — untranslated placeholder text, then structural missing sections, then word count last and extreme-only against a family median, requiring three or more members. The noisy signal no longer decides whether the other two are believed.
+- **Risk:** Split out of S-02 precisely so this unknown did not block the parity work next to it. The PRD kept this requirement as must-have with the noise objection raised, and it stayed blocked until the objection was answered rather than overruled — planning it before deciding what drift means would have produced a check nobody trusts, which is the guardrail failure the PRD names as fatal. The staged shape is what makes it buildable: rule 1 can be trusted on day one whether or not rule 3 ever earns its keep.
+- **Status:** ready
 
 ### S-04: Crawl-level technical checks
 
@@ -220,10 +220,10 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Parallel with:** S-09, S-10
 - **Blockers:** —
 - **Unknowns:**
-  - How long is a snapshot kept? The PRD requires a bounded storage footprint, but baselines and comparison need history to persist. The window that satisfies both is unresolved (Open Question 5). — Owner: user. Block: yes.
+  - ~~How long is a snapshot kept?~~ Answered in PRD Open Question 5: the pinned baseline never expires; beyond it only the three most recent runs keep their images. Retention binds the bytes, not the history.
   - With per-finding muting ruled out, are masked regions enough to keep visual noise tolerable? (Open Question 2) — Owner: user. Block: no.
-- **Risk:** The most expensive subsystem in the product and the one most likely to be abandoned, which is why it is sequenced late rather than early despite answering the user's most-stated pain. Blocked on retention because building snapshot storage before deciding how long snapshots live means building the wrong thing: 1,200 URLs multiplied by baselines, history and 3-10 projects is the line item most likely to force a hosting bill in a product whose defining constraint is not spending money.
-- **Status:** blocked
+- **Risk:** The most expensive subsystem in the product and the one most likely to be abandoned, which is why it is sequenced late rather than early despite answering the user's most-stated pain. The retention answer removes the reason it was blocked, but not the reason it is last: it still needs S-06 (rendering) and S-07 (run comparison), neither of which is built.
+- **Status:** proposed
 
 ### S-09: Correlated findings
 
@@ -271,9 +271,9 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Parallel with:** S-08, S-09, S-10, S-11, S-13, S-14
 - **Blockers:** —
 - **Unknowns:**
-  - Same retention conflict as S-08: a trend needs retained history, the PRD requires a bounded footprint (Open Question 5). — Owner: user. Block: yes.
-- **Risk:** Blocked on the same unresolved question as S-08, and for the same reason - how long data lives determines what can be built on top of it. Resolving that one question promotes both slices, which makes it the highest-leverage open question on the roadmap.
-- **Status:** blocked
+  - ~~Same retention conflict as S-08.~~ Answered in PRD Open Question 5, and answered generously for this slice: run metadata and findings are rows measured in kilobytes and are kept indefinitely, so the trend this slice draws needs no window at all. Only images expire.
+- **Risk:** Was blocked on the same question as S-08, and resolving that one question did promote both — which is why the roadmap called it the highest-leverage open question. What remains is ordinary sequencing: S-07 must exist before there is run history to trend.
+- **Status:** proposed
 
 ### S-13: Scheduled and staging runs
 
@@ -296,9 +296,9 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Parallel with:** S-08, S-10, S-11, S-12, S-13
 - **Blockers:** —
 - **Unknowns:**
-  - What bounds the cost? This is the only recurring spend in a product whose defining constraint is zero spend, and the spend cap was explicitly declined (Open Question 4). — Owner: user. Block: yes.
-- **Risk:** Last by design. The PRD narrowed this from explaining findings and suggesting fixes down to ranking alone, on the reasoning that a finding needing help to explain it is a badly written finding. Depends on S-09 because ranking symptoms is far less useful than ranking explained problems. Blocked until a cost boundary exists, since an uncapped external cost contradicts the constraint the whole stack was chosen around.
-- **Status:** blocked
+  - ~~What bounds the cost?~~ Answered in PRD Open Question 4: the bound is structural, not monetary. One call per run over S-09's correlated problems rather than raw findings, cached against the run, with a monthly call ceiling as a backstop. Cost scales with runs, not with pages.
+- **Risk:** Last by design. The PRD narrowed this from explaining findings and suggesting fixes down to ranking alone, on the reasoning that a finding needing help to explain it is a badly written finding. Depends on S-09 because ranking symptoms is far less useful than ranking explained problems — a dependency the cost answer now leans on, since it is S-09's correlation that keeps the input to tens of items rather than hundreds.
+- **Status:** proposed
 
 ## Backlog Handoff
 
