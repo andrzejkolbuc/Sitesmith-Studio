@@ -364,6 +364,27 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 				if (member.declares.has(sibling.url)) continue;
 
 				/**
+				 * The question is about a language, not a URL.
+				 *
+				 * "does not link to /de/careers (de)" is a complaint about German, and
+				 * a page that publishes German somewhere else has answered it. Asking
+				 * for one specific URL reported four false defects on a real site whose
+				 * hreflang was correct.
+				 */
+				if (sibling.locale) {
+					// A page does not link to another page in its own language; the set
+					// holds one page per language by definition.
+					if (
+						member.locale &&
+						satisfies(new Set([member.locale]), sibling.locale)
+					) {
+						continue;
+					}
+					// Or it declares that language, pointing somewhere else.
+					if (satisfies(member.declaredLocales, sibling.locale)) continue;
+				}
+
+				/**
 				 * Classified exclusively, because the two describe the same omission
 				 * from different sides and the fix differs. If the sibling named this
 				 * member, the link back is what is missing. If neither named the other,

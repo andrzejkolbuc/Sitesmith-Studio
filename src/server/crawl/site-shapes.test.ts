@@ -900,3 +900,64 @@ describe("a crawl that did not finish", () => {
 		).toHaveLength(1);
 	});
 });
+
+/**
+ * The question is about a language, not about a URL.
+ *
+ * Rule 5 asked whether a member declared a sibling's exact URL. That is not what
+ * the finding it produces claims — "does not link to /de/careers (de)" is a
+ * complaint about German, and a page that declares German somewhere else has
+ * answered it.
+ *
+ * Every instance of this observed in the wild was caused by redirect aliases,
+ * which phase 1 removed. These cases are therefore constructed rather than
+ * reproduced: they describe a site genuinely serving two URLs for one language,
+ * which is rarer but not impossible, and which the rule would still misreport.
+ */
+describe("a family holding two URLs for one language", () => {
+	it("does not report a member for a language it already declares", () => {
+		/**
+		 * `/en` declares German once, pointing at `/de-a`. `/de-b` is also German
+		 * and also in the family. Asking whether `/en` links to `/de-b` specifically
+		 * is the wrong question — it has published a German alternate, which is what
+		 * the finding would otherwise accuse it of not doing.
+		 */
+		const findings = findingsFor({
+			pages: [
+				page("/en", { hreflang: { en: "/en", de: "/de-a" } }),
+				page("/de-a", { hreflang: { de: "/de-a", en: "/en" } }),
+				page("/de-b", { hreflang: { de: "/de-b", en: "/en" } }),
+			],
+		});
+
+		expect(
+			findings.filter((f) => f.type === "hreflang_family_inconsistent"),
+		).toEqual([]);
+	});
+
+	it("still reports a member that declares nothing for a sibling's language", () => {
+		/**
+		 * The guard, and the more important half. Loosening the comparison must not
+		 * silence the rule: `/en` declares only itself, so it publishes no German at
+		 * all, and the sibling that names it gets no link back.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/en", { hreflang: { en: "/en" } }),
+				page("/de", { hreflang: { de: "/de", en: "/en" } }),
+			],
+		}).filter((f) => f.type === "hreflang_family_inconsistent");
+
+		expect(findings).toHaveLength(1);
+
+		const defects = findings[0]?.detail.defects as Array<
+			Record<string, unknown>
+		>;
+		expect(defects).toContainEqual({
+			url: `${BASE}/en`,
+			kind: "not_reciprocated",
+			sibling: `${BASE}/de`,
+			siblingLocale: "de",
+		});
+	});
+});

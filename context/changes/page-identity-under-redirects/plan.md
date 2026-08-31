@@ -370,17 +370,17 @@ the before half of the phase 3 comparison.
 
 #### Automated
 
-- [x] 1.1 Cases fail before the change and pass after
-- [x] 1.2 A redirected URL is recorded under the URL the server served
-- [x] 1.3 Two routes to one page produce one page, in either arrival order
-- [x] 1.4 A relative href on a redirected page resolves against the final URL
-- [x] 1.5 A discarded alias advances neither the page ceiling nor the failure counters
-- [x] 1.6 Mutation: reverting to the requested URL fails the identity cases
-- [x] 1.7 Mutation: removing the post-fetch dedup fails the two-routes case
-- [x] 1.8 Schema applies: `npm run db:push`
-- [x] 1.9 Existing crawler, politeness and run tests pass unchanged
-- [x] 1.10 Type checking passes: `npm run typecheck`
-- [x] 1.11 Linting passes: `npm run check`
+- [x] 1.1 Cases fail before the change and pass after — 94b9210
+- [x] 1.2 A redirected URL is recorded under the URL the server served — 94b9210
+- [x] 1.3 Two routes to one page produce one page, in either arrival order — 94b9210
+- [x] 1.4 A relative href on a redirected page resolves against the final URL — 94b9210
+- [x] 1.5 A discarded alias advances neither the page ceiling nor the failure counters — 94b9210
+- [x] 1.6 Mutation: reverting to the requested URL fails the identity cases — 94b9210
+- [x] 1.7 Mutation: removing the post-fetch dedup fails the two-routes case — 94b9210
+- [x] 1.8 Schema applies: `npm run db:push` — 94b9210
+- [x] 1.9 Existing crawler, politeness and run tests pass unchanged — 94b9210
+- [x] 1.10 Type checking passes: `npm run typecheck` — 94b9210
+- [x] 1.11 Linting passes: `npm run check` — 94b9210
 - [ ] 1.12 Whole suite passes: `npm run test:all`
 
 #### Manual
@@ -391,13 +391,13 @@ the before half of the phase 3 comparison.
 
 #### Automated
 
-- [ ] 2.1 Cases fail before the change and pass after
-- [ ] 2.2 Two URLs for one locale, both declared, produce no finding
-- [ ] 2.3 A genuinely undeclared language is still reported
-- [ ] 2.4 Mutation: reverting to the URL comparison fails the two-URL case
-- [ ] 2.5 Every existing site-shape case passes unchanged
-- [ ] 2.6 Type checking passes: `npm run typecheck`
-- [ ] 2.7 Linting passes: `npm run check`
+- [x] 2.1 Cases fail before the change and pass after
+- [x] 2.2 Two URLs for one locale, both declared, produce no finding
+- [x] 2.3 A genuinely undeclared language is still reported
+- [x] 2.4 Mutation: reverting to the URL comparison fails the two-URL case
+- [x] 2.5 Every existing site-shape case passes unchanged
+- [x] 2.6 Type checking passes: `npm run typecheck`
+- [x] 2.7 Linting passes: `npm run check`
 - [ ] 2.8 Whole suite passes: `npm run test:all`
 
 #### Manual

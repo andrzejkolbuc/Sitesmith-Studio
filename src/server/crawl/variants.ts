@@ -107,6 +107,14 @@ export type FamilyMember = {
 	 * report a missing declaration on most real multilingual sites.
 	 */
 	declares: Set<string>;
+	/**
+	 * The language tags this page declares for pages other than itself.
+	 *
+	 * Kept alongside the URLs because the question a rule asks is about a
+	 * language — "does this page publish German" — and a set of URLs cannot
+	 * answer it when a family holds two URLs for one language.
+	 */
+	declaredLocales: Set<string>;
 	/** Whether the page declares itself under a language tag, as the spec asks. */
 	declaresSelf: boolean;
 };
@@ -139,12 +147,17 @@ export function groupFamilies(pages: CrawledPage[]): VariantFamily[] {
 		if (!variant) continue;
 
 		const declares = new Set<string>();
+		const declaredLocales = new Set<string>();
 		let declaresSelf = false;
 
 		for (const [locale, target] of Object.entries(page.hreflangTargets)) {
 			if (!isLanguageTag(locale)) continue;
-			if (target === page.url) declaresSelf = true;
-			else declares.add(target);
+			if (target === page.url) {
+				declaresSelf = true;
+			} else {
+				declares.add(target);
+				declaredLocales.add(locale.toLowerCase());
+			}
 		}
 
 		const members = byGroup.get(variant.groupKey) ?? [];
@@ -152,6 +165,7 @@ export function groupFamilies(pages: CrawledPage[]): VariantFamily[] {
 			url: page.url,
 			locale: variant.locale,
 			declares,
+			declaredLocales,
 			declaresSelf,
 		});
 		byGroup.set(variant.groupKey, members);
