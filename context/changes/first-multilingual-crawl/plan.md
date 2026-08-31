@@ -571,7 +571,7 @@ deployment exists, so rollback is re-pushing a corrected schema.
 #### Manual
 
 - [ ] 3.8 Findings against a real client site are recognisably true
-- [ ] 3.9 The volume of rule-4 findings is small enough to read
+- [x] 3.9 The volume of rule-4 findings is small enough to read — zero across 20 real pages of yazaki-emea.com; see the real-site note below
 
 ### Phase 4: Run orchestration
 
@@ -629,3 +629,38 @@ prediction, not a result, and a real site is the only thing that settles it.
 Crawl scope is now settable from the creation form (3d18391), which is what
 these criteria were waiting on: pointing the crawler at a client site without a
 way to exclude its admin area was not something to do.
+
+## Real-site evidence, 2026-08-30 — yazaki-emea.com
+
+A first bounded run against a live client site: twenty pages, one request at a
+time, one second apart, other locales and the path `robots.txt` disallows
+excluded by hand. Recorded here so the next person does not repeat it to learn
+the same things.
+
+**What it settled.**
+
+- **3.9 — rule-4 volume.** Zero findings across twenty real pages. This was the
+  criterion most at risk: rule 4 fires on locale-shaped URLs, and the narrowing
+  it received during the test rollout had only ever been checked against
+  fixtures. The site's homepage declares `x-default` and `en` pointing at the
+  same URL — precisely the shape that used to break — and nothing fired.
+
+**What it did not settle, and why.**
+
+- **2.9** is half-answered. The crawl itself was clean: twenty pages, no errors,
+  no abort, 20.2 seconds. The other half — that nothing appeared in the client's
+  monitoring — cannot be checked from this side and needs someone with access.
+- **2.10** cannot be judged from a run that stopped at its own ceiling by design.
+- **3.8** is not settled either way. Before the truncation fix the run produced
+  eighteen findings, every one false. After it, zero — which is correct silence
+  rather than a passing grade. Judging whether findings are recognisably *true*
+  needs a crawl that finishes, roughly 100–200 pages for English and German here.
+- **4.8** needs the run pipeline rather than a script. `MAX_PAGES` is hardcoded
+  at 2,000 and is not per-project, so a bounded first run cannot go through
+  `startRun` — which is also why no duration was recorded.
+
+**What it found.** The most valuable outcome was not a tick. Rules 1 and 3
+reasoned from absence without knowing whether the crawl had finished, so a
+truncated run reported its own page ceiling as eighteen defects on the client's
+site, naming URLs that all return 200. Fixed in 01df814. No fixture could have
+taught it: every fixture crawl finishes.
