@@ -1,9 +1,10 @@
 ---
 change_id: auth-and-abuse-behaviours
 title: "Auth and abuse behaviours"
-status: complete
+status: archived
 created: 2026-08-25
-updated: 2026-08-25
+archived_at: 2026-08-31T07:33:51Z
+updated: 2026-08-31
 test_plan_phase: 2
 risks: [R3, R5, R6, R7]
 ---
