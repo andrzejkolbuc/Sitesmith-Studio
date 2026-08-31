@@ -1,9 +1,10 @@
 ---
 change_id: politeness-under-stress
 title: "Politeness under stress"
-status: complete
+status: archived
 created: 2026-08-25
-updated: 2026-08-25
+archived_at: 2026-08-31T07:33:51Z
+updated: 2026-08-31
 test_plan_phase: 4
 risks: [R2]
 ---
