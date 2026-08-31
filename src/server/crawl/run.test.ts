@@ -358,18 +358,39 @@ describe("progress while a run is in flight", () => {
 			projectId: project.id,
 		});
 
-		// Poll the way the interface does, and record what it would have shown.
+		/**
+		 * Poll the way the interface does, recording what it would have shown — then
+		 * keep polling until the run is genuinely finished.
+		 *
+		 * The waiting is not politeness. `startRun` returns immediately and crawls
+		 * in the background, so a test that stops watching leaves inserts in flight;
+		 * the next test truncates the database underneath them and the failures land
+		 * somewhere else entirely, as foreign keys on a tenant that no longer exists.
+		 */
+		const TERMINAL: string[] = [
+			RUN_STATUS.DONE,
+			RUN_STATUS.FAILED,
+			RUN_STATUS.INTERRUPTED,
+		];
+
 		let seenWhileRunning = 0;
-		for (let i = 0; i < 40; i++) {
-			await new Promise((r) => setTimeout(r, 250));
+		let finished = false;
+
+		for (let i = 0; i < 400; i++) {
+			await new Promise((r) => setTimeout(r, 50));
 			const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
 			if (!run) continue;
 			if (run.status === RUN_STATUS.RUNNING) {
 				seenWhileRunning = Math.max(seenWhileRunning, run.pagesCrawled);
 			}
-			if (run.status === RUN_STATUS.DONE) break;
+			if (TERMINAL.includes(run.status)) {
+				finished = true;
+				break;
+			}
 		}
 
+		// Loudly, rather than by corrupting whatever runs next.
+		expect(finished, "the run never reached a terminal status").toBe(true);
 		expect(seenWhileRunning).toBeGreaterThan(0);
 	}, 60_000);
 });
