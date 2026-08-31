@@ -381,7 +381,7 @@ the before half of the phase 3 comparison.
 - [x] 1.9 Existing crawler, politeness and run tests pass unchanged — 94b9210
 - [x] 1.10 Type checking passes: `npm run typecheck` — 94b9210
 - [x] 1.11 Linting passes: `npm run check` — 94b9210
-- [ ] 1.12 Whole suite passes: `npm run test:all`
+- [x] 1.12 Whole suite passes: `npm run test:all` — 138 unit, 35 integration, 15 browser — 9232331
 
 #### Manual
 
@@ -391,14 +391,14 @@ the before half of the phase 3 comparison.
 
 #### Automated
 
-- [x] 2.1 Cases fail before the change and pass after
-- [x] 2.2 Two URLs for one locale, both declared, produce no finding
-- [x] 2.3 A genuinely undeclared language is still reported
-- [x] 2.4 Mutation: reverting to the URL comparison fails the two-URL case
-- [x] 2.5 Every existing site-shape case passes unchanged
-- [x] 2.6 Type checking passes: `npm run typecheck`
-- [x] 2.7 Linting passes: `npm run check`
-- [ ] 2.8 Whole suite passes: `npm run test:all`
+- [x] 2.1 Cases fail before the change and pass after — e1a097e
+- [x] 2.2 Two URLs for one locale, both declared, produce no finding — e1a097e
+- [x] 2.3 A genuinely undeclared language is still reported — e1a097e
+- [x] 2.4 Mutation: reverting to the URL comparison fails the two-URL case — e1a097e
+- [x] 2.5 Every existing site-shape case passes unchanged — e1a097e
+- [x] 2.6 Type checking passes: `npm run typecheck` — e1a097e
+- [x] 2.7 Linting passes: `npm run check` — e1a097e
+- [x] 2.8 Whole suite passes: `npm run test:all` — 9232331
 
 #### Manual
 
@@ -408,7 +408,7 @@ the before half of the phase 3 comparison.
 
 #### Automated
 
-- [ ] 3.1 Whole suite passes: `npm run test:all`
+- [x] 3.1 Whole suite passes: `npm run test:all` — 9232331
 
 #### Manual
 
