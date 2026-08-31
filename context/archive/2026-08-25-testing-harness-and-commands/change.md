@@ -1,8 +1,9 @@
 ---
 change_id: testing-harness-and-commands
 title: "Test harness and commands"
-status: complete
+status: archived
 created: 2026-08-25
+archived_at: 2026-08-31T07:33:51Z
 updated: 2026-08-31
 test_plan_phase: 1
 risks: [R4]
