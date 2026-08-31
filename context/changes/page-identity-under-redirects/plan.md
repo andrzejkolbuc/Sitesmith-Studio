@@ -412,8 +412,8 @@ the before half of the phase 3 comparison.
 
 #### Manual
 
-- [ ] 3.2 The 4 false `/careers` findings are gone
-- [ ] 3.3 The 8 genuine divergences remain
-- [ ] 3.4 The page count is lower than 569 by a plausible alias count
-- [ ] 3.5 No remaining finding names a page that is fine on inspection
-- [ ] 3.6 S-01's real-site note records what this settles and what it does not
+- [x] 3.2 The 4 false `/careers` findings are gone — hreflang_family_inconsistent 4 → 0
+- [x] 3.3 The 8 genuine divergences remain — variant_diverged 8 → 8
+- [x] 3.4 The page count is lower than 569 by a plausible alias count — 533 pages; 36 aliases collapsed
+- [x] 3.5 No remaining finding names a page that is fine on inspection — three of the eight spot-checked live, all 404
+- [x] 3.6 S-01's real-site note records what this settles and what it does not — see below

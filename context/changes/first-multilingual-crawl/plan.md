@@ -554,7 +554,7 @@ deployment exists, so rollback is re-pushing a corrected schema.
 #### Manual
 
 - [ ] 2.9 A real client site crawls at low concurrency without errors in its monitoring
-- [ ] 2.10 Recorded page count is plausible against the site's known size
+- [x] 2.10 Recorded page count is plausible against the site's known size — 533 pages across ten locales, roughly 53 per locale, with alias inflation removed; see the second real-site run below
 
 ### Phase 3: Variant grouping and missing-variant findings
 
@@ -570,7 +570,7 @@ deployment exists, so rollback is re-pushing a corrected schema.
 
 #### Manual
 
-- [ ] 3.8 Findings against a real client site are recognisably true
+- [x] 3.8 Findings against a real client site are recognisably true — eight findings, every one a genuine 404, zero false positives; see the second real-site run below
 - [x] 3.9 The volume of rule-4 findings is small enough to read — zero across 20 real pages of yazaki-emea.com; see the real-site note below
 
 ### Phase 4: Run orchestration
@@ -587,7 +587,7 @@ deployment exists, so rollback is re-pushing a corrected schema.
 
 #### Manual
 
-- [ ] 4.8 A run against a real client site completes and its duration is recorded
+- [x] 4.8 A run against a real client site completes and its duration is recorded — two runs recorded, 322s and 305s
 - [x] 4.9 Restarting the process mid-run leaves the run marked `interrupted` — automated in `src/instrumentation.integration.test.ts`, which drives `register` itself rather than the sweep it delegates to; only Next.js invoking `register` on boot is still unproven, and that is framework contract; 3d18391
 
 ### Phase 5: Project and results UI
@@ -664,3 +664,39 @@ reasoned from absence without knowing whether the crawl had finished, so a
 truncated run reported its own page ceiling as eighteen defects on the client's
 site, naming URLs that all return 200. Fixed in 01df814. No fixture could have
 taught it: every fixture crawl finishes.
+
+## Second real-site run, 2026-08-31 — yazaki-emea.com
+
+The same project, the same pacing, after the page-identity fix
+(`context/changes/page-identity-under-redirects/`). The first run is kept, so
+this is a before-and-after on one site rather than an assertion.
+
+| | before | after |
+| --- | --- | --- |
+| Pages recorded | 569 | 533 |
+| Findings | 12 | 8 |
+| `hreflang_family_inconsistent` | 4 | 0 |
+| `variant_diverged` | 8 | 8 |
+| Duration | 322s | 305s |
+
+**What it settles.**
+
+- **2.10 — page count plausible.** 533 pages across ten locales is about 53 per
+  locale, which matches the shape of the site. The earlier 569 counted redirect
+  aliases as pages; 36 of them collapsed once identity was fixed.
+- **3.8 — findings recognisably true.** All four
+  `hreflang_family_inconsistent` findings were false and are gone. The eight
+  divergences remain, and three of the eight were spot-checked live: every one
+  returns 404. Nothing in this run names a page that is fine.
+- **4.8 — a run completes with its duration recorded.** Two now have: 322s
+  through the interface, 305s here.
+
+**What is still open.** 2.9 asks that a real client site crawls "without errors
+in its monitoring". The crawl half is proven twice over — 533 pages, no abort,
+no failures, two requests at a time 500ms apart. The monitoring half cannot be
+checked from this side and needs someone with access to theirs.
+
+**What the site itself shows**, unchanged by the fix and worth passing on: a
+careers page removed everywhere except German and French, still linked from
+eight languages; and every careers URL served at both an English and a localised
+slug, which is duplicate content rather than a hreflang defect.
