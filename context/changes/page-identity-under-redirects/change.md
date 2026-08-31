@@ -1,7 +1,7 @@
 ---
 change_id: page-identity-under-redirects
 title: "Page identity under redirects"
-status: preparing
+status: planned
 created: 2026-08-31
 updated: 2026-08-31
 prd_refs: [FR-024, FR-025, NFR-1]
@@ -14,3 +14,5 @@ for not linking to `/de/careers`, when both are redirect aliases and the page's
 hreflang is correct.
 
 - Frame: `frame.md`
+- Brief: `plan-brief.md`
+- Plan: `plan.md`
