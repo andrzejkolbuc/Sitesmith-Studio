@@ -1,9 +1,10 @@
 ---
 change_id: detection-rule-confidence
 title: "Detection-rule confidence"
-status: complete
+status: archived
 created: 2026-08-25
-updated: 2026-08-25
+archived_at: 2026-08-31T07:33:51Z
+updated: 2026-08-31
 test_plan_phase: 3
 risks: [R1]
 ---
