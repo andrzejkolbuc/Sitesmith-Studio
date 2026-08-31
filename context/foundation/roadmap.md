@@ -3,7 +3,7 @@ project: "Sitesmith-Studio"
 version: 1
 status: draft
 created: 2026-08-21
-updated: 2026-08-24
+updated: 2026-08-31
 prd_version: 1
 main_goal: market-feedback
 top_blocker: capacity
@@ -53,7 +53,7 @@ works.
 | F-01 | tenant-scoped-owner-signin      | (foundation) records are tenant-scoped and an Owner can sign in                | —                | FR-002, FR-009, NFR-2                                                                | done     |
 | F-02 | container-deploy-skeleton       | (foundation) the app runs as a container on a persistent host                  | —                | NFR-3                                                                                | ready    |
 | S-01 | first-multilingual-crawl        | define a project, crawl it, and see pages missing a language variant           | F-01             | US-01, FR-006, FR-007, FR-008, FR-011, FR-012, FR-013, FR-014, FR-024, FR-036, NFR-1 | built    |
-| S-02 | hreflang-and-variant-parity     | see hreflang graph problems and variants that regressed while siblings did not | S-01             | US-01, FR-025, FR-026                                                                | built    |
+| S-02 | hreflang-and-variant-parity     | see hreflang graph problems and variants that regressed while siblings did not | S-01             | US-01, FR-025, FR-026                                                                | done     |
 | S-03 | cross-variant-content-drift     | see content drift between language variants                                    | S-02             | FR-027                                                                               | blocked  |
 | S-04 | crawl-technical-checks          | see broken links, sitemap and robots problems, orphans, duplicates, TLS issues | S-01             | FR-016, FR-017, FR-018, FR-019, FR-020, FR-030                                       | proposed |
 | S-05 | seo-metadata-checks             | see title, meta, canonical and noindex problems                                | S-01             | FR-021, FR-022, FR-023                                                               | proposed |
@@ -147,7 +147,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Blockers:** —
 - **Unknowns:** —
 - **Risk:** Comparative findings are the product's reason to exist, and this is where "one variant is broken, five are fine" becomes a single reported problem rather than six independent URL reports. Sequenced immediately after the north star because it reuses the same variant mapping and adds no new infrastructure.
-- **Status:** proposed
+- **Status:** done
 
 ### S-03: Cross-variant content drift
 
@@ -351,5 +351,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Observability tooling.** Why parked: no PRD requirement demands it, so no foundation opens for it. Revisit if operating scheduled runs proves opaque.
 
 ## Done
+
+- **S-02: hreflang graph and cross-variant parity** — Archived 2026-08-31 → `context/archive/2026-08-25-hreflang-and-variant-parity/`. Lesson: a rule that reasons from absence must know whether the crawl finished.
 
 - **F-01: (foundation) every record carries the tenant and project it belongs to, and an Owner can sign in and reach their own data.** — Archived 2026-08-24 → `context/archive/2026-08-21-tenant-scoped-owner-signin/`. Lesson: —.
