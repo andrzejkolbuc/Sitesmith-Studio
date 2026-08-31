@@ -59,12 +59,12 @@ export default async function AppLayout({
 
 function NoTenantNotice({ email }: { email?: string }) {
 	return (
-		<main className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 text-neutral-100">
+		<main className="flex min-h-screen items-center justify-center px-6">
 			<div className="w-full max-w-md text-center">
-				<h1 className="font-bold text-2xl tracking-tight">
+				<h1 className="font-display font-semibold text-3xl text-ink tracking-tight">
 					This account has no workspace
 				</h1>
-				<p className="mt-3 text-neutral-400 text-sm">
+				<p className="mt-3 max-w-prose text-ink-soft text-sm leading-relaxed">
 					{email ? `${email} is signed in, but ` : "You are signed in, but "}
 					the account is not attached to a workspace yet, so there is nothing to
 					show. Accounts are attached when they are invited.
@@ -77,7 +77,7 @@ function NoTenantNotice({ email }: { email?: string }) {
 					}}
 				>
 					<button
-						className="mt-6 rounded-md bg-neutral-100 px-4 py-2 font-medium text-neutral-950 transition hover:bg-white"
+						className="mt-8 rounded-sm bg-ink px-5 py-2.5 font-medium text-paper text-sm transition-opacity hover:opacity-85"
 						type="submit"
 					>
 						Sign out

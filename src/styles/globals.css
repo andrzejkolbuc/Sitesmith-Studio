@@ -1,7 +1,85 @@
 @import "tailwindcss";
 
+/**
+ * Proof sheet.
+ *
+ * This product is a proofreader for multilingual sites, and its stated fatal
+ * failure is that runs report things which do not matter until people stop
+ * reading them. So the visual system encodes that rather than decorating over
+ * it: the interface is ink on paper, and colour is reserved for correction
+ * marks. A healthy page is silent. Anything carrying colour is asking for
+ * attention, and there is nothing else competing for it.
+ *
+ * Type is IBM Plex, all three widths. Not a default reach: Plex is a superfamily
+ * built to hold one voice across many languages and scripts, which is the
+ * subject of this product stated in its typography. Mono is load-bearing rather
+ * than stylistic — locale tags and URLs are the data, and they need to align.
+ */
 @theme {
-	--font-sans:
-		var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
-		"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+	--font-display: var(--font-plex-serif), ui-serif, Georgia, serif;
+	--font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+	--font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
+
+	/* Ink, at three strengths. Deep green-black — printer's ink, not #000. */
+	--color-ink: #17211e;
+	--color-ink-soft: #55625e;
+	--color-ink-faint: #8a9793;
+
+	/* Paper, tinted with a trace of the ink hue so the two belong together. */
+	--color-paper: #eff1ef;
+	--color-sheet: #ffffff;
+	--color-rule: #d5dbd8;
+	--color-rule-soft: #e6eae8;
+
+	/* The correction marks. The only colour in the interface. */
+	--color-mark: #c63d1f;
+	--color-mark-soft: #fbeae5;
+	--color-flag: #a8760d;
+	--color-flag-soft: #faf1dd;
+}
+
+html {
+	background-color: var(--color-paper);
+	color: var(--color-ink);
+}
+
+body {
+	font-family: var(--font-sans);
+	/* Plex Sans reads a shade tight at body size in dense tables. */
+	letter-spacing: 0.005em;
+}
+
+/**
+ * Tabular figures everywhere a number can change.
+ *
+ * Counts in this interface update while a run is in progress. Proportional
+ * digits make the row jump on every poll, which reads as the layout being
+ * unstable rather than the number being live.
+ */
+.tnum {
+	font-variant-numeric: tabular-nums;
+}
+
+/* Visible focus, on a light ground, without a browser-default halo. */
+:focus-visible {
+	outline: 2px solid var(--color-ink);
+	outline-offset: 2px;
+	border-radius: 2px;
+}
+
+/**
+ * Someone who has asked their system to reduce motion has to win against every
+ * utility class that sets a duration, which is the one case `!important` is for.
+ */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		/* biome-ignore lint/complexity/noImportantStyles: a motion preference must outrank utility classes */
+		animation-duration: 0.01ms !important;
+		/* biome-ignore lint/complexity/noImportantStyles: a motion preference must outrank utility classes */
+		animation-iteration-count: 1 !important;
+		/* biome-ignore lint/complexity/noImportantStyles: a motion preference must outrank utility classes */
+		transition-duration: 0.01ms !important;
+	}
 }

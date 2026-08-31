@@ -33,10 +33,14 @@ export default async function SignInPage({
 	}
 
 	return (
-		<main className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 text-neutral-100">
+		<main className="flex min-h-screen items-center justify-center px-6">
 			<div className="w-full max-w-sm">
-				<h1 className="font-bold text-2xl tracking-tight">Sign in</h1>
-				<p className="mt-1 text-neutral-400 text-sm">Sitesmith Studio</p>
+				<h1 className="font-display font-semibold text-3xl text-ink tracking-tight">
+					Sign in
+				</h1>
+				<p className="mt-2 max-w-prose text-ink-soft text-sm leading-relaxed">
+					Sitesmith Studio
+				</p>
 
 				{error ? (
 					/**
@@ -46,7 +50,7 @@ export default async function SignInPage({
 					 * accounts; saying "no such user" here would give that back.
 					 */
 					<p
-						className="mt-6 rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-red-200 text-sm"
+						className="mt-6 border-mark border-l-2 bg-mark-soft px-4 py-3 text-mark text-sm"
 						role="alert"
 					>
 						Those details did not match an account.
@@ -54,22 +58,26 @@ export default async function SignInPage({
 				) : null}
 
 				<form action={authenticate} className="mt-6 flex flex-col gap-4">
-					<label className="flex flex-col gap-1.5 text-sm">
-						<span className="text-neutral-300">Email</span>
+					<label className="flex flex-col gap-2 text-sm">
+						<span className="font-mono text-ink-faint text-xs uppercase tracking-wider">
+							Email
+						</span>
 						<input
 							autoComplete="email"
-							className="rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-neutral-100 outline-none focus:border-neutral-600"
+							className="rounded-sm border border-rule bg-sheet px-3 py-2.5 text-ink text-sm outline-none placeholder:text-ink-faint focus:border-ink"
 							name="email"
 							required
 							type="email"
 						/>
 					</label>
 
-					<label className="flex flex-col gap-1.5 text-sm">
-						<span className="text-neutral-300">Password</span>
+					<label className="flex flex-col gap-2 text-sm">
+						<span className="font-mono text-ink-faint text-xs uppercase tracking-wider">
+							Password
+						</span>
 						<input
 							autoComplete="current-password"
-							className="rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-neutral-100 outline-none focus:border-neutral-600"
+							className="rounded-sm border border-rule bg-sheet px-3 py-2.5 text-ink text-sm outline-none placeholder:text-ink-faint focus:border-ink"
 							name="password"
 							required
 							type="password"
@@ -77,14 +85,14 @@ export default async function SignInPage({
 					</label>
 
 					<button
-						className="mt-2 rounded-md bg-neutral-100 px-4 py-2 font-medium text-neutral-950 transition hover:bg-white"
+						className="mt-2 w-full rounded-sm bg-ink px-4 py-2.5 font-medium text-paper text-sm transition-opacity hover:opacity-85"
 						type="submit"
 					>
 						Sign in
 					</button>
 				</form>
 
-				<p className="mt-6 text-neutral-500 text-xs">
+				<p className="mt-10 max-w-prose border-rule border-t pt-5 text-ink-faint text-xs leading-relaxed">
 					Accounts are created by invitation. There is no sign-up.
 				</p>
 			</div>

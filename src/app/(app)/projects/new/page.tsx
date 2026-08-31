@@ -65,23 +65,25 @@ export default async function NewProjectPage({
 	}
 
 	return (
-		<main className="min-h-screen bg-neutral-950 text-neutral-100">
-			<div className="container mx-auto max-w-lg px-4 py-12">
+		<main className="min-h-screen">
+			<div className="mx-auto max-w-lg px-6 py-16">
 				<Link
-					className="text-neutral-400 text-sm underline-offset-4 hover:text-neutral-100 hover:underline"
+					className="font-mono text-ink-faint text-xs underline-offset-4 hover:text-ink hover:underline"
 					href="/projects"
 				>
 					← Projects
 				</Link>
 
-				<h1 className="mt-6 font-bold text-2xl tracking-tight">New project</h1>
-				<p className="mt-1 text-neutral-400 text-sm">
+				<h1 className="mt-8 font-display font-semibold text-3xl text-ink tracking-tight">
+					New project
+				</h1>
+				<p className="mt-2 max-w-prose text-ink-soft text-sm leading-relaxed">
 					One client site to check.
 				</p>
 
 				{error ? (
 					<p
-						className="mt-6 rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-red-200 text-sm"
+						className="mt-6 border-mark border-l-2 bg-mark-soft px-4 py-3 text-mark text-sm"
 						role="alert"
 					>
 						That did not work. Check the start URL is a full address including
@@ -90,10 +92,12 @@ export default async function NewProjectPage({
 				) : null}
 
 				<form action={create} className="mt-6 flex flex-col gap-5">
-					<label className="flex flex-col gap-1.5 text-sm">
-						<span className="text-neutral-300">Name</span>
+					<label className="flex flex-col gap-2 text-sm">
+						<span className="font-mono text-ink-faint text-xs uppercase tracking-wider">
+							Name
+						</span>
 						<input
-							className="rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-neutral-100 outline-none focus:border-neutral-600"
+							className="rounded-sm border border-rule bg-sheet px-3 py-2.5 text-ink text-sm outline-none placeholder:text-ink-faint focus:border-ink"
 							name="name"
 							placeholder="Acme Corporation"
 							required
@@ -101,75 +105,83 @@ export default async function NewProjectPage({
 						/>
 					</label>
 
-					<label className="flex flex-col gap-1.5 text-sm">
-						<span className="text-neutral-300">Start URL</span>
+					<label className="flex flex-col gap-2 text-sm">
+						<span className="font-mono text-ink-faint text-xs uppercase tracking-wider">
+							Start URL
+						</span>
 						<input
-							className="rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-neutral-100 outline-none focus:border-neutral-600"
+							className="rounded-sm border border-rule bg-sheet px-3 py-2.5 text-ink text-sm outline-none placeholder:text-ink-faint focus:border-ink"
 							name="startUrl"
 							placeholder="https://acme.example"
 							required
 							type="url"
 						/>
-						<span className="text-neutral-500 text-xs">
+						<span className="max-w-prose text-ink-soft text-xs leading-relaxed">
 							Crawling begins here and follows links within the same site.
 						</span>
 					</label>
 
-					<label className="flex flex-col gap-1.5 text-sm">
-						<span className="text-neutral-300">Expected locales</span>
+					<label className="flex flex-col gap-2 text-sm">
+						<span className="font-mono text-ink-faint text-xs uppercase tracking-wider">
+							Expected locales
+						</span>
 						<input
-							className="rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-neutral-100 outline-none focus:border-neutral-600"
+							className="rounded-sm border border-rule bg-sheet px-3 py-2.5 text-ink text-sm outline-none placeholder:text-ink-faint focus:border-ink"
 							name="locales"
 							placeholder="en, de, fr"
 							type="text"
 						/>
-						<span className="text-neutral-500 text-xs">
+						<span className="max-w-prose text-ink-soft text-xs leading-relaxed">
 							Comma-separated. A page family missing one of these is reported —
 							so list only what the site is supposed to publish.
 						</span>
 					</label>
 
-					<label className="flex flex-col gap-1.5 text-sm">
-						<span className="text-neutral-300">Exclude paths</span>
+					<label className="flex flex-col gap-2 text-sm">
+						<span className="font-mono text-ink-faint text-xs uppercase tracking-wider">
+							Exclude paths
+						</span>
 						<input
-							className="rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-neutral-100 outline-none focus:border-neutral-600"
+							className="rounded-sm border border-rule bg-sheet px-3 py-2.5 text-ink text-sm outline-none placeholder:text-ink-faint focus:border-ink"
 							name="excludePaths"
 							placeholder="/admin, /cart, /search"
 							type="text"
 						/>
-						<span className="text-neutral-500 text-xs">
+						<span className="max-w-prose text-ink-soft text-xs leading-relaxed">
 							Comma-separated path prefixes the check will never request. Worth
 							filling in before the first run against a live site — anything
 							that does work when fetched belongs here.
 						</span>
 					</label>
 
-					<label className="flex flex-col gap-1.5 text-sm">
-						<span className="text-neutral-300">Only these paths</span>
+					<label className="flex flex-col gap-2 text-sm">
+						<span className="font-mono text-ink-faint text-xs uppercase tracking-wider">
+							Only these paths
+						</span>
 						<input
-							className="rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-neutral-100 outline-none focus:border-neutral-600"
+							className="rounded-sm border border-rule bg-sheet px-3 py-2.5 text-ink text-sm outline-none placeholder:text-ink-faint focus:border-ink"
 							name="includePaths"
 							placeholder="leave empty for the whole site"
 							type="text"
 						/>
-						<span className="text-neutral-500 text-xs">
+						<span className="max-w-prose text-ink-soft text-xs leading-relaxed">
 							Comma-separated. Empty means the whole site. Excluded paths still
 							win, so listing a path in both leaves it excluded.
 						</span>
 					</label>
 
 					<button
-						className="mt-1 rounded-md bg-neutral-100 px-4 py-2 font-medium text-neutral-950 transition hover:bg-white"
+						className="mt-2 rounded-sm bg-ink px-5 py-2.5 font-medium text-paper text-sm transition-opacity hover:opacity-85"
 						type="submit"
 					>
 						Create project
 					</button>
 				</form>
 
-				<p className="mt-6 text-neutral-500 text-xs">
+				<p className="mt-10 max-w-prose border-rule border-t pt-5 text-ink-faint text-xs leading-relaxed">
 					Request rate and concurrency default to something gentle. Adjust them
-					with <code className="text-neutral-400">npm run db:seed-project</code>
-					.
+					with{" "}
+					<code className="font-mono text-ink">npm run db:seed-project</code>.
 				</p>
 			</div>
 		</main>

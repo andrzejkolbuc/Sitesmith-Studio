@@ -28,19 +28,21 @@ export default async function ProjectPage({
 	}
 
 	return (
-		<main className="min-h-screen bg-neutral-950 text-neutral-100">
-			<div className="container mx-auto max-w-3xl px-4 py-12">
+		<main className="min-h-screen">
+			<div className="mx-auto max-w-4xl px-6 py-14">
 				<Link
-					className="text-neutral-400 text-sm underline-offset-4 hover:text-neutral-100 hover:underline"
+					className="font-mono text-ink-faint text-xs underline-offset-4 hover:text-ink hover:underline"
 					href="/projects"
 				>
 					← Projects
 				</Link>
 
-				<header className="mt-6">
-					<h1 className="font-bold text-2xl tracking-tight">{project.name}</h1>
+				<header className="mt-8">
+					<h1 className="font-display font-semibold text-4xl text-ink tracking-tight">
+						{project.name}
+					</h1>
 					<a
-						className="mt-1 inline-block break-all text-neutral-400 text-sm underline-offset-4 hover:text-neutral-100 hover:underline"
+						className="mt-2 inline-block break-all font-mono text-ink-soft text-sm underline-offset-4 hover:text-ink hover:underline"
 						href={project.startUrl}
 						rel="noreferrer"
 						target="_blank"
@@ -49,38 +51,69 @@ export default async function ProjectPage({
 					</a>
 				</header>
 
-				<dl className="mt-6 flex flex-wrap gap-x-8 gap-y-3 text-sm">
-					<div>
-						<dt className="text-neutral-500 text-xs">Expected locales</dt>
-						<dd className="mt-0.5 text-neutral-200">
-							{project.locales.length > 0 ? (
-								project.locales.join(", ")
-							) : (
-								<span className="text-neutral-500">
-									none — nothing can be reported missing
-								</span>
-							)}
-						</dd>
-					</div>
-					<div>
-						<dt className="text-neutral-500 text-xs">Request pacing</dt>
-						<dd className="mt-0.5 text-neutral-200">
+				<dl className="mt-8 flex flex-wrap gap-x-12 gap-y-5 border-rule border-t pt-6 text-sm">
+					<Field label="Expected locales">
+						{project.locales.length > 0 ? (
+							<span className="flex flex-wrap gap-1.5">
+								{project.locales.map((locale) => (
+									<code
+										className="rounded-sm border border-rule bg-sheet px-1.5 py-0.5 font-mono text-ink text-xs"
+										key={locale}
+									>
+										{locale}
+									</code>
+								))}
+							</span>
+						) : (
+							<span className="text-ink-faint">
+								none — nothing can be reported missing
+							</span>
+						)}
+					</Field>
+
+					<Field label="Request pacing">
+						<span className="tnum font-mono text-xs">
 							{project.maxConcurrency} at a time, {project.requestDelayMs}ms
 							apart
-						</dd>
-					</div>
+						</span>
+					</Field>
+
 					{project.excludePaths.length > 0 ? (
-						<div>
-							<dt className="text-neutral-500 text-xs">Excluded</dt>
-							<dd className="mt-0.5 text-neutral-200">
+						<Field label="Excluded">
+							<span className="font-mono text-xs">
 								{project.excludePaths.join(", ")}
-							</dd>
-						</div>
+							</span>
+						</Field>
+					) : null}
+
+					{project.includePaths.length > 0 ? (
+						<Field label="Only these paths">
+							<span className="font-mono text-xs">
+								{project.includePaths.join(", ")}
+							</span>
+						</Field>
 					) : null}
 				</dl>
 
-				<RunPanel projectId={project.id} />
+				<RunPanel expectedLocales={project.locales} projectId={project.id} />
 			</div>
 		</main>
+	);
+}
+
+function Field({
+	label,
+	children,
+}: {
+	label: string;
+	children: React.ReactNode;
+}) {
+	return (
+		<div>
+			<dt className="font-mono text-ink-faint text-xs uppercase tracking-wider">
+				{label}
+			</dt>
+			<dd className="mt-1.5 text-ink">{children}</dd>
+		</div>
 	);
 }
