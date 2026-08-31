@@ -201,6 +201,11 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 	const origin = new URL(start).origin;
 	const frontier: string[] = [start];
 	const seen = new Set<string>([start]);
+	/**
+	 * URLs the crawl has actually recorded a page for, which is not the same set
+	 * as the URLs it has requested: a redirect means the two differ.
+	 */
+	const recorded = new Set<string>();
 	const pages: CrawledPage[] = [];
 
 	let abortedReason: string | null = null;
@@ -232,11 +237,25 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 			const contentType = response.headers.get("content-type") ?? "";
 			const html = contentType.includes("html") ? await response.text() : "";
 
+			/**
+			 * The page is the URL the server served, not the one we asked for.
+			 *
+			 * Two things follow from getting this wrong, and a real client site
+			 * showed both: an alias is recorded as a page of its own, and every
+			 * relative href on it resolves against a URL the page does not live at —
+			 * inventing links the site never published.
+			 *
+			 * Falls back to the requested URL when the response carries nothing
+			 * usable, which keeps behaviour identical for the overwhelming majority
+			 * of pages that never redirect.
+			 */
+			const served = normaliseUrl(response.url) ?? url;
+
 			return {
-				url,
+				url: served,
 				httpStatus: response.status,
-				hreflangTargets: extractHreflang(html, url),
-				links: extractLinks(html, url),
+				hreflangTargets: extractHreflang(html, served),
+				links: extractLinks(html, served),
 				fetchError: null,
 			};
 		} catch (caught) {
@@ -264,6 +283,21 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 
 			const page = await fetchOne(next);
 			if (abortedReason !== null) return;
+
+			/**
+			 * A second route to a page we already have.
+			 *
+			 * The `seen` check above stops us *requesting* a URL twice, but it runs
+			 * before the fetch, when where a URL leads is not yet knowable. Only the
+			 * server can say, so this check has to come after the response.
+			 *
+			 * Discarded outright: no page, no `onPage`, no links enqueued — they
+			 * would be the links of a page already recorded. It counts as neither a
+			 * page nor a failure, because it was neither: the request succeeded and
+			 * led somewhere already known.
+			 */
+			if (recorded.has(page.url)) continue;
+			recorded.add(page.url);
 
 			pages.push(page);
 			await onPage?.(page);

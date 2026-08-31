@@ -47,6 +47,12 @@ type Page = {
  *   each other. Fires rule 5 (declarations not returned).
  * - `/careers`, `/de/karriere` — two healthy siblings both declaring a French
  *   variant that 404s. Fires rule 6 (one variant failing while siblings are fine).
+ * - `/redirect-hub` → `/moved/page` and `/final/page` — two routes to one
+ *   page, the alias listed first. `/redirect-hub-reversed` lists them the other
+ *   way round; only reachable as a start URL, so ordinary crawls stay small.
+ * - `/final/page` — carries a **relative** link, so a redirected page proves
+ *   which URL its hrefs resolve against. None of these paths is locale-shaped,
+ *   so no detection rule speaks about them.
  * - `/private/secret` — only reachable if excludePaths is ignored.
  * - `/slow`, `/flaky` — timing and abort behaviour.
  */
@@ -63,6 +69,7 @@ const SITE: Record<string, Page> = {
 			"/de/blog-post",
 			"/support",
 			"/careers",
+			"/redirect-hub",
 			"/private/secret",
 			"/?utm_source=nav",
 		],
@@ -116,6 +123,20 @@ const SITE: Record<string, Page> = {
 		alternates: { en: "/careers", de: "/de/karriere", fr: "/fr/carrieres" },
 	},
 
+	/**
+	 * Redirect aliases. `/moved/page` is not in this map at all — it is served by
+	 * REDIRECTS below, which is the point: it exists only as a route.
+	 */
+	"/redirect-hub": { links: ["/moved/page", "/final/page"] },
+	"/redirect-hub-reversed": { links: ["/final/page", "/moved/page"] },
+	"/final/page": {
+		// Deliberately relative. Resolved against the requested URL this lands on
+		// /moved/sibling, which does not exist; against the served URL it lands on
+		// /final/sibling, which does.
+		links: ["sibling"],
+	},
+	"/final/sibling": { body: "<p>Reached only by a relative link.</p>" },
+
 	// Rule 4: locale-shaped URL with no hreflang.
 	"/de/blog-post": { body: "<p>Ein Beitrag ohne hreflang.</p>" },
 
@@ -133,6 +154,16 @@ const SITE: Record<string, Page> = {
 	"/flaky-hub": {
 		links: ["/flaky/1", "/flaky/2", "/flaky/3", "/flaky/4", "/flaky/5"],
 	},
+};
+
+/**
+ * Routes that answer with a redirect rather than a page.
+ *
+ * The fixture had none until now, which is exactly why a whole class of defect
+ * went unseen: every crawl the suite performed landed on the URL it asked for.
+ */
+const REDIRECTS: Record<string, string> = {
+	"/moved/page": "/final/page",
 };
 
 /**
@@ -229,6 +260,14 @@ export async function startFixtureSite(): Promise<Fixture> {
 			}
 
 			const key = pathname ? canonicalPath(pathname) : "/";
+
+			const destination = REDIRECTS[key];
+			if (destination) {
+				res.writeHead(301, { location: destination });
+				res.end();
+				return;
+			}
+
 			const page = INDEX[key];
 			if (!page) {
 				res.writeHead(404, { "content-type": "text/html" });

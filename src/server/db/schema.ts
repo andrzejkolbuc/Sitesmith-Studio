@@ -1,5 +1,10 @@
 import { relations } from "drizzle-orm";
-import { index, pgTableCreator, primaryKey } from "drizzle-orm/pg-core";
+import {
+	index,
+	pgTableCreator,
+	primaryKey,
+	uniqueIndex,
+} from "drizzle-orm/pg-core";
 import type { AdapterAccount } from "next-auth/adapters";
 
 /**
@@ -293,6 +298,15 @@ export const pages = createTable(
 		index("page_tenant_id_idx").on(t.tenantId),
 		index("page_run_id_idx").on(t.runId),
 		index("page_variant_group_idx").on(t.runId, t.variantGroupKey),
+		/**
+		 * One row per page per run, enforced rather than assumed.
+		 *
+		 * It was already true, but only because the crawler happened to dedupe on
+		 * the URL it requested — and that incidental guarantee is exactly what broke
+		 * when redirect aliases turned out to be several routes to one page. An
+		 * invariant nothing enforces is one that returns silently.
+		 */
+		uniqueIndex("page_run_url_uq").on(t.runId, t.url),
 	],
 );
 

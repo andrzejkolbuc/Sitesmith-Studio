@@ -197,3 +197,91 @@ describe("incremental persistence", () => {
 		expect(seen).toHaveLength(result.pages.length);
 	});
 });
+
+/**
+ * A page is the URL the server served, not the one we asked for.
+ *
+ * Found on a real client site: `/bg/careers` answers 200 from `/bg/karieri`, and
+ * both were recorded as pages. The family swelled to nineteen members and the
+ * rules reported four defects that were not there — every one of them naming a
+ * page whose hreflang is correct.
+ *
+ * Every fixture crawl before this landed on the URL it requested, which is why
+ * none of it was caught. These cases exist to make that impossible again.
+ */
+describe("page identity under redirects", () => {
+	const path = (url: string) => new URL(url).pathname;
+
+	it("records a redirected page under the URL the server served", async () => {
+		const result = await crawl({
+			...base(),
+			startUrl: `${site.baseUrl}/moved/page`,
+		});
+
+		const paths = result.pages.map((p) => path(p.url));
+		expect(paths).toContain("/final/page");
+		expect(paths).not.toContain("/moved/page");
+	});
+
+	it("records one page when the alias is reached first", async () => {
+		/**
+		 * `/redirect-hub` lists the alias before the canonical URL, so the crawl
+		 * records the page, then meets a second route to something it already has.
+		 */
+		const result = await crawl({
+			...base(),
+			startUrl: `${site.baseUrl}/redirect-hub`,
+		});
+
+		const finals = result.pages.filter((p) => path(p.url) === "/final/page");
+		expect(finals).toHaveLength(1);
+	});
+
+	it("records one page when the canonical URL is reached first", async () => {
+		/**
+		 * The other order, which behaves differently and is the one more likely to
+		 * be got wrong: the page is already recorded when the alias resolves to it.
+		 */
+		const result = await crawl({
+			...base(),
+			startUrl: `${site.baseUrl}/redirect-hub-reversed`,
+		});
+
+		const finals = result.pages.filter((p) => path(p.url) === "/final/page");
+		expect(finals).toHaveLength(1);
+	});
+
+	it("resolves a relative link against the URL the server served", async () => {
+		/**
+		 * `/final/page` publishes `<a href="sibling">`. Against the URL we asked for
+		 * that resolves to `/moved/sibling`, which does not exist; against the URL
+		 * we landed on it resolves to `/final/sibling`, which does. A crawl that
+		 * gets this wrong reports a dead link the site does not have.
+		 */
+		const result = await crawl({
+			...base(),
+			startUrl: `${site.baseUrl}/moved/page`,
+		});
+
+		const paths = result.pages.map((p) => path(p.url));
+		expect(paths).toContain("/final/sibling");
+		expect(paths).not.toContain("/moved/sibling");
+	});
+
+	it("does not count a discarded alias as a page or as a failure", async () => {
+		/**
+		 * An alias produces no page, so it must not advance the page ceiling and
+		 * must not look like a failed request — it succeeded; it simply led
+		 * somewhere already known.
+		 */
+		const result = await crawl({
+			...base(),
+			startUrl: `${site.baseUrl}/redirect-hub`,
+		});
+
+		expect(result.abortedReason).toBeNull();
+		// Every recorded page is a distinct URL: no alias slipped in as a duplicate.
+		const urls = result.pages.map((p) => p.url);
+		expect(new Set(urls).size).toBe(urls.length);
+	});
+});

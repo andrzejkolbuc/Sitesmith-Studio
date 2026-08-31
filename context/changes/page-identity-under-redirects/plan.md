@@ -370,17 +370,17 @@ the before half of the phase 3 comparison.
 
 #### Automated
 
-- [ ] 1.1 Cases fail before the change and pass after
-- [ ] 1.2 A redirected URL is recorded under the URL the server served
-- [ ] 1.3 Two routes to one page produce one page, in either arrival order
-- [ ] 1.4 A relative href on a redirected page resolves against the final URL
-- [ ] 1.5 A discarded alias advances neither the page ceiling nor the failure counters
-- [ ] 1.6 Mutation: reverting to the requested URL fails the identity cases
-- [ ] 1.7 Mutation: removing the post-fetch dedup fails the two-routes case
-- [ ] 1.8 Schema applies: `npm run db:push`
-- [ ] 1.9 Existing crawler, politeness and run tests pass unchanged
-- [ ] 1.10 Type checking passes: `npm run typecheck`
-- [ ] 1.11 Linting passes: `npm run check`
+- [x] 1.1 Cases fail before the change and pass after
+- [x] 1.2 A redirected URL is recorded under the URL the server served
+- [x] 1.3 Two routes to one page produce one page, in either arrival order
+- [x] 1.4 A relative href on a redirected page resolves against the final URL
+- [x] 1.5 A discarded alias advances neither the page ceiling nor the failure counters
+- [x] 1.6 Mutation: reverting to the requested URL fails the identity cases
+- [x] 1.7 Mutation: removing the post-fetch dedup fails the two-routes case
+- [x] 1.8 Schema applies: `npm run db:push`
+- [x] 1.9 Existing crawler, politeness and run tests pass unchanged
+- [x] 1.10 Type checking passes: `npm run typecheck`
+- [x] 1.11 Linting passes: `npm run check`
 - [ ] 1.12 Whole suite passes: `npm run test:all`
 
 #### Manual
