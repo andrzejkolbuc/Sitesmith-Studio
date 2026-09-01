@@ -45,6 +45,19 @@ const FINDING_LABEL: Record<string, string> = {
 	no_hreflang: "No language variants declared",
 	hreflang_family_inconsistent: "Language links that disagree",
 	variant_diverged: "One variant broken, its siblings fine",
+	content_untranslated: "Content that was never translated",
+};
+
+/**
+ * Marker kinds in the reader's words.
+ *
+ * The stored value is a slug so that a run recorded today still means the same
+ * thing when read back later; what to call it on screen is a presentation
+ * decision and belongs here.
+ */
+const MARKER_LABEL: Record<string, string> = {
+	lorem_ipsum: "placeholder text (lorem ipsum)",
+	unrendered_expression: "an unrendered template expression",
 };
 
 function Listed({ items }: { items: string[] }) {
@@ -605,6 +618,50 @@ function Evidence({
 					</div>
 					<div className="mt-2 text-ink-faint text-xs">Linked from:</div>
 					<Listed items={declaredBy.map(pathOf)} />
+				</>
+			);
+		}
+
+		case "content_untranslated": {
+			if (detail.kind === "identical_to_siblings") {
+				const urls = Array.isArray(detail.urls)
+					? (detail.urls as string[])
+					: [];
+				const locales = Array.isArray(detail.locales)
+					? (detail.locales as string[])
+					: [];
+
+				return (
+					<>
+						<span className="text-ink">
+							{urls.length} pages serve the same content under different
+							languages
+						</span>
+						<div className="mt-1.5 flex flex-wrap gap-1">
+							{locales.map((locale) => (
+								<Tag key={locale} tone="flag">
+									{locale}
+								</Tag>
+							))}
+						</div>
+						<Listed items={urls.map(pathOf)} />
+					</>
+				);
+			}
+
+			const markers = Array.isArray(detail.markers)
+				? (detail.markers as string[])
+				: [];
+
+			return (
+				<>
+					<span className="text-ink">
+						This page shows{" "}
+						{markers.map((m) => MARKER_LABEL[m] ?? m).join(", ")}
+					</span>
+					<div className="mt-1.5 break-all font-mono text-ink-soft text-xs">
+						{pathOf(str("url"))}
+					</div>
 				</>
 			);
 		}

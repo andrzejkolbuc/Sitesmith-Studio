@@ -205,6 +205,69 @@ describe("detectMissingVariants against the fixture site", () => {
 			JSON.stringify(first.findings),
 		);
 	});
+
+	it("reports the page whose template never rendered", async () => {
+		const { findings } = await detect();
+		const markers = findings.filter(
+			(f) =>
+				f.type === FINDING_TYPES.CONTENT_UNTRANSLATED &&
+				f.detail.kind === "placeholder_markers",
+		);
+
+		expect(markers).toHaveLength(1);
+		expect(markers[0]?.url).toBe(`${site.baseUrl}/blog/draft`);
+		expect(markers[0]?.detail.markers).toEqual(["unrendered_expression"]);
+	});
+
+	it("reports the German page that serves the English body, once", async () => {
+		/**
+		 * End to end from real HTML: the fixture serves `/de/handbuch` the same body
+		 * as `/handbook`, and nothing else on the site shares content with anything.
+		 * One finding naming both pages — not one finding per page.
+		 */
+		const { findings } = await detect();
+		const identical = findings.filter(
+			(f) =>
+				f.type === FINDING_TYPES.CONTENT_UNTRANSLATED &&
+				f.detail.kind === "identical_to_siblings",
+		);
+
+		expect(identical).toHaveLength(1);
+		expect(identical[0]?.detail.urls).toEqual([
+			`${site.baseUrl}/de/handbuch`,
+			`${site.baseUrl}/handbook`,
+		]);
+		expect(identical[0]?.detail.locales).toEqual(["de", "en"]);
+	});
+
+	it("says nothing about three honest translations of different lengths", async () => {
+		/**
+		 * The assertion this whole slice rests on, and the direct answer to the PRD's
+		 * unresolved objection that content drift is noise by default.
+		 *
+		 * `/story`, `/de/geschichte` and `/fr/histoire` run to 212, 414 and 243
+		 * characters — materially different, as honest translations are. If this ever
+		 * fails, the rule has started reporting translation for being translation.
+		 */
+		const { findings } = await detect();
+		const family = [
+			`${site.baseUrl}/story`,
+			`${site.baseUrl}/de/geschichte`,
+			`${site.baseUrl}/fr/histoire`,
+		];
+
+		const about = findings.filter((f) => {
+			if (f.type !== FINDING_TYPES.CONTENT_UNTRANSLATED) return false;
+			const urls = Array.isArray(f.detail.urls)
+				? (f.detail.urls as string[])
+				: [];
+			return (
+				family.includes(f.url ?? "") || urls.some((url) => family.includes(url))
+			);
+		});
+
+		expect(about).toEqual([]);
+	});
 });
 
 describe("detectMissingVariants edge cases", () => {

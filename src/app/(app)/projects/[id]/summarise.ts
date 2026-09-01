@@ -78,6 +78,17 @@ export function pagesInvolved(finding: {
 		case "no_hreflang":
 			return one(detail.url);
 
+		/**
+		 * Two shapes under one type. The marker kind is about the single page it
+		 * names; the identical-content kind speaks for every page sharing that
+		 * content, and counting only one of them would understate a problem whose
+		 * whole point is that it touches several.
+		 */
+		case "content_untranslated":
+			return detail.kind === "identical_to_siblings"
+				? strings(detail.urls)
+				: one(detail.url);
+
 		default:
 			// An unmapped type still counts the page it names, so a new finding
 			// never reports as affecting nothing.

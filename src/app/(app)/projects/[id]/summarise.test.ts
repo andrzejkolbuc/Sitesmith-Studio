@@ -168,3 +168,35 @@ describe("countPages", () => {
 		).toBe(3);
 	});
 });
+
+describe("pagesInvolved for content findings", () => {
+	const B = "https://shop.test";
+
+	it("counts every page sharing identical content", () => {
+		/**
+		 * The group-level shape. One finding, three pages — counting only the one it
+		 * names would report a problem spanning a whole family as touching nothing,
+		 * because this kind carries no `url` at all.
+		 */
+		expect(
+			pagesInvolved({
+				type: "content_untranslated",
+				url: null,
+				detail: {
+					kind: "identical_to_siblings",
+					urls: [`${B}/en`, `${B}/de`, `${B}/fr`],
+				},
+			}),
+		).toHaveLength(3);
+	});
+
+	it("counts the single page a marker finding names", () => {
+		expect(
+			pagesInvolved({
+				type: "content_untranslated",
+				url: `${B}/draft`,
+				detail: { kind: "placeholder_markers", url: `${B}/draft` },
+			}),
+		).toEqual([`${B}/draft`]);
+	});
+});

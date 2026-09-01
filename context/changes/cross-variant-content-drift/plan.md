@@ -491,17 +491,17 @@ a record of what was concluded then.
 
 #### Automated
 
-- [ ] 2.1 A page with an unrendered template marker produces exactly one finding
-- [ ] 2.2 A page whose content is identical to its sibling's produces exactly one finding, naming that sibling
-- [ ] 2.3 A family of honest translations produces no `content_untranslated` finding
-- [ ] 2.4 A broken page in a family produces no `content_untranslated` finding
-- [ ] 2.5 A page below the comparable-length floor produces no sibling finding
-- [ ] 2.6 A truncated crawl produces no sibling findings
-- [ ] 2.7 Mutation: removing the `isError` guard fails the broken-page case
-- [ ] 2.8 Mutation: comparing raw text instead of normalised text fails the whitespace case
-- [ ] 2.9 Every existing site-shape case passes unchanged
-- [ ] 2.10 `pagesInvolved` returns non-empty for the new type
-- [ ] 2.11 Type checking, linting and the whole suite pass
+- [x] 2.1 A page with an unrendered template marker produces exactly one finding
+- [x] 2.2 A page whose content is identical to its sibling's produces exactly one finding, naming that sibling
+- [x] 2.3 A family of honest translations produces no `content_untranslated` finding
+- [x] 2.4 A broken page in a family produces no `content_untranslated` finding
+- [x] 2.5 A page below the comparable-length floor produces no sibling finding
+- [x] 2.6 A truncated crawl produces no sibling findings
+- [x] 2.7 Mutation: removing the `isError` guard fails the broken-page case
+- [x] 2.8 Mutation: comparing raw text instead of normalised text fails the whitespace case
+- [x] 2.9 Every existing site-shape case passes unchanged
+- [x] 2.10 `pagesInvolved` returns non-empty for the new type
+- [x] 2.11 Type checking, linting and the whole suite pass
 
 #### Manual
 

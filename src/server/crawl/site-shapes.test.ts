@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { emptyContent } from "./content";
+import { type ContentSummary, emptyContent } from "./content";
 import type { CrawledPage } from "./crawler";
 import { detectMissingVariants } from "./findings";
 import { localeFromUrl } from "./variants";
@@ -34,6 +34,15 @@ const page = (
 	options: {
 		hreflang?: Record<string, string>;
 		status?: number;
+		/**
+		 * Overrides on the content summary.
+		 *
+		 * The content rules read a digest, not text, so a case states the digest it
+		 * means directly. Writing HTML here and extracting from it would make every
+		 * case depend on the extractor as well as the rule, and a failure would no
+		 * longer say which of the two was wrong.
+		 */
+		content?: Partial<ContentSummary>;
 	} = {},
 ): CrawledPage => ({
 	url: `${BASE}${path}`,
@@ -45,7 +54,7 @@ const page = (
 		]),
 	),
 	links: [],
-	content: emptyContent(true),
+	content: { ...emptyContent(true), ...options.content },
 	fetchError: null,
 });
 
@@ -961,5 +970,211 @@ describe("a family holding two URLs for one language", () => {
 			sibling: `${BASE}/de`,
 			siblingLocale: "de",
 		});
+	});
+});
+
+/**
+ * Rule 7, against shapes it was not written for.
+ *
+ * The rule answers one question — was this page ever actually translated — from
+ * two kinds of evidence. What matters here is not that it fires, which the
+ * fixture already shows, but the set of cases where a human would say nothing is
+ * wrong and the rule must agree.
+ */
+describe("content that was never translated", () => {
+	const trio = { en: "/en", de: "/de", fr: "/fr" };
+	const SAME = "d".repeat(64);
+	const OTHER = "e".repeat(64);
+
+	const untranslated = (finding: { type: string }) =>
+		finding.type === "content_untranslated";
+
+	it("reports one finding when two locales serve the same content", () => {
+		/**
+		 * Not two. The pair is one problem, and reporting it from each side would be
+		 * the double-report rule 6 exists to collapse, wearing a new name.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/en", { hreflang: trio, content: { textDigest: SAME } }),
+				page("/de", { hreflang: trio, content: { textDigest: SAME } }),
+				page("/fr", { hreflang: trio, content: { textDigest: OTHER } }),
+			],
+		}).filter(untranslated);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "identical_to_siblings",
+			urls: [`${BASE}/de`, `${BASE}/en`],
+			locales: ["de", "en"],
+		});
+	});
+
+	it("still reports one finding when three locales share one body", () => {
+		/**
+		 * The shape that decides whether this scales: a site that copied its source
+		 * language into every translation. Per-page reporting would produce three
+		 * findings here and six on a six-language site, which is how a rule that is
+		 * right in principle becomes unreadable in practice.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/en", { hreflang: trio, content: { textDigest: SAME } }),
+				page("/de", { hreflang: trio, content: { textDigest: SAME } }),
+				page("/fr", { hreflang: trio, content: { textDigest: SAME } }),
+			],
+		}).filter(untranslated);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail.urls).toHaveLength(3);
+	});
+
+	it("says nothing when siblings genuinely differ", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en", { hreflang: trio, content: { textDigest: SAME } }),
+					page("/de", { hreflang: trio, content: { textDigest: OTHER } }),
+					page("/fr", {
+						hreflang: trio,
+						content: { textDigest: "f".repeat(64) },
+					}),
+				],
+			}).filter(untranslated),
+		).toEqual([]);
+	});
+
+	it("says nothing about a regional refinement sharing its language's content", () => {
+		/**
+		 * Duplicate content is a real problem and a different one. A British English
+		 * page carrying the generic English body has not failed to be translated —
+		 * there was never a second language involved — and calling it a translation
+		 * defect would send the reader looking for a translator.
+		 *
+		 * `en` and `en-gb` are different locale tags, so a rule comparing tags rather
+		 * than languages reports this. Found by mutation: weakening the guard to
+		 * "two URLs" left every test passing, because the first version of this case
+		 * forgot to give both pages a digest and so proved nothing.
+		 */
+		const uk = { en: "/en", "en-gb": "/uk" };
+
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en", { hreflang: uk, content: { textDigest: SAME } }),
+					page("/uk", { hreflang: uk, content: { textDigest: SAME } }),
+				],
+			}).filter(untranslated),
+		).toEqual([]);
+	});
+
+	it("says nothing when a page has too little text to compare", () => {
+		/**
+		 * A null digest is the extractor declining to judge. The rule has to decline
+		 * with it rather than treating "no evidence" as "no difference".
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en", { hreflang: trio, content: { textDigest: null } }),
+					page("/de", { hreflang: trio, content: { textDigest: null } }),
+				],
+			}).filter(untranslated),
+		).toEqual([]);
+	});
+
+	it("says nothing about a member that errored", () => {
+		/**
+		 * A broken page has no content, so every content rule would rank it as the
+		 * most extreme drift on the site — while rules 2 and 6 already describe it
+		 * correctly. This is the fifth time this project has had to write this guard.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en", { hreflang: trio, content: { textDigest: SAME } }),
+					page("/de", {
+						hreflang: trio,
+						status: 404,
+						content: { textDigest: SAME },
+					}),
+				],
+			}).filter(untranslated),
+		).toEqual([]);
+	});
+
+	it("says nothing about a response that was not HTML", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en", { hreflang: trio, content: { textDigest: SAME } }),
+					page("/de", {
+						hreflang: trio,
+						content: { textDigest: SAME, isHtml: false },
+					}),
+				],
+			}).filter(untranslated),
+		).toEqual([]);
+	});
+
+	it("stays quiet about identical siblings on a crawl that stopped early", () => {
+		/**
+		 * The same reasoning rules 1 and 3 carry. A truncated run holds half a
+		 * family, and the member it did not reach is the one most likely to hold the
+		 * real translation.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en", { hreflang: trio, content: { textDigest: SAME } }),
+					page("/de", { hreflang: trio, content: { textDigest: SAME } }),
+				],
+				crawlComplete: false,
+			}).filter(untranslated),
+		).toEqual([]);
+	});
+
+	it("reports a marker on a page with no family at all", () => {
+		/**
+		 * An unrendered expression needs nothing to compare against. A monolingual
+		 * site showing `{{ headline }}` has the same defect as a multilingual one,
+		 * and a rule that only spoke about families would miss every such page.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/pricing", { content: { markers: ["unrendered_expression"] } }),
+			],
+		}).filter(untranslated);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBe(`${BASE}/pricing`);
+		expect(findings[0]?.detail.kind).toBe("placeholder_markers");
+	});
+
+	it("reports a marker even on a crawl that stopped early", () => {
+		/**
+		 * Unlike the sibling comparison, this evidence is on the page in front of
+		 * us. Where we stopped crawling says nothing about whether that page
+		 * rendered.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [page("/pricing", { content: { markers: ["lorem_ipsum"] } })],
+				crawlComplete: false,
+			}).filter(untranslated),
+		).toHaveLength(1);
+	});
+
+	it("says nothing about a marker on a page that errored", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/pricing", {
+						status: 500,
+						content: { markers: ["lorem_ipsum"] },
+					}),
+				],
+			}).filter(untranslated),
+		).toEqual([]);
 	});
 });

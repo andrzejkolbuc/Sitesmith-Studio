@@ -48,3 +48,29 @@ finding to the site's own assertion — and the two-member guard that fixed
 detection rules 1 and 6. Open Question 2 still stands: there is no mechanism for
 suppressing a known-acceptable finding, so signal quality has to come entirely
 from conservative detection.
+
+## Adaptation during phase 2
+
+The plan's phase 2 contract says the sibling condition is "reported once per
+page, naming the sibling it matches". Implemented literally, an identical pair
+fires from both sides — two findings for one problem, and three on a family
+where German and French were both copied from English. That is the double-report
+class rule 6 exists to collapse, and the one this project has now corrected four
+times.
+
+Adapted, with the user's agreement, to **one finding per identical set**. The
+type keeps a `kind` discriminator in its detail, following the pattern rule 5
+already uses for its defects:
+
+- `placeholder_markers` — per page (`url` set). A marker is a fact about one
+  page, needs no family, and needs no `crawlComplete` guard: the evidence is on
+  the page in front of us.
+- `identical_to_siblings` — per set (`url: null`). Names every URL sharing that
+  content, so a three-way copy reports once.
+
+A second correction came out of mutation testing rather than review. The guard
+was first written as "two locale tags", which reports `en` beside `en-gb`
+serving one body — a British page carrying the generic English text has not
+failed to be translated, because no second language was ever involved. It now
+compares primary language subtags, the same way `satisfies` treats a regional
+refinement as answering for its language.

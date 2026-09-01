@@ -29,6 +29,8 @@ export const FINDING_TYPES = {
 	HREFLANG_FAMILY_INCONSISTENT: "hreflang_family_inconsistent",
 	/** One variant failing while its siblings are fine. */
 	VARIANT_DIVERGED: "variant_diverged",
+	/** A page that was never translated, or never finished rendering. */
+	CONTENT_UNTRANSLATED: "content_untranslated",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -480,6 +482,125 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 			url: page.url,
 			detail: { url: page.url, impliedLocale },
 		});
+	}
+
+	// ── Rule 7: content that was never translated ─────────────────────────────
+	//
+	// FR-027's first and most trustworthy signal, in two kinds of evidence that
+	// share a finding type because they are one story to the reader: this page was
+	// never finished. The `kind` in the detail says which was observed, following
+	// the same discriminator rule 5 uses for its defects.
+	//
+	// Both kinds skip pages that errored. A page that 404s has no content at all,
+	// so every content rule would rank it as the most extreme drift on the site —
+	// while rules 2 and 6 are already describing it correctly, and better. That is
+	// the double-report this file spends half its length avoiding.
+
+	/**
+	 * A template that reached the reader.
+	 *
+	 * Per page and independent of family, because an unrendered expression is a
+	 * defect on a monolingual page too — nothing about it depends on there being
+	 * a translation to compare against. It needs no `crawlComplete` guard for the
+	 * same reason: the evidence is on the page in front of us, not in the shape of
+	 * what we did or did not reach.
+	 */
+	for (const page of [...pages].sort((a, b) => a.url.localeCompare(b.url))) {
+		if (isError(page)) continue;
+		if (!page.content.isHtml) continue;
+		if (page.content.markers.length === 0) continue;
+
+		findings.push({
+			type: FINDING_TYPES.CONTENT_UNTRANSLATED,
+			url: page.url,
+			detail: {
+				kind: "placeholder_markers",
+				url: page.url,
+				locale: variants.get(page.url)?.locale ?? null,
+				markers: [...page.content.markers].sort(),
+			},
+		});
+	}
+
+	/**
+	 * Pages inside one family serving the same content under different languages.
+	 *
+	 * Reported once per identical *set*, never once per page. Two pages sharing a
+	 * body is one problem, and naming it twice — once from each side — would be
+	 * the defect rule 6 was written to collapse, reappearing under a new type. A
+	 * family where German and French were both copied from English is one finding
+	 * naming three URLs, not three findings naming each other.
+	 *
+	 * Only meaningful on a crawl that finished: a truncated run can hold half a
+	 * family, and the members it did not reach are the ones most likely to carry
+	 * the real translation.
+	 */
+	if (crawlComplete) {
+		for (const family of variantFamilies) {
+			if (family.members.length < 2) continue;
+
+			const byDigest = new Map<
+				string,
+				Array<{ url: string; locale: string }>
+			>();
+
+			for (const member of family.members) {
+				const page = byUrl.get(member.url);
+				if (!page || isError(page) || !page.content.isHtml) continue;
+
+				const digest = page.content.textDigest;
+				/**
+				 * Null below the comparable-length floor. A page with almost no text
+				 * matches its sibling by accident rather than by neglect.
+				 */
+				if (!digest) continue;
+				/**
+				 * A member whose language nothing established cannot be said to be
+				 * untranslated — there is no language it failed to be in.
+				 */
+				if (!member.locale) continue;
+
+				byDigest.set(digest, [
+					...(byDigest.get(digest) ?? []),
+					{ url: member.url, locale: member.locale },
+				]);
+			}
+
+			for (const [, sharing] of [...byDigest.entries()].sort(([a], [b]) =>
+				a.localeCompare(b),
+			)) {
+				/**
+				 * Two *languages*, not two URLs and not two locale tags.
+				 *
+				 * One page is nothing to compare. Two URLs serving one language
+				 * identically is duplicate content — a real problem, a different one,
+				 * and no evidence that anything went untranslated. And `en` beside
+				 * `en-gb` is that same case wearing two tags: a British page carrying
+				 * the generic English body has not failed to be translated, because
+				 * there was never a second language involved.
+				 *
+				 * Compared on the primary subtag for the same reason `satisfies` above
+				 * treats a regional refinement as answering for its language.
+				 */
+				const languages = new Set(
+					sharing.map((m) => m.locale.split(/[-_]/)[0] ?? m.locale),
+				);
+				if (languages.size < 2) continue;
+
+				const locales = new Set(sharing.map((m) => m.locale));
+
+				findings.push({
+					type: FINDING_TYPES.CONTENT_UNTRANSLATED,
+					url: null,
+					detail: {
+						kind: "identical_to_siblings",
+						groupKey: family.groupKey,
+						urls: sharing.map((m) => m.url).sort(),
+						locales: [...locales].sort(),
+					},
+				});
+			}
+		}
 	}
 
 	return findings;
