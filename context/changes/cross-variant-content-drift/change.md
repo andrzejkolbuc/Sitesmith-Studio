@@ -74,3 +74,52 @@ serving one body — a British page carrying the generic English text has not
 failed to be translated, because no second language was ever involved. It now
 compares primary language subtags, the same way `satisfies` treats a regional
 refinement as answering for its language.
+
+## Phase 4 results — yazaki-emea.com, 2026-09-01
+
+Run `af97d198`, same project and pacing as the two runs of 2026-08-31: two
+requests at a time, 500ms apart.
+
+| | 2026-08-31 | 2026-09-01 |
+|---|---|---|
+| Pages | 533 | 533 |
+| `variant_diverged` | 8 | 9 |
+| `content_untranslated` | — | **0** |
+| `content_structure_differs` | — | **0** |
+| Duration | 305s | 412s |
+
+**Both new rules were completely silent, and the silence is genuine rather than
+blindness.** A 14-page sample re-fetched from the live site shows the extractor
+had full visibility:
+
+- `<main>` found on **14 of 14** pages — rule 8 could see every page it was
+  offered.
+- Every page cleared the comparable-length floor, 1,276–5,830 characters — rule
+  7 could compare every page.
+- **51 families of two or more members, covering 510 of 533 pages.**
+
+So rule 8 compared 51 families and found no block-type disagreement; rule 7
+compared 510 digested pages and found no two sharing content. Yazaki translates
+its content properly and renders it from a consistent template, and both rules
+agreed.
+
+That is the evidence the PRD's noise objection needed: **zero false positives
+across 510 pages in 51 families**, on a site nobody designed for these rules. It
+is not evidence the rules find anything — no true positive has been observed in
+the wild — and that distinction should not be blurred when S-03 is judged.
+
+### A pre-existing defect this surfaced
+
+The ninth `variant_diverged` is new since yesterday and answers **200** on five
+consecutive fetches. The crawl recorded **502** for it; both earlier runs
+recorded 200.
+
+`/news-press/one-team-many-languages-mother-language-day` was therefore reported
+on the strength of one unlucky request. The finding is a true observation at
+crawl time and a false statement about the site — a client opening the URL sees
+a working page and concludes the tool is wrong.
+
+This is the lessons.md failure mode again — a finding resting on how we
+collected the data rather than on something the site asserts — in an existing
+rule rather than either new one. Out of scope for S-03; recorded here because it
+was found here.

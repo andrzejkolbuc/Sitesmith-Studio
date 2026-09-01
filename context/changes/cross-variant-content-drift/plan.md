@@ -531,7 +531,7 @@ a record of what was concluded then.
 
 #### Automated
 
-- [ ] 4.1 Whole suite passes: `npm run test:all`
+- [x] 4.1 Whole suite passes: `npm run test:all`
 
 #### Manual
 
