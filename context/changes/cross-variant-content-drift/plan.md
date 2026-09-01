@@ -511,17 +511,17 @@ a record of what was concluded then.
 
 #### Automated
 
-- [x] 3.1 A family where one member's main content has a form and another's does not produces exactly one finding
-- [x] 3.2 The finding names both sides of the difference
-- [x] 3.3 A family whose members agree on block types produces no finding
-- [x] 3.4 A family whose members were not isolated produces no finding
-- [x] 3.5 A family with a broken member produces no finding about that member
-- [x] 3.6 A truncated crawl produces no findings of this type
-- [x] 3.7 Mutation: removing the `isolated` requirement fails the fallback case
-- [x] 3.8 Mutation: comparing block counts instead of presence fails the honest-translation case
-- [x] 3.9 Every existing site-shape case passes unchanged
-- [x] 3.10 `pagesInvolved` counts every member
-- [x] 3.11 Type checking, linting and the whole suite pass
+- [x] 3.1 A family where one member's main content has a form and another's does not produces exactly one finding — 5b681f9
+- [x] 3.2 The finding names both sides of the difference — 5b681f9
+- [x] 3.3 A family whose members agree on block types produces no finding — 5b681f9
+- [x] 3.4 A family whose members were not isolated produces no finding — 5b681f9
+- [x] 3.5 A family with a broken member produces no finding about that member — 5b681f9
+- [x] 3.6 A truncated crawl produces no findings of this type — 5b681f9
+- [x] 3.7 Mutation: removing the `isolated` requirement fails the fallback case — 5b681f9
+- [x] 3.8 Mutation: comparing block counts instead of presence fails the honest-translation case — 5b681f9
+- [x] 3.9 Every existing site-shape case passes unchanged — 5b681f9
+- [x] 3.10 `pagesInvolved` counts every member — 5b681f9
+- [x] 3.11 Type checking, linting and the whole suite pass — 5b681f9
 
 #### Manual
 
