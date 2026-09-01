@@ -146,6 +146,17 @@ const BLOCK_PATTERNS: Array<[keyof ContentBlocks, RegExp]> = [
 	["list", /<(ul|ol|dl)\b/i],
 ];
 
+/**
+ * The block types, in a fixed order.
+ *
+ * Derived from the patterns rather than written out again, so a block added
+ * above is automatically one the comparison rule considers. Two lists that had
+ * to be kept in step by hand would eventually stop being.
+ */
+export const BLOCK_NAMES: Array<keyof ContentBlocks> = BLOCK_PATTERNS.map(
+	([name]) => name,
+);
+
 const MARKER_PATTERNS: Array<[MarkerKind, RegExp]> = [
 	["lorem_ipsum", /lorem ipsum/i],
 	/**

@@ -89,6 +89,9 @@ export function pagesInvolved(finding: {
 				? strings(detail.urls)
 				: one(detail.url);
 
+		case "content_structure_differs":
+			return strings(detail.memberUrls);
+
 		default:
 			// An unmapped type still counts the page it names, so a new finding
 			// never reports as affecting nothing.

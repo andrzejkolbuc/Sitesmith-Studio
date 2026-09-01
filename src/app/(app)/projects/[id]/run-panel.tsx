@@ -46,6 +46,16 @@ const FINDING_LABEL: Record<string, string> = {
 	hreflang_family_inconsistent: "Language links that disagree",
 	variant_diverged: "One variant broken, its siblings fine",
 	content_untranslated: "Content that was never translated",
+	content_structure_differs: "Variants that do not contain the same things",
+};
+
+/** Block types in the reader's words, for the structure comparison. */
+const BLOCK_LABEL: Record<string, string> = {
+	heading: "headings",
+	form: "a form",
+	table: "a table",
+	media: "images or video",
+	list: "a list",
 };
 
 /**
@@ -662,6 +672,44 @@ function Evidence({
 					<div className="mt-1.5 break-all font-mono text-ink-soft text-xs">
 						{pathOf(str("url"))}
 					</div>
+				</>
+			);
+		}
+
+		case "content_structure_differs": {
+			const differences = Array.isArray(detail.differences)
+				? (detail.differences as Array<Record<string, unknown>>)
+				: [];
+			const members = Array.isArray(detail.memberUrls)
+				? (detail.memberUrls as string[])
+				: [];
+
+			/**
+			 * Both sides of each difference, and no culprit. With two members there
+			 * is no basis to say which is wrong, and the editors know which way the
+			 * content was meant to go.
+			 */
+			const lines = differences.map((difference) => {
+				const block = String(difference.block ?? "?");
+				const present = Array.isArray(difference.present)
+					? (difference.present as string[])
+					: [];
+				const absent = Array.isArray(difference.absent)
+					? (difference.absent as string[])
+					: [];
+
+				return `${BLOCK_LABEL[block] ?? block} — on ${present
+					.map(pathOf)
+					.join(", ")}; not on ${absent.map(pathOf).join(", ")}`;
+			});
+
+			return (
+				<>
+					<span className="text-ink">
+						{members.length} variants of this page do not contain the same
+						things
+					</span>
+					<Listed items={lines} />
 				</>
 			);
 		}

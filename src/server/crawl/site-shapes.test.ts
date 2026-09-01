@@ -1178,3 +1178,155 @@ describe("content that was never translated", () => {
 		).toEqual([]);
 	});
 });
+
+/**
+ * Rule 8, against shapes it was not written for.
+ *
+ * The rule compares what a family's variants contain, and the risk it carries is
+ * the mirror of rule 7's: not that it misses a dropped form, but that it calls
+ * an ordinary editorial difference a defect.
+ */
+describe("variants that do not contain the same things", () => {
+	const trio = { en: "/en", de: "/de", fr: "/fr" };
+
+	const differs = (finding: { type: string }) =>
+		finding.type === "content_structure_differs";
+
+	/** A member whose content we isolated, carrying the given blocks. */
+	const withBlocks = (
+		path: string,
+		blocks: Partial<Record<string, boolean>>,
+		extra: { status?: number; isHtml?: boolean; isolated?: boolean } = {},
+	) =>
+		page(path, {
+			hreflang: trio,
+			status: extra.status,
+			content: {
+				isolated: extra.isolated ?? true,
+				isHtml: extra.isHtml ?? true,
+				blocks: {
+					heading: false,
+					form: false,
+					table: false,
+					media: false,
+					list: false,
+					...blocks,
+				},
+			},
+		});
+
+	it("reports one finding naming both sides of the difference", () => {
+		const findings = detailedFindingsFor({
+			pages: [
+				withBlocks("/en", { heading: true, form: true }),
+				withBlocks("/de", { heading: true }),
+				withBlocks("/fr", { heading: true }),
+			],
+		}).filter(differs);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail.differences).toEqual([
+			{
+				block: "form",
+				present: [`${BASE}/en`],
+				absent: [`${BASE}/de`, `${BASE}/fr`],
+			},
+		]);
+	});
+
+	it("says nothing when every member contains the same things", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					withBlocks("/en", { heading: true, list: true }),
+					withBlocks("/de", { heading: true, list: true }),
+					withBlocks("/fr", { heading: true, list: true }),
+				],
+			}).filter(differs),
+		).toEqual([]);
+	});
+
+	it("declines when the content could not be isolated", () => {
+		/**
+		 * The guard that decides whether this rule is trustworthy on real sites. A
+		 * fallback summary swept in the navigation, so a search box in the header
+		 * makes a page appear to contain a form. Reporting that would be a claim
+		 * about our extraction, not about the site.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					withBlocks("/en", { heading: true, form: true }, { isolated: false }),
+					withBlocks("/de", { heading: true }, { isolated: false }),
+				],
+			}).filter(differs),
+		).toEqual([]);
+	});
+
+	it("ignores a member that errored rather than comparing its empty content", () => {
+		/**
+		 * A broken page contains nothing, so it differs from every healthy sibling
+		 * in every block at once — the most alarming finding on the site, about a
+		 * page rules 2 and 6 already describe correctly.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					withBlocks("/en", { heading: true, form: true }),
+					withBlocks("/de", {}, { status: 404 }),
+				],
+			}).filter(differs),
+		).toEqual([]);
+	});
+
+	it("ignores a member whose response was not HTML", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					withBlocks("/en", { heading: true, form: true }),
+					withBlocks("/de", {}, { isHtml: false }),
+				],
+			}).filter(differs),
+		).toEqual([]);
+	});
+
+	it("stays quiet on a crawl that stopped early", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					withBlocks("/en", { heading: true, form: true }),
+					withBlocks("/de", { heading: true }),
+				],
+				crawlComplete: false,
+			}).filter(differs),
+		).toEqual([]);
+	});
+
+	it("needs two comparable members before it says anything", () => {
+		/**
+		 * One isolated member and one that fell back is not a comparison. Without
+		 * this the rule would report a family against a single page's blocks.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					withBlocks("/en", { heading: true, form: true }),
+					withBlocks("/de", { heading: true }, { isolated: false }),
+				],
+			}).filter(differs),
+		).toEqual([]);
+	});
+
+	it("lists every differing block type in one finding, not one finding each", () => {
+		const findings = detailedFindingsFor({
+			pages: [
+				withBlocks("/en", { heading: true, form: true, table: true }),
+				withBlocks("/de", { heading: true }),
+				withBlocks("/fr", { heading: true }),
+			],
+		}).filter(differs);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail.differences).toHaveLength(2);
+	});
+});

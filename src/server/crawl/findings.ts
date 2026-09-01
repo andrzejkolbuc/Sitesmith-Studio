@@ -1,3 +1,4 @@
+import { BLOCK_NAMES, type ContentSummary } from "./content";
 import type { CrawledPage } from "./crawler";
 import {
 	groupFamilies,
@@ -31,6 +32,8 @@ export const FINDING_TYPES = {
 	VARIANT_DIVERGED: "variant_diverged",
 	/** A page that was never translated, or never finished rendering. */
 	CONTENT_UNTRANSLATED: "content_untranslated",
+	/** A family whose variants disagree about what their content contains. */
+	CONTENT_STRUCTURE_DIFFERS: "content_structure_differs",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -600,6 +603,75 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 					},
 				});
 			}
+		}
+	}
+
+	// ── Rule 8: variants that disagree about what they contain ────────────────
+	//
+	// FR-027's "missing sections", judged on the presence of a block type and
+	// never on how many of it there are. Translators legitimately merge and split
+	// headings, so a rule comparing counts would fire on honest work — which is
+	// the objection the PRD raised against content drift and the reason this slice
+	// ships the signals that can be stated as yes or no.
+	//
+	// One finding per family, matching rule 5's shape and for the same reason: a
+	// template that dropped a block in one locale breaks every page it renders,
+	// and per-page reporting would make the worst sites the least readable.
+	//
+	// The finding names both sides of each difference and designates no culprit.
+	// With two members there is no basis to say which is wrong, and with more it
+	// is still the site's editors who know which way the content was supposed to
+	// go. The difference itself is the actionable fact.
+	if (crawlComplete) {
+		for (const family of variantFamilies) {
+			/**
+			 * Only members whose content we actually isolated.
+			 *
+			 * A summary that fell back to the whole body carries the navigation with
+			 * it, and a site with a search box in its header would show every page as
+			 * containing a form. Comparing those would be comparing our extraction
+			 * rather than the site — the distinction `context/foundation/lessons.md`
+			 * exists to enforce — so the rule declines instead.
+			 */
+			const comparable: Array<{ url: string; content: ContentSummary }> = [];
+			for (const member of family.members) {
+				const page = byUrl.get(member.url);
+				if (!page || isError(page)) continue;
+				if (!page.content.isHtml || !page.content.isolated) continue;
+				comparable.push({ url: member.url, content: page.content });
+			}
+
+			if (comparable.length < 2) continue;
+
+			const differences: Array<Record<string, unknown>> = [];
+
+			for (const block of BLOCK_NAMES) {
+				const present = comparable
+					.filter((m) => m.content.blocks[block])
+					.map((m) => m.url)
+					.sort();
+				const absent = comparable
+					.filter((m) => !m.content.blocks[block])
+					.map((m) => m.url)
+					.sort();
+
+				// Agreement, either way, is not a difference.
+				if (present.length === 0 || absent.length === 0) continue;
+
+				differences.push({ block, present, absent });
+			}
+
+			if (differences.length === 0) continue;
+
+			findings.push({
+				type: FINDING_TYPES.CONTENT_STRUCTURE_DIFFERS,
+				url: null,
+				detail: {
+					groupKey: family.groupKey,
+					memberUrls: comparable.map((m) => m.url).sort(),
+					differences,
+				},
+			});
 		}
 	}
 

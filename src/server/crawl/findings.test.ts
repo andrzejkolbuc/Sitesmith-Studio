@@ -268,6 +268,56 @@ describe("detectMissingVariants against the fixture site", () => {
 
 		expect(about).toEqual([]);
 	});
+
+	it("reports the English page carrying a form its translations lack", async () => {
+		const { findings } = await detect();
+		const differs = findings.filter(
+			(f) => f.type === FINDING_TYPES.CONTENT_STRUCTURE_DIFFERS,
+		);
+
+		expect(differs).toHaveLength(1);
+		expect(differs[0]?.detail.differences).toEqual([
+			{
+				block: "form",
+				present: [`${site.baseUrl}/quote`],
+				absent: [`${site.baseUrl}/de/angebot`, `${site.baseUrl}/fr/devis`],
+			},
+		]);
+	});
+
+	it("says nothing about a family whose headings merely differ in number", async () => {
+		/**
+		 * The counterpart to the length objection, and the reason rule 8 compares
+		 * presence rather than counts. `/de/geschichte` carries an extra `<h3>` its
+		 * siblings do not — translators split and merge sections routinely — while
+		 * every member still contains headings and a list.
+		 *
+		 * A rule counting headings would report this family. A reader would not.
+		 */
+		const { findings } = await detect();
+		const family = [
+			`${site.baseUrl}/story`,
+			`${site.baseUrl}/de/geschichte`,
+			`${site.baseUrl}/fr/histoire`,
+		];
+
+		/**
+		 * Matched on membership, not on `groupKey`. The key is the lexicographically
+		 * smallest member URL — `/de/geschichte` here, not `/story` — so filtering
+		 * by the name a human would use silently matches nothing and asserts
+		 * nothing. Found by mutation: making headings count-sensitive left this case
+		 * green while breaking three others.
+		 */
+		const about = findings.filter((f) => {
+			if (f.type !== FINDING_TYPES.CONTENT_STRUCTURE_DIFFERS) return false;
+			const members = Array.isArray(f.detail.memberUrls)
+				? (f.detail.memberUrls as string[])
+				: [];
+			return members.some((url) => family.includes(url));
+		});
+
+		expect(about).toEqual([]);
+	});
 });
 
 describe("detectMissingVariants edge cases", () => {

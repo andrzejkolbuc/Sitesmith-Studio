@@ -240,8 +240,12 @@ const SITE: Record<string, Page> = {
 	 * Three honest translations. The German runs materially longer than the
 	 * English and the French shorter, which is exactly the objection the PRD
 	 * raised against content drift and never resolved: languages legitimately
-	 * differ in length. All three carry the same block types and none shares text
-	 * with another, so **both content rules must stay completely silent here.**
+	 * differ in length. The German also carries an extra `<h3>` the others do not,
+	 * because translators genuinely merge and split sections — so heading *counts*
+	 * differ here while heading *presence* does not, which is the whole reason
+	 * rule 8 compares presence. All three carry the same block types and none
+	 * shares text with another, so **both content rules must stay completely
+	 * silent here.**
 	 *
 	 * If this family ever produces a finding, the noise failure the PRD called
 	 * fatal has arrived, and the rules are wrong rather than the fixture.
@@ -264,6 +268,8 @@ const SITE: Record<string, Page> = {
     anfassen wollte — die alten, die verworrenen, die in vier Sprachen
     gewachsenen, bei denen niemand mehr genau wusste, welche Seite eigentlich
     das Original war.</p>
+    <h3>Wie wir arbeiten</h3>
+    <p>Langsam, und mit sehr viel Geduld für alte Systeme.</p>
     <ul><li>Gegründet 2019</li><li>Elf Personen</li></ul>`,
 		main: true,
 	},

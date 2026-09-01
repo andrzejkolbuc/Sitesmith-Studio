@@ -200,3 +200,21 @@ describe("pagesInvolved for content findings", () => {
 		).toEqual([`${B}/draft`]);
 	});
 });
+
+describe("pagesInvolved for a structure difference", () => {
+	it("counts every member of the family it compared", () => {
+		expect(
+			pagesInvolved({
+				type: "content_structure_differs",
+				url: null,
+				detail: {
+					memberUrls: [
+						"https://shop.test/en",
+						"https://shop.test/de",
+						"https://shop.test/fr",
+					],
+				},
+			}),
+		).toHaveLength(3);
+	});
+});
