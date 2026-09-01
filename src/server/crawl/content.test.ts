@@ -68,11 +68,61 @@ describe("isolating the main content", () => {
 		expect(withNav.textDigest).toBe(alone.textDigest);
 	});
 
-	it("accepts <article> as a content region too", () => {
+	it("accepts a lone <article> as a content region too", () => {
 		expect(
 			extractContent(page(`<article><p>${prose("x")}</p></article>`), true)
 				.isolated,
 		).toBe(true);
+	});
+
+	it("prefers <main> even when an <article> comes first in the document", () => {
+		/**
+		 * Preference has to be encoded, not implied. Written as one alternation the
+		 * winner is whichever tag appears first, so a sidebar `<article>` above the
+		 * content silently became the content — and the digest then described the
+		 * sidebar while every rule built on it described the wrong region.
+		 *
+		 * Found in implementation review, never by the suite: the fixture and the
+		 * real client site both put `<main>` first.
+		 */
+		const sidebarFirst = extractContent(
+			page(
+				`<article><p>${prose("sidebar")}</p></article><main><p>${prose("content")}</p></main>`,
+			),
+			true,
+		);
+		const contentAlone = extractContent(
+			page(`<main><p>${prose("content")}</p></main>`),
+			true,
+		);
+
+		expect(sidebarFirst.isolated).toBe(true);
+		expect(sidebarFirst.textDigest).toBe(contentAlone.textDigest);
+	});
+
+	it("declines to isolate a listing of several <article> elements", () => {
+		/**
+		 * The region match returns the first article only, so a listing would digest
+		 * as though it were its own opening entry. Two locale variants of a listing
+		 * sharing a leading untranslated item would then be reported as untranslated
+		 * wholesale — a claim about one entry dressed as a claim about the page.
+		 *
+		 * Falling back is the honest answer: the summary is weaker, says so, and
+		 * rule 8 declines on it.
+		 */
+		const listing = extractContent(
+			page(
+				`<article><p>${prose("first")}</p></article><article><p>${prose("second")}</p></article>`,
+			),
+			true,
+		);
+		const firstAlone = extractContent(
+			page(`<article><p>${prose("first")}</p></article>`),
+			true,
+		);
+
+		expect(listing.isolated).toBe(false);
+		expect(listing.textDigest).not.toBe(firstAlone.textDigest);
 	});
 
 	it("falls back to the whole body and says so", () => {

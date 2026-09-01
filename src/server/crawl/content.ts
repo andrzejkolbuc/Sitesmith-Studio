@@ -92,7 +92,19 @@ export type MarkerKind = "lorem_ipsum" | "unrendered_expression";
  */
 export const MIN_COMPARABLE_CHARS = 200;
 
-const MAIN_REGION = /<(main|article)\b[^>]*>([\s\S]*?)<\/\1\s*>/i;
+/**
+ * Where a page says its own content lives, in order of preference.
+ *
+ * `<main>` first and separately, rather than as one alternation with
+ * `<article>`. Written as `<(main|article)…>` the winner is whichever appears
+ * first in the document, so a sidebar `<article>` placed above the content
+ * became the content — the digest then described the sidebar, and every claim
+ * built on it described the wrong region.
+ */
+const MAIN_REGION = /<main\b[^>]*>([\s\S]*?)<\/main\s*>/i;
+const ARTICLE_REGION = /<article\b[^>]*>([\s\S]*?)<\/article\s*>/i;
+/** Counting opening tags, to tell a single article from a listing of them. */
+const ARTICLE_OPENING = /<article\b[^>]*>/gi;
 const BODY_REGION = /<body\b[^>]*>([\s\S]*?)<\/body\s*>/i;
 
 /** Content that is markup or code rather than prose the reader sees. */
@@ -208,10 +220,25 @@ export function extractContent(html: string, isHtml: boolean): ContentSummary {
 	 * whole body is honest but weaker evidence, and `isolated` is what lets a rule
 	 * tell the two apart rather than quietly treating them alike.
 	 */
-	const main = MAIN_REGION.exec(html);
-	const body = BODY_REGION.exec(html);
-	const isolated = main !== null;
-	const region = main?.[2] ?? body?.[1] ?? html;
+	const main = MAIN_REGION.exec(html)?.[1];
+
+	/**
+	 * A lone `<article>` is a page's content. Several of them is a listing, and
+	 * the region match would return only the first — so a two-article listing
+	 * digests identically to its first article alone, and a family of listings
+	 * whose leading item happens to be shared would be reported as untranslated
+	 * content on the strength of one entry.
+	 *
+	 * Declining is the honest answer, and the same one `isolated` exists to give.
+	 */
+	const article =
+		main === undefined && (html.match(ARTICLE_OPENING) ?? []).length === 1
+			? ARTICLE_REGION.exec(html)?.[1]
+			: undefined;
+
+	const found = main ?? article;
+	const isolated = found !== undefined;
+	const region = found ?? BODY_REGION.exec(html)?.[1] ?? html;
 
 	const blocks = {} as ContentBlocks;
 	for (const [name, pattern] of BLOCK_PATTERNS) {
