@@ -29,8 +29,38 @@ type Page = {
 	alternates?: Record<string, string>;
 	links?: string[];
 	body?: string;
+	/**
+	 * Wraps the body in `<main>`, so the content extractor can isolate it.
+	 *
+	 * Both shapes need to exist. A page with `<main>` proves isolation works; a
+	 * page without it proves the fallback is recorded rather than mistaken for
+	 * the real thing — which is what stops a rule reporting on navigation.
+	 */
+	main?: boolean;
 	status?: number;
 };
+
+/**
+ * Bodies long enough to be compared.
+ *
+ * The content extractor refuses to digest anything under `MIN_COMPARABLE_CHARS`,
+ * because two nearly-empty pages match each other by accident. Every existing
+ * fixture body is one short sentence, so these are written at realistic length
+ * on purpose — a shorter version would silently exercise the guard instead of
+ * the rule.
+ */
+const HANDBOOK_EN = `<h2>Configuring a project</h2>
+    <p>A project describes one site: where a crawl begins, which paths it may
+    follow, and which languages the site is expected to publish. Every check the
+    product performs is scoped to a single project, so the settings here decide
+    what any later run is able to say about the site.</p>
+    <ul><li>Start URL</li><li>Included paths</li><li>Expected locales</li></ul>`;
+
+const HANDBOOK_FR = `<h2>Configurer un projet</h2>
+    <p>Un projet décrit un seul site : le point de départ d'une exploration, les
+    chemins qu'elle peut suivre, et les langues que le site est censé publier.
+    Chaque vérification effectuée par le produit est limitée à un seul projet.</p>
+    <ul><li>URL de départ</li><li>Chemins inclus</li><li>Langues attendues</li></ul>`;
 
 /**
  * The site map. Read this as the test's expectations.
@@ -47,6 +77,16 @@ type Page = {
  *   each other. Fires rule 5 (declarations not returned).
  * - `/careers`, `/de/karriere` — two healthy siblings both declaring a French
  *   variant that 404s. Fires rule 6 (one variant failing while siblings are fine).
+ * - `/handbook`, `/de/handbuch`, `/fr/manuel` — the German page serves the
+ *   English body unchanged. Fires rule 7 (untranslated), sibling half.
+ * - `/blog/draft` — an unrendered `{{ headline }}` reached the reader. Fires
+ *   rule 7, marker half, and nothing else.
+ * - `/quote`, `/de/angebot`, `/fr/devis` — the English page has a form its
+ *   translations lack. Fires rule 8 (structure differs).
+ * - `/story`, `/de/geschichte`, `/fr/histoire` — honest translations of
+ *   materially different lengths. Must fire NOTHING; this is the negative
+ *   assertion answering the PRD's objection that content drift is noise by
+ *   default.
  * - `/redirect-hub` → `/moved/page` and `/final/page` — two routes to one
  *   page, the alias listed first. `/redirect-hub-reversed` lists them the other
  *   way round; only reachable as a start URL, so ordinary crawls stay small.
@@ -69,6 +109,10 @@ const SITE: Record<string, Page> = {
 			"/de/blog-post",
 			"/support",
 			"/careers",
+			"/handbook",
+			"/quote",
+			"/story",
+			"/blog/draft",
 			"/redirect-hub",
 			"/private/secret",
 			"/?utm_source=nav",
@@ -121,6 +165,132 @@ const SITE: Record<string, Page> = {
 	},
 	"/de/karriere": {
 		alternates: { en: "/careers", de: "/de/karriere", fr: "/fr/carrieres" },
+	},
+
+	/**
+	 * Rule 7, sibling half: content that was never sent to a translator.
+	 *
+	 * `/de/handbuch` serves the English body byte for byte. That is the realistic
+	 * shape — a page duplicated from the source language and never translated,
+	 * carrying no marker of any kind and looking perfectly healthy to every other
+	 * rule in the product.
+	 *
+	 * The French member is genuinely translated, so this family is also the
+	 * evidence that the rule reports one member rather than the whole set. All
+	 * three locales are published deliberately: an en/de-only family would fire
+	 * rule 1 as well, and this family exists to exercise one rule at a time.
+	 */
+	"/handbook": {
+		alternates: { en: "/handbook", de: "/de/handbuch", fr: "/fr/manuel" },
+		body: HANDBOOK_EN,
+		main: true,
+	},
+	"/de/handbuch": {
+		alternates: { en: "/handbook", de: "/de/handbuch", fr: "/fr/manuel" },
+		body: HANDBOOK_EN,
+		main: true,
+	},
+	"/fr/manuel": {
+		alternates: { en: "/handbook", de: "/de/handbuch", fr: "/fr/manuel" },
+		body: HANDBOOK_FR,
+		main: true,
+	},
+
+	/**
+	 * Rule 8: variants that disagree about what their content contains.
+	 *
+	 * The English page carries a quote form; neither translation does. This is the
+	 * shape a human recognises instantly — the German visitor cannot request a
+	 * quote — and it is invisible to every hreflang rule, because the declarations
+	 * are perfect.
+	 *
+	 * Every member is wrapped in `<main>`, without which the rule declines to
+	 * speak: comparing block presence across whole-body extractions would be
+	 * comparing navigation.
+	 */
+	"/quote": {
+		alternates: { en: "/quote", de: "/de/angebot", fr: "/fr/devis" },
+		body: `<h2>Request a quote</h2>
+    <p>Tell us about the site you would like checked and we will come back to you
+    with a price. Most projects are quoted within two working days, and larger
+    multilingual estates sometimes take a little longer to scope properly.</p>
+    <form><label>Email<input name="email"></label></form>`,
+		main: true,
+	},
+	"/de/angebot": {
+		alternates: { en: "/quote", de: "/de/angebot", fr: "/fr/devis" },
+		body: `<h2>Angebot anfordern</h2>
+    <p>Beschreiben Sie uns die Website, die geprüft werden soll, und wir melden
+    uns mit einem Preis zurück. Die meisten Projekte werden innerhalb von zwei
+    Werktagen kalkuliert, größere mehrsprachige Bestände dauern etwas länger.</p>`,
+		main: true,
+	},
+	"/fr/devis": {
+		alternates: { en: "/quote", de: "/de/angebot", fr: "/fr/devis" },
+		body: `<h2>Demander un devis</h2>
+    <p>Décrivez-nous le site que vous souhaitez faire vérifier et nous vous
+    répondrons avec un prix. La plupart des projets sont chiffrés en deux jours
+    ouvrés, les ensembles multilingues plus vastes demandent un peu plus.</p>`,
+		main: true,
+	},
+
+	/**
+	 * The negative assertion this whole slice rests on.
+	 *
+	 * Three honest translations. The German runs materially longer than the
+	 * English and the French shorter, which is exactly the objection the PRD
+	 * raised against content drift and never resolved: languages legitimately
+	 * differ in length. All three carry the same block types and none shares text
+	 * with another, so **both content rules must stay completely silent here.**
+	 *
+	 * If this family ever produces a finding, the noise failure the PRD called
+	 * fatal has arrived, and the rules are wrong rather than the fixture.
+	 */
+	"/story": {
+		alternates: { en: "/story", de: "/de/geschichte", fr: "/fr/histoire" },
+		body: `<h2>Our story</h2>
+    <p>We began as a two-person studio taking on whatever work came through the
+    door, and gradually found that the projects we enjoyed most were the ones
+    nobody else wanted to touch.</p>
+    <ul><li>Founded 2019</li><li>Eleven people</li></ul>`,
+		main: true,
+	},
+	"/de/geschichte": {
+		alternates: { en: "/story", de: "/de/geschichte", fr: "/fr/histoire" },
+		body: `<h2>Unsere Geschichte</h2>
+    <p>Wir haben als Studio mit zwei Personen angefangen und jede Arbeit
+    angenommen, die zu uns kam. Mit der Zeit stellten wir fest, dass uns
+    ausgerechnet jene Projekte am meisten Freude bereiteten, die sonst niemand
+    anfassen wollte — die alten, die verworrenen, die in vier Sprachen
+    gewachsenen, bei denen niemand mehr genau wusste, welche Seite eigentlich
+    das Original war.</p>
+    <ul><li>Gegründet 2019</li><li>Elf Personen</li></ul>`,
+		main: true,
+	},
+	"/fr/histoire": {
+		alternates: { en: "/story", de: "/de/geschichte", fr: "/fr/histoire" },
+		body: `<h2>Notre histoire</h2>
+    <p>Nous avons commencé à deux, en acceptant tout ce qui se présentait. Peu à
+    peu, nous avons constaté que les projets qui nous plaisaient le plus étaient
+    ceux dont personne d'autre ne voulait s'occuper.</p>
+    <ul><li>Fondé en 2019</li><li>Onze personnes</li></ul>`,
+		main: true,
+	},
+
+	/**
+	 * Rule 7, marker half: a template that reached the reader.
+	 *
+	 * No locale segment and no hreflang, so every other rule stays silent — the
+	 * same isolation `/blog/monolingual` provides for rule 4. Deliberately without
+	 * `<main>`, which makes it the fixture's one page proving markers are found on
+	 * a fallback extraction too: an unrendered expression is a defect wherever it
+	 * appears, unlike a block comparison.
+	 */
+	"/blog/draft": {
+		body: `<h1>{{ headline }}</h1>
+    <p>An article whose template never finished rendering. The heading above is
+    the giveaway, and it is the kind of thing that reaches production precisely
+    because it looks fine to everyone who already knows what it should say.</p>`,
 	},
 
 	/**
@@ -210,6 +380,15 @@ function render(path: string, page: Page): string {
 		.map((href) => `<a href="${href}">${href}</a>`)
 		.join("\n    ");
 
+	const content = page.body ?? `<h1>${path}</h1>`;
+	/**
+	 * Links stay outside `<main>` on purpose. They are this fixture's navigation,
+	 * and a page whose content region included them would digest differently from
+	 * its sibling for reasons that have nothing to do with translation — which is
+	 * the whole problem main-content isolation exists to solve.
+	 */
+	const region = page.main ? `<main>\n    ${content}\n    </main>` : content;
+
 	return `<!doctype html>
 <html>
   <head>
@@ -217,7 +396,7 @@ function render(path: string, page: Page): string {
     ${alternates}
   </head>
   <body>
-    ${page.body ?? `<h1>${path}</h1>`}
+    ${region}
     ${links}
   </body>
 </html>`;

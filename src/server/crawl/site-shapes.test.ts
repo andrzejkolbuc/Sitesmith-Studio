@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { emptyContent } from "./content";
 import type { CrawledPage } from "./crawler";
 import { detectMissingVariants } from "./findings";
 import { localeFromUrl } from "./variants";
@@ -44,6 +45,7 @@ const page = (
 		]),
 	),
 	links: [],
+	content: emptyContent(true),
 	fetchError: null,
 });
 

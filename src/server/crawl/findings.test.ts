@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { type Fixture, startFixtureSite } from "../../../test/fixtures/site";
+import { emptyContent } from "./content";
 import { type CrawledPage, crawl } from "./crawler";
 import { detectMissingVariants, FINDING_TYPES } from "./findings";
 import { groupVariants, localeFromUrl } from "./variants";
@@ -24,6 +25,7 @@ const page = (
 	httpStatus: 200,
 	hreflangTargets,
 	links: [],
+	content: emptyContent(true),
 	fetchError: null,
 });
 
@@ -237,6 +239,7 @@ describe("detectMissingVariants edge cases", () => {
 				de: "https://x.test/ueber-uns",
 			},
 			links: [],
+			content: emptyContent(true),
 			fetchError: null,
 		};
 		// The declared German page exists but is broken, and its URL carries no
@@ -246,6 +249,7 @@ describe("detectMissingVariants edge cases", () => {
 			httpStatus: 404,
 			hreflangTargets: {},
 			links: [],
+			content: emptyContent(true),
 			fetchError: null,
 		};
 
@@ -277,6 +281,7 @@ describe("detectMissingVariants edge cases", () => {
 				de: "https://x.test/ueber-uns",
 			},
 			links: [],
+			content: emptyContent(true),
 			fetchError: null,
 		};
 		const de: CrawledPage = {
@@ -287,6 +292,7 @@ describe("detectMissingVariants edge cases", () => {
 				de: "https://x.test/ueber-uns",
 			},
 			links: [],
+			content: emptyContent(true),
 			fetchError: null,
 		};
 
@@ -310,6 +316,7 @@ describe("detectMissingVariants edge cases", () => {
 			httpStatus: 500,
 			hreflangTargets: {},
 			links: [],
+			content: emptyContent(true),
 			fetchError: null,
 		};
 

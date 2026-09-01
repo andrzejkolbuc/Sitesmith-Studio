@@ -1,9 +1,9 @@
 ---
 change_id: cross-variant-content-drift
 title: "Cross-variant content drift"
-status: planned
+status: implementing
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 archived_at: null
 roadmap_ref: S-03
 prd_refs: [FR-027]

@@ -475,13 +475,13 @@ a record of what was concluded then.
 
 #### Automated
 
-- [ ] 1.1 Extractor unit tests pass across isolation, non-HTML, markers, blocks, digest and the too-short guard
-- [ ] 1.2 Identical normalised text produces identical digests across differing markup whitespace
-- [ ] 1.3 `TODO` in page text produces no marker
-- [ ] 1.4 Existing crawler, politeness and run tests pass with updated page counts
-- [ ] 1.5 Type checking passes: `npm run typecheck`
-- [ ] 1.6 Linting passes: `npm run check`
-- [ ] 1.7 Whole suite passes: `npm run test:all`
+- [x] 1.1 Extractor unit tests pass across isolation, non-HTML, markers, blocks, digest and the too-short guard
+- [x] 1.2 Identical normalised text produces identical digests across differing markup whitespace
+- [x] 1.3 `TODO` in page text produces no marker
+- [x] 1.4 Existing crawler, politeness and run tests pass with updated page counts
+- [x] 1.5 Type checking passes: `npm run typecheck`
+- [x] 1.6 Linting passes: `npm run check`
+- [x] 1.7 Whole suite passes: `npm run test:all`
 
 #### Manual
 

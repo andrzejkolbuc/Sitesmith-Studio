@@ -11,6 +11,8 @@
  * outcome than the regression being hunted.
  */
 
+import { type ContentSummary, emptyContent, extractContent } from "./content";
+
 export type CrawlOptions = {
 	startUrl: string;
 	/** Empty means "anything on the start URL's origin". */
@@ -44,6 +46,14 @@ export type CrawledPage = {
 	hreflangTargets: Record<string, string>;
 	/** Absolute, in-scope URLs linked from this page. */
 	links: string[];
+	/**
+	 * What the page's content is, in fixed-size form.
+	 *
+	 * Fixed-size is the whole constraint: this type is held for every page of a
+	 * crawl that can reach two thousand of them, so the summary carries a digest
+	 * of the text rather than the text.
+	 */
+	content: ContentSummary;
 	fetchError: string | null;
 };
 
@@ -235,7 +245,8 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 			});
 
 			const contentType = response.headers.get("content-type") ?? "";
-			const html = contentType.includes("html") ? await response.text() : "";
+			const isHtml = contentType.includes("html");
+			const html = isHtml ? await response.text() : "";
 
 			/**
 			 * The page is the URL the server served, not the one we asked for.
@@ -256,6 +267,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 				httpStatus: response.status,
 				hreflangTargets: extractHreflang(html, served),
 				links: extractLinks(html, served),
+				content: extractContent(html, isHtml),
 				fetchError: null,
 			};
 		} catch (caught) {
@@ -264,6 +276,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 				httpStatus: null,
 				hreflangTargets: {},
 				links: [],
+				content: emptyContent(false),
 				fetchError: caught instanceof Error ? caught.message : String(caught),
 			};
 		} finally {
