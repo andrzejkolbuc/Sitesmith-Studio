@@ -1,10 +1,10 @@
 ---
 change_id: cross-variant-content-drift
 title: "Cross-variant content drift"
-status: impl_reviewed
+status: archived
 created: 2026-08-31
 updated: 2026-09-01
-archived_at: null
+archived_at: 2026-09-01T12:26:24Z
 roadmap_ref: S-03
 prd_refs: [FR-027]
 ---

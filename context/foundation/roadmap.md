@@ -3,7 +3,7 @@ project: "Sitesmith-Studio"
 version: 1
 status: draft
 created: 2026-08-21
-updated: 2026-08-31
+updated: 2026-09-01
 prd_version: 1
 main_goal: market-feedback
 top_blocker: capacity
@@ -54,7 +54,7 @@ works.
 | F-02 | container-deploy-skeleton       | (foundation) the app runs as a container on a persistent host                  | —                | NFR-3                                                                                | ready    |
 | S-01 | first-multilingual-crawl        | define a project, crawl it, and see pages missing a language variant           | F-01             | US-01, FR-006, FR-007, FR-008, FR-011, FR-012, FR-013, FR-014, FR-024, FR-036, NFR-1 | built    |
 | S-02 | hreflang-and-variant-parity     | see hreflang graph problems and variants that regressed while siblings did not | S-01             | US-01, FR-025, FR-026                                                                | done     |
-| S-03 | cross-variant-content-drift     | see content drift between language variants                                    | S-02             | FR-027                                                                               | ready    |
+| S-03 | cross-variant-content-drift     | see content drift between language variants                                    | S-02             | FR-027                                                                               | done     |
 | S-04 | crawl-technical-checks          | see broken links, sitemap and robots problems, orphans, duplicates, TLS issues | S-01             | FR-016, FR-017, FR-018, FR-019, FR-020, FR-030                                       | proposed |
 | S-05 | seo-metadata-checks             | see title, meta, canonical and noindex problems                                | S-01             | FR-021, FR-022, FR-023                                                               | proposed |
 | S-06 | browser-observed-checks         | see console errors, sampled performance scores, and image weight problems      | S-01             | FR-015, FR-028, FR-029                                                               | proposed |
@@ -160,7 +160,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Unknowns:** — (resolved 2026-08-31)
   - ~~What counts as drift rather than an honest translation?~~ Answered in PRD Open Question 3: three independent rules in ascending order of noise — untranslated placeholder text, then structural missing sections, then word count last and extreme-only against a family median, requiring three or more members. The noisy signal no longer decides whether the other two are believed.
 - **Risk:** Split out of S-02 precisely so this unknown did not block the parity work next to it. The PRD kept this requirement as must-have with the noise objection raised, and it stayed blocked until the objection was answered rather than overruled — planning it before deciding what drift means would have produced a check nobody trusts, which is the guardrail failure the PRD names as fatal. The staged shape is what makes it buildable: rule 1 can be trusted on day one whether or not rule 3 ever earns its keep.
-- **Status:** ready
+- **Status:** done
 
 ### S-04: Crawl-level technical checks
 
@@ -351,6 +351,8 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Observability tooling.** Why parked: no PRD requirement demands it, so no foundation opens for it. Revisit if operating scheduled runs proves opaque.
 
 ## Done
+
+- **S-03: User can see where language variants have diverged in substance - very different length, missing sections, or untranslated placeholder text left in production.** — Archived 2026-09-01 → `context/archive/2026-08-31-cross-variant-content-drift/`. Lesson: —.
 
 - **S-02: hreflang graph and cross-variant parity** — Archived 2026-08-31 → `context/archive/2026-08-25-hreflang-and-variant-parity/`. Lesson: a rule that reasons from absence must know whether the crawl finished.
 
