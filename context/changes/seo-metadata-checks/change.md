@@ -62,3 +62,78 @@ implementation review twice. It is the template.
 itself asserted. A `noindex` tag is about as direct an assertion as exists; a
 length threshold is entirely our inference. Expect the same staging that worked
 for S-03: ship the signals with an external oracle first.
+
+## Phase 5 results — yazaki-emea.com, 2026-09-02
+
+Run `8a2e9cc9`, same project and pacing as every previous run: two requests at a
+time, 500ms apart. **533 pages in 326s**, finishing cleanly — the same page count
+as the runs of 2026-08-31 and 2026-09-01, and inside their 305–412s band.
+
+| | 2026-08-31 | 2026-09-01 | 2026-09-02 |
+|---|---|---|---|
+| Pages | 533 | 533 | 533 |
+| `variant_diverged` | 8 | 9 | 8 |
+| `content_untranslated` | — | 0 | 0 |
+| `content_structure_differs` | — | 0 | 0 |
+| `metadata_duplicated` | — | — | **34** |
+| `metadata_missing` | — | — | 0 |
+| `canonical_missing` | — | — | 0 |
+| `canonical_conflicting` | — | — | 0 |
+| `canonical_target_broken` | — | — | 0 |
+| `noindex_present` | — | — | 0 |
+
+### The duplicate rule found the defect, and it is larger than the sample showed
+
+Research saw the legal page serving the homepage's title and description in
+`pt`, `ro` and `de`. The crawl shows the same defect in **every language the
+site publishes**: 10 languages × (homepage + 5 legal pages) sharing one title
+*and* one description. Spot-checked live and confirmed byte for byte —
+`/imprint` and `/s172-statement` both serve
+`Powering the Future of Mobility Since 1929 | Yazaki EMEA`, and
+`/de/rechtliches/impressum` serves the German homepage's pair.
+
+Two clusters the sample never reached:
+
+- **Press releases, 10 languages × 5 articles.** Five distinct articles, five
+  distinct titles, and one shared description — the text belonging to a *sixth*
+  article about the Prahova Companies Awards. Verified live on the CES 2026
+  release, whose description is about the awards gala. This is a real defect and
+  a genuinely new find; nothing in the research predicted it.
+- **`/de/karriere` and `/fr/carrieres`**, each sharing title and description with
+  a page under `previous-career-pages/` — an archived page still live and
+  competing with the current one.
+
+34 findings covering **114 of 533 pages**, 12 on titles and 22 on descriptions.
+Every one traces to a string the site published on more than one URL, which is
+the oracle `lessons.md` asks for. **No false positive was found.**
+
+### The five silent rules were silent, not blind
+
+A 6-page live re-fetch spread across the site shows the extractor had full
+visibility on every channel the silent rules read:
+
+- **Canonical present and self-referential on 6 of 6**, resolved from a relative
+  href. So `canonical_missing` had a site that uses them and no page lacking
+  one; `canonical_conflicting` saw exactly one canonical per page; and
+  `canonical_target_broken` saw every canonical pointing at the page itself.
+- **Title and description present on 6 of 6** — `metadata_missing` was offered
+  no page to report.
+- **Both robots channels present on 6 of 6**, `index,follow` in markup and
+  `index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1`
+  in the header. `noindex_present` correctly said nothing.
+
+That last value is worth recording. The header carries three colon-bearing
+directives, and `parseRobotsHeader` keeps them as directives rather than reading
+`max-image-preview` as a crawler scope — the reason its guard is a closed list
+of directive names rather than of crawler names. Guarded the other way round,
+this run would have misparsed the header on all 533 pages.
+
+### What this does and does not establish
+
+One rule of the six found a real, previously-unknown defect at scale on a site
+nobody built for it, and no rule produced a finding a human would call wrong.
+The other five were correct to stay quiet, and the re-fetch shows they could
+see. It is **not** evidence that the canonical or `noindex` rules find anything
+in the wild — no true positive has been observed for them — and that
+distinction should not be blurred when S-05 is judged. This client's site is
+simply well configured on those axes.
