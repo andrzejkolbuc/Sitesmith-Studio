@@ -49,6 +49,9 @@ const FINDING_LABEL: Record<string, string> = {
 	content_structure_differs: "Variants that do not contain the same things",
 	metadata_missing: "Pages missing a title or description",
 	metadata_duplicated: "One title or description on several pages",
+	canonical_missing: "Pages declaring no canonical URL",
+	canonical_conflicting: "Canonical tags that disagree",
+	canonical_target_broken: "Canonical pointing somewhere broken",
 };
 
 /**
@@ -770,6 +773,89 @@ function Evidence({
 				</>
 			);
 		}
+
+		case "canonical_missing": {
+			const declaring = Number(detail.pagesDeclaringCanonical ?? 0);
+
+			/**
+			 * The narrowing's evidence, on screen. A canonical tag is optional, so
+			 * "this page has none" is only a defect next to the fact that the site
+			 * publishes them elsewhere — and a reader who cannot see that half is
+			 * being asked to take the finding on trust.
+			 */
+			return (
+				<>
+					<span className="text-ink">
+						This page declares no canonical URL, on a site that declares one on{" "}
+						{declaring} other {declaring === 1 ? "page" : "pages"}
+					</span>
+					<div className="mt-1.5 break-all font-mono text-ink-soft text-xs">
+						{pathOf(str("url"))}
+					</div>
+				</>
+			);
+		}
+
+		case "canonical_conflicting": {
+			if (detail.kind === "chain") {
+				/**
+				 * All three URLs. A chain is only legible as a sequence: the page, what
+				 * it nominated, and what that nominated in turn — and the fix is
+				 * usually to point the first straight at the last.
+				 */
+				return (
+					<>
+						<span className="text-ink">
+							This page's canonical is itself not canonical
+						</span>
+						<div className="mt-1.5 break-all font-mono text-ink-soft text-xs">
+							{pathOf(str("url"))}
+							<div className="text-ink-faint">
+								→ {pathOf(str("canonical"))} → {pathOf(str("targetCanonical"))}
+							</div>
+						</div>
+					</>
+				);
+			}
+
+			const canonicals = Array.isArray(detail.canonicals)
+				? (detail.canonicals as string[])
+				: [];
+
+			return (
+				<>
+					<span className="text-ink">
+						This page declares {canonicals.length} different canonical URLs
+					</span>
+					<div className="mt-1.5 break-all font-mono text-ink-soft text-xs">
+						{pathOf(str("url"))}
+					</div>
+					<Listed items={canonicals.map(pathOf)} />
+				</>
+			);
+		}
+
+		case "canonical_target_broken":
+			return (
+				<>
+					<span className="text-ink">
+						{detail.kind === "unreached" ? (
+							<>This page's canonical was never reached</>
+						) : (
+							<>
+								This page's canonical returns{" "}
+								{String(detail.httpStatus ?? detail.fetchError ?? "an error")}
+							</>
+						)}
+					</span>
+					<div className="mt-1.5 break-all font-mono text-ink-soft text-xs">
+						{pathOf(str("canonical"))}
+						<div className="text-ink-faint">
+							declared by {pathOf(str("url"))}
+						</div>
+					</div>
+				</>
+			);
 
 		default:
 			return (

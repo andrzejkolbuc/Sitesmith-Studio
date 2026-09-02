@@ -31,7 +31,7 @@ test("an owner crawls a multilingual site and reads a real finding", async ({
 	await expect(signedIn.getByText("Crawling")).toBeVisible();
 
 	// Completion, on the same page, still without a reload.
-	await expect(signedIn.getByText("Complete")).toBeVisible({
+	await expect(signedIn.getByText("Complete", { exact: true })).toBeVisible({
 		timeout: 60_000,
 	});
 
@@ -69,7 +69,7 @@ test("a finding says which locale is missing, not just that something is wrong",
 	await createProject({ startUrl: site.baseUrl });
 
 	await signedIn.getByRole("button", { name: "Run a check" }).click();
-	await expect(signedIn.getByText("Complete")).toBeVisible({
+	await expect(signedIn.getByText("Complete", { exact: true })).toBeVisible({
 		timeout: 60_000,
 	});
 
@@ -116,7 +116,9 @@ test("a family whose language links disagree is reported once, naming the pages"
 	await createProject({ startUrl: site.baseUrl });
 
 	await signedIn.getByRole("button", { name: "Run a check" }).click();
-	await expect(signedIn.getByText("Complete")).toBeVisible({ timeout: 60_000 });
+	await expect(signedIn.getByText("Complete", { exact: true })).toBeVisible({
+		timeout: 60_000,
+	});
 
 	await expect(
 		signedIn.getByRole("heading", {
@@ -160,7 +162,9 @@ test("a variant failing while its siblings work is stated as one comparison", as
 	await createProject({ startUrl: site.baseUrl });
 
 	await signedIn.getByRole("button", { name: "Run a check" }).click();
-	await expect(signedIn.getByText("Complete")).toBeVisible({ timeout: 60_000 });
+	await expect(signedIn.getByText("Complete", { exact: true })).toBeVisible({
+		timeout: 60_000,
+	});
 
 	await expect(
 		signedIn.getByRole("heading", { name: EXPECTED.divergedVariant.heading }),
@@ -184,7 +188,9 @@ test("no finding renders as a raw payload", async ({
 	await createProject({ startUrl: site.baseUrl });
 
 	await signedIn.getByRole("button", { name: "Run a check" }).click();
-	await expect(signedIn.getByText("Complete")).toBeVisible({ timeout: 60_000 });
+	await expect(signedIn.getByText("Complete", { exact: true })).toBeVisible({
+		timeout: 60_000,
+	});
 
 	await expect(signedIn.getByText(/^\{"/)).toHaveCount(0);
 });

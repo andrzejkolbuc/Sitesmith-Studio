@@ -253,3 +253,68 @@ describe("pagesInvolved for metadata findings", () => {
 		).toEqual([`${B}/en/bare`]);
 	});
 });
+
+describe("pagesInvolved for canonical findings", () => {
+	const B = "https://shop.test";
+
+	it("counts the single page a missing-canonical finding names", () => {
+		expect(
+			pagesInvolved({
+				type: "canonical_missing",
+				url: `${B}/en/pricing`,
+				detail: { url: `${B}/en/pricing`, pagesDeclaringCanonical: 12 },
+			}),
+		).toEqual([`${B}/en/pricing`]);
+	});
+
+	it("counts every URL a page declaring several canonicals named", () => {
+		expect(
+			pagesInvolved({
+				type: "canonical_conflicting",
+				url: `${B}/en/pricing`,
+				detail: {
+					kind: "multiple",
+					url: `${B}/en/pricing`,
+					canonicals: [`${B}/en/pricing`, `${B}/en/plans`],
+				},
+			}),
+		).toEqual([`${B}/en/pricing`, `${B}/en/pricing`, `${B}/en/plans`]);
+	});
+
+	it("counts both ends of a chain", () => {
+		expect(
+			new Set(
+				pagesInvolved({
+					type: "canonical_conflicting",
+					url: `${B}/en/a`,
+					detail: {
+						kind: "chain",
+						url: `${B}/en/a`,
+						canonical: `${B}/en/b`,
+						targetCanonical: `${B}/en/c`,
+					},
+				}),
+			),
+		).toEqual(new Set([`${B}/en/a`, `${B}/en/b`]));
+	});
+
+	it("counts the page and the target a broken canonical names", () => {
+		/**
+		 * Both, the way rules 2 and 3 already count a declared sibling. A canonical
+		 * defect is a relationship between two URLs, and counting only the page
+		 * that declared it describes half of what the reader has to open.
+		 */
+		expect(
+			pagesInvolved({
+				type: "canonical_target_broken",
+				url: `${B}/en/pricing`,
+				detail: {
+					kind: "failed",
+					url: `${B}/en/pricing`,
+					canonical: `${B}/en/gone`,
+					httpStatus: 404,
+				},
+			}),
+		).toEqual([`${B}/en/pricing`, `${B}/en/gone`]);
+	});
+});

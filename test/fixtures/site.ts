@@ -152,6 +152,7 @@ const SITE: Record<string, Page> = {
 			"/meta/cross-en",
 			"/meta/cross-de",
 			"/meta/two-canonicals",
+			"/meta/no-canonical",
 			"/meta/canonical-gone",
 			"/meta/noindex-markup",
 			"/meta/noindex-header",
@@ -414,6 +415,16 @@ const SITE: Record<string, Page> = {
 	"/meta/two-canonicals": {
 		canonical: ["/meta/two-canonicals", "/meta/complete"],
 	},
+
+	/**
+	 * The only page of this fixture declaring no canonical at all.
+	 *
+	 * Its being the only one is the point. A canonical tag is optional, so a page
+	 * without one is a defect only next to a site that publishes them elsewhere —
+	 * and every other page here does, which is exactly the inconsistency the rule
+	 * narrows itself to.
+	 */
+	"/meta/no-canonical": { canonical: null },
 
 	/**
 	 * A canonical pointing at a page that 404s. Linked as well as declared,

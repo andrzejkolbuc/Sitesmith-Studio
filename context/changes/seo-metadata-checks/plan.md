@@ -478,18 +478,18 @@ runs were judged.
 
 #### Automated
 
-- [x] 2.1 A page with no title produces exactly one finding naming the title
-- [x] 2.2 A page with an empty-string description produces a finding
-- [x] 2.3 Two same-language pages sharing a title produce exactly one finding naming both
-- [x] 2.4 Two different-language pages sharing a title produce no finding
-- [x] 2.5 A page whose language is unknown is never reported as a duplicate
-- [x] 2.6 A broken page produces no metadata findings
-- [x] 2.7 A truncated crawl produces no duplicate findings
-- [x] 2.8 Mutation: removing the language scope fails the cross-language case
-- [x] 2.9 Mutation: reporting per page rather than per string fails the pair case
-- [x] 2.10 Every existing site-shape case passes unchanged
-- [x] 2.11 `pagesInvolved` counts every page of a duplicate finding
-- [x] 2.12 Type checking, linting and the whole suite pass
+- [x] 2.1 A page with no title produces exactly one finding naming the title — 0609b6b
+- [x] 2.2 A page with an empty-string description produces a finding — 0609b6b
+- [x] 2.3 Two same-language pages sharing a title produce exactly one finding naming both — 0609b6b
+- [x] 2.4 Two different-language pages sharing a title produce no finding — 0609b6b
+- [x] 2.5 A page whose language is unknown is never reported as a duplicate — 0609b6b
+- [x] 2.6 A broken page produces no metadata findings — 0609b6b
+- [x] 2.7 A truncated crawl produces no duplicate findings — 0609b6b
+- [x] 2.8 Mutation: removing the language scope fails the cross-language case — 0609b6b
+- [x] 2.9 Mutation: reporting per page rather than per string fails the pair case — 0609b6b
+- [x] 2.10 Every existing site-shape case passes unchanged — 0609b6b
+- [x] 2.11 `pagesInvolved` counts every page of a duplicate finding — 0609b6b
+- [x] 2.12 Type checking, linting and the whole suite pass — 0609b6b
 
 #### Manual
 
@@ -499,18 +499,18 @@ runs were judged.
 
 #### Automated
 
-- [ ] 3.1 A page with two canonical tags naming different URLs produces exactly one finding
-- [ ] 3.2 A canonical pointing at a 404 produces exactly one finding
-- [ ] 3.3 A canonical chain (A→B where B→C) produces exactly one finding
-- [ ] 3.4 A canonical differing from the page URL only by a trailing slash produces no finding
-- [ ] 3.5 A canonical differing only by a query string produces no finding
-- [ ] 3.6 A page with no canonical on a site using none produces no finding
-- [ ] 3.7 A page with no canonical on a site using them elsewhere produces exactly one finding
-- [ ] 3.8 A canonical pointing outside the crawl scope produces no unreached finding
-- [ ] 3.9 Mutation: comparing un-normalised URLs fails the trailing-slash case
-- [ ] 3.10 Mutation: removing the site-uses-canonicals narrowing fails the no-canonicals case
-- [ ] 3.11 Every existing site-shape case passes unchanged
-- [ ] 3.12 Type checking, linting and the whole suite pass
+- [x] 3.1 A page with two canonical tags naming different URLs produces exactly one finding
+- [x] 3.2 A canonical pointing at a 404 produces exactly one finding
+- [x] 3.3 A canonical chain (A→B where B→C) produces exactly one finding
+- [x] 3.4 A canonical differing from the page URL only by a trailing slash produces no finding
+- [x] 3.5 A canonical differing only by a query string produces no finding
+- [x] 3.6 A page with no canonical on a site using none produces no finding
+- [x] 3.7 A page with no canonical on a site using them elsewhere produces exactly one finding
+- [x] 3.8 A canonical pointing outside the crawl scope produces no unreached finding
+- [x] 3.9 Mutation: comparing un-normalised URLs fails the trailing-slash case
+- [x] 3.10 Mutation: removing the site-uses-canonicals narrowing fails the no-canonicals case
+- [x] 3.11 Every existing site-shape case passes unchanged
+- [x] 3.12 Type checking, linting and the whole suite pass
 
 #### Manual
 

@@ -1,5 +1,6 @@
 import { BLOCK_NAMES, type ContentSummary } from "./content";
 import type { CrawledPage } from "./crawler";
+import { normaliseUrl } from "./url";
 import {
 	groupFamilies,
 	groupVariants,
@@ -38,6 +39,12 @@ export const FINDING_TYPES = {
 	METADATA_MISSING: "metadata_missing",
 	/** Pages in one language publishing the same title or description. */
 	METADATA_DUPLICATED: "metadata_duplicated",
+	/** A page declaring no canonical, on a site that declares them elsewhere. */
+	CANONICAL_MISSING: "canonical_missing",
+	/** A page whose canonicals contradict each other, or point down a chain. */
+	CANONICAL_CONFLICTING: "canonical_conflicting",
+	/** A canonical naming a page that errored, or one the crawl never reached. */
+	CANONICAL_TARGET_BROKEN: "canonical_target_broken",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -788,6 +795,196 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 					value: entry.value,
 					urls: [...entry.urls].sort(),
 				},
+			});
+		}
+	}
+
+	// ── Rules 11, 12 and 13: what a page says its canonical URL is ────────────
+	//
+	// FR-022, in three defects that share one input. Every canonical below has
+	// already been through `normaliseUrl` in the extractor, and every page URL
+	// through it in the crawler — but both sides pass through again here, because
+	// these rules are also called with pages a test built by hand, and a
+	// comparison that only works when its caller normalised first is a comparison
+	// waiting to report our own trailing slash as the client's defect.
+
+	/**
+	 * A page's canonicals, in the same shape as the URL they are compared to.
+	 *
+	 * Deduplicated *after* normalising rather than before: two hrefs differing
+	 * only by a trailing slash or a tracking parameter name one URL, and counting
+	 * them as two would make "this page declares several canonicals" fire on a
+	 * page that declares one.
+	 */
+	const canonicalsOf = (page: CrawledPage): string[] => [
+		...new Set(
+			page.metadata.canonicals
+				.map((href) => normaliseUrl(href))
+				.filter((href): href is string => href !== null),
+		),
+	];
+
+	const selfUrl = (page: CrawledPage): string =>
+		normaliseUrl(page.url) ?? page.url;
+
+	/**
+	 * The pages the canonical rules are willing to speak about.
+	 *
+	 * The same two exclusions rule 9 makes, for the same reasons: a page that
+	 * errored served no head at all, and a PDF has no canonical link element and
+	 * never should — reporting either would be a finding about the response
+	 * rather than about the site.
+	 */
+	const canonicalCandidates = [...pages]
+		.filter((page) => !isError(page) && page.content.isHtml)
+		.sort((a, b) => a.url.localeCompare(b.url));
+
+	// ── Rule 11: no canonical, on a site that publishes them ──────────────────
+	//
+	// Narrowed the way rule 4 was, and for the identical reason. A canonical tag
+	// is optional, so a site that uses none is not defective — and firing per page
+	// would produce one finding for every page of such a site, all saying the same
+	// thing and none of them naming a defect. What *is* evidence is the site
+	// publishing them somewhere: a template emitting a canonical on most pages and
+	// not on others is an inconsistency the site itself reveals, rather than a
+	// convention we prefer.
+	//
+	// Needs a finished crawl for the same reason the narrowing exists. The
+	// evidence that the site uses canonicals is drawn from the pages we reached,
+	// so a run that stopped early can be looking at exactly the half that has none.
+	if (crawlComplete) {
+		const declaring = canonicalCandidates.filter(
+			(page) => canonicalsOf(page).length > 0,
+		);
+
+		if (declaring.length > 0) {
+			for (const page of canonicalCandidates) {
+				if (canonicalsOf(page).length > 0) continue;
+
+				findings.push({
+					type: FINDING_TYPES.CANONICAL_MISSING,
+					url: page.url,
+					detail: {
+						url: page.url,
+						/**
+						 * The narrowing's own evidence, carried into the finding. Without
+						 * it the reader is told a page lacks something optional and has no
+						 * way to see why that was worth reporting.
+						 */
+						pagesDeclaringCanonical: declaring.length,
+					},
+				});
+			}
+		}
+	}
+
+	// ── Rule 12: canonicals that contradict each other ────────────────────────
+	//
+	// Two shapes under a `kind` discriminator, following rule 7's precedent: they
+	// are one story to the reader — this page cannot say which URL it wants
+	// indexed — and the detail says which was observed.
+	//
+	// One finding per page, never one per tag or per link in a chain. A template
+	// emitting two canonicals emits them on every page it renders, so per-tag
+	// reporting would make the worst sites the least readable.
+	for (const page of canonicalCandidates) {
+		const canonicals = canonicalsOf(page);
+		if (canonicals.length === 0) continue;
+
+		if (canonicals.length > 1) {
+			findings.push({
+				type: FINDING_TYPES.CANONICAL_CONFLICTING,
+				url: page.url,
+				detail: { kind: "multiple", url: page.url, canonicals },
+			});
+			continue;
+		}
+
+		const canonical = canonicals[0];
+		if (canonical === undefined) continue;
+		// A self-referential canonical is standard practice, not a chain of one.
+		if (canonical === selfUrl(page)) continue;
+
+		const target = byUrl.get(canonical);
+		/**
+		 * A target the crawl never fetched, or that errored, is rule 13's business.
+		 * Saying it here as well would be one problem under two names — and a page
+		 * that served an error has no head to have declared anything with.
+		 */
+		if (!target || isError(target) || !target.content.isHtml) continue;
+
+		const onward = canonicalsOf(target);
+		/**
+		 * A target declaring no canonical is missing one, which rule 11 says when
+		 * the site's own usage makes it worth saying. A target declaring several is
+		 * contradicting itself, which this rule already reports against that page.
+		 * Neither is a chain, and calling either one would file the target's defect
+		 * against whichever page happened to point at it.
+		 */
+		if (onward.length !== 1) continue;
+
+		const targetCanonical = onward[0];
+		if (targetCanonical === undefined) continue;
+		if (targetCanonical === selfUrl(target)) continue;
+
+		/**
+		 * A chain: this page names a canonical which is itself not canonical, so
+		 * nothing in the sequence states where the content actually lives.
+		 */
+		findings.push({
+			type: FINDING_TYPES.CANONICAL_CONFLICTING,
+			url: page.url,
+			detail: { kind: "chain", url: page.url, canonical, targetCanonical },
+		});
+	}
+
+	// ── Rule 13: a canonical naming somewhere broken ──────────────────────────
+	//
+	// Rules 2 and 3 in a second setting, guards included: the target errored, or
+	// the crawl finished without reaching an in-scope target. The reasoning that
+	// shaped those two applies here unchanged — an out-of-scope target's absence
+	// is the configuration working rather than the site failing, and an unreached
+	// target on a truncated crawl blames the site for where we stopped.
+	//
+	// One type rather than two, because the fix is the same either way: the URL
+	// this page nominated does not serve the content. The `kind` says which was
+	// observed.
+	for (const page of canonicalCandidates) {
+		const canonicals = canonicalsOf(page);
+		/**
+		 * Only a page naming exactly one canonical. With several there is no single
+		 * target to call broken, and rule 12 is already telling the reader the more
+		 * useful thing — that the page has to decide where it points before
+		 * anything can be said about what it points at.
+		 */
+		if (canonicals.length !== 1) continue;
+
+		const canonical = canonicals[0];
+		if (canonical === undefined) continue;
+		if (canonical === selfUrl(page)) continue;
+
+		const target = byUrl.get(canonical);
+
+		if (target && isError(target)) {
+			findings.push({
+				type: FINDING_TYPES.CANONICAL_TARGET_BROKEN,
+				url: page.url,
+				detail: {
+					kind: "failed",
+					url: page.url,
+					canonical,
+					httpStatus: target.httpStatus,
+					fetchError: target.fetchError,
+				},
+			});
+			continue;
+		}
+
+		if (!target && crawlComplete && inScope(canonical)) {
+			findings.push({
+				type: FINDING_TYPES.CANONICAL_TARGET_BROKEN,
+				url: page.url,
+				detail: { kind: "unreached", url: page.url, canonical },
 			});
 		}
 	}

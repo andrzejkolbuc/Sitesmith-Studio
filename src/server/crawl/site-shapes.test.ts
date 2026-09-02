@@ -1581,3 +1581,281 @@ describe("titles and descriptions", () => {
 		).toEqual([]);
 	});
 });
+
+describe("canonical URLs", () => {
+	const CANONICAL_TYPES = new Set([
+		"canonical_missing",
+		"canonical_conflicting",
+		"canonical_target_broken",
+	]);
+
+	/**
+	 * Every canonical finding, not one type at a time.
+	 *
+	 * The three rules read one input and narrow each other — rule 13 declines
+	 * where rule 12 already spoke, rule 12 declines where rule 13 will — so a
+	 * test filtering to a single type could not see the double-report those
+	 * narrowings exist to prevent. "Exactly one finding" here means one across
+	 * all three.
+	 */
+	const canonicalFindings = (
+		options: Parameters<typeof detailedFindingsFor>[0],
+	) => detailedFindingsFor(options).filter((f) => CANONICAL_TYPES.has(f.type));
+
+	/**
+	 * Canonicals are written here as the page would write them, un-normalised.
+	 *
+	 * `extractMetadata` normalises what it reads, so in production both sides of
+	 * every comparison already match. These cases deliberately bypass it — which
+	 * is the point: a rule that only works because its caller normalised first is
+	 * a rule waiting to report our own trailing slash as the client's defect, and
+	 * the two cases below would pass either way if the rule were trusted to skip
+	 * the step.
+	 */
+
+	it("reports a page declaring two different canonicals, once", () => {
+		const findings = canonicalFindings({
+			pages: [
+				page("/en/pricing", {
+					metadata: {
+						canonicals: [`${BASE}/en/pricing`, `${BASE}/en/plans`],
+					},
+				}),
+			],
+		});
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.type).toBe("canonical_conflicting");
+		expect(findings[0]?.url).toBe(`${BASE}/en/pricing`);
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "multiple",
+			canonicals: [`${BASE}/en/pricing`, `${BASE}/en/plans`],
+		});
+	});
+
+	it("reports a canonical pointing at a page that 404s", () => {
+		const findings = canonicalFindings({
+			pages: [
+				page("/en/pricing", {
+					metadata: { canonicals: [`${BASE}/en/gone`] },
+				}),
+				page("/en/gone", { status: 404 }),
+			],
+		});
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.type).toBe("canonical_target_broken");
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "failed",
+			url: `${BASE}/en/pricing`,
+			canonical: `${BASE}/en/gone`,
+			httpStatus: 404,
+		});
+	});
+
+	it("reports a chain once, against the page that starts it", () => {
+		/**
+		 * A→B where B→C. Only A is defective: B names a canonical and that
+		 * canonical is itself canonical, which is what a correct page looks like.
+		 * Reporting B as well would file A's defect against the page it points at.
+		 */
+		const findings = canonicalFindings({
+			pages: [
+				page("/en/a", { metadata: { canonicals: [`${BASE}/en/b`] } }),
+				page("/en/b", { metadata: { canonicals: [`${BASE}/en/c`] } }),
+				page("/en/c", { metadata: { canonicals: [`${BASE}/en/c`] } }),
+			],
+		});
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.type).toBe("canonical_conflicting");
+		expect(findings[0]?.url).toBe(`${BASE}/en/a`);
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "chain",
+			canonical: `${BASE}/en/b`,
+			targetCanonical: `${BASE}/en/c`,
+		});
+	});
+
+	it("says nothing about a canonical differing only by a trailing slash", () => {
+		/**
+		 * The crawl records `/en/pricing`; the page writes `/en/pricing/`. They are
+		 * the same page, and it was *our* normalisation that made the strings
+		 * differ — reporting it would be the page-identity false positive under a
+		 * new name, which is the failure `lessons.md` exists to prevent.
+		 */
+		expect(
+			canonicalFindings({
+				pages: [
+					page("/en/pricing", {
+						metadata: { canonicals: [`${BASE}/en/pricing/`] },
+					}),
+				],
+			}),
+		).toEqual([]);
+	});
+
+	it("says nothing about a canonical differing only by a query string", () => {
+		// `normaliseUrl` drops query strings, so the crawl already collapsed this
+		// URL to the page it recorded.
+		expect(
+			canonicalFindings({
+				pages: [
+					page("/en/pricing", {
+						metadata: {
+							canonicals: [`${BASE}/en/pricing?utm_source=newsletter`],
+						},
+					}),
+				],
+			}),
+		).toEqual([]);
+	});
+
+	it("says nothing about pages on a site that uses no canonicals at all", () => {
+		/**
+		 * The negative assertion the missing rule rests on. A canonical tag is
+		 * optional; a site using none has not made a mistake, and firing per page
+		 * would produce one finding for every page it publishes.
+		 */
+		expect(
+			canonicalFindings({
+				pages: [page("/en/pricing"), page("/en/about"), page("/en/contact")],
+			}),
+		).toEqual([]);
+	});
+
+	it("reports a page with no canonical when the site declares them elsewhere", () => {
+		const findings = canonicalFindings({
+			pages: [
+				page("/en/about", { metadata: { canonicals: [`${BASE}/en/about`] } }),
+				page("/en/pricing"),
+			],
+		});
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.type).toBe("canonical_missing");
+		expect(findings[0]?.url).toBe(`${BASE}/en/pricing`);
+		expect(findings[0]?.detail).toMatchObject({
+			url: `${BASE}/en/pricing`,
+			pagesDeclaringCanonical: 1,
+		});
+	});
+
+	it("says nothing about a canonical pointing outside the crawl scope", () => {
+		/**
+		 * The crawl was told not to go there, so the target's absence is the
+		 * configuration working rather than the site being broken — the same
+		 * suppression rule 3 carries.
+		 */
+		expect(
+			canonicalFindings({
+				pages: [
+					page("/en/pricing", {
+						metadata: { canonicals: ["https://elsewhere.test/pricing"] },
+					}),
+				],
+			}),
+		).toEqual([]);
+	});
+
+	it("reports an in-scope canonical the finished crawl never reached", () => {
+		const findings = canonicalFindings({
+			pages: [
+				page("/en/pricing", {
+					metadata: { canonicals: [`${BASE}/en/plans`] },
+				}),
+			],
+		});
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.type).toBe("canonical_target_broken");
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "unreached",
+			canonical: `${BASE}/en/plans`,
+		});
+	});
+
+	it("stays quiet on a crawl that stopped early", () => {
+		/**
+		 * Both inferences that reason from absence. A truncated run can be looking
+		 * at exactly the half of a site that carries no canonicals, and the page a
+		 * canonical names may sit beyond where we stopped.
+		 */
+		expect(
+			canonicalFindings({
+				crawlComplete: false,
+				pages: [
+					page("/en/about", { metadata: { canonicals: [`${BASE}/en/about`] } }),
+					page("/en/pricing"),
+					page("/en/plans", {
+						metadata: { canonicals: [`${BASE}/en/tariffs`] },
+					}),
+				],
+			}),
+		).toEqual([]);
+	});
+
+	it("says nothing about a page that failed", () => {
+		expect(
+			canonicalFindings({
+				pages: [
+					page("/en/about", { metadata: { canonicals: [`${BASE}/en/about`] } }),
+					page("/en/gone", { status: 404 }),
+					page("/en/down", { status: 500 }),
+				],
+			}),
+		).toEqual([]);
+	});
+
+	it("says nothing about a response that was never HTML", () => {
+		/**
+		 * A PDF has no canonical link element and never should. Reporting one would
+		 * be a finding about the format the URL serves rather than about the site.
+		 */
+		expect(
+			canonicalFindings({
+				pages: [
+					page("/en/about", { metadata: { canonicals: [`${BASE}/en/about`] } }),
+					page("/en/brochure", { content: { isHtml: false } }),
+				],
+			}),
+		).toEqual([]);
+	});
+
+	it("does not call a page conflicted for repeating one canonical two ways", () => {
+		/**
+		 * One URL written twice, once with a trailing slash. The page has declared
+		 * a single canonical and said so clumsily; deduplicating before comparing
+		 * is what stops that reading as "this page cannot decide".
+		 */
+		expect(
+			canonicalFindings({
+				pages: [
+					page("/en/pricing", {
+						metadata: {
+							canonicals: [`${BASE}/en/pricing`, `${BASE}/en/pricing/`],
+						},
+					}),
+				],
+			}),
+		).toEqual([]);
+	});
+
+	it("leaves a page whose canonical target declares none to the missing rule", () => {
+		/**
+		 * A→B where B declares nothing. That is B missing a canonical, not A
+		 * pointing down a chain — and filing it against A would name the wrong
+		 * page in the finding the reader has to act on.
+		 */
+		const findings = canonicalFindings({
+			pages: [
+				page("/en/a", { metadata: { canonicals: [`${BASE}/en/b`] } }),
+				page("/en/b"),
+			],
+		});
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.type).toBe("canonical_missing");
+		expect(findings[0]?.url).toBe(`${BASE}/en/b`);
+	});
+});

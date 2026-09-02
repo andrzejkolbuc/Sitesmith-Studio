@@ -25,7 +25,7 @@ test("a site with nothing wrong says so, rather than showing an empty list", asy
 	});
 
 	await signedIn.getByRole("button", { name: "Run a check" }).click();
-	await expect(signedIn.getByText("Complete")).toBeVisible({
+	await expect(signedIn.getByText("Complete", { exact: true })).toBeVisible({
 		timeout: 60_000,
 	});
 

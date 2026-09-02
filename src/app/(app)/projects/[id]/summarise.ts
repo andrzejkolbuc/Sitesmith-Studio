@@ -104,6 +104,25 @@ export function pagesInvolved(finding: {
 		case "metadata_duplicated":
 			return strings(detail.urls);
 
+		case "canonical_missing":
+			return one(detail.url);
+
+		/**
+		 * The page and whatever it nominated. A canonical defect is about a
+		 * relationship between two URLs, so counting only the page that declared it
+		 * would describe half of what the reader has to go and look at — the same
+		 * reading rules 2 and 3 already get above.
+		 */
+		case "canonical_conflicting":
+			return [
+				...one(detail.url),
+				...one(detail.canonical),
+				...strings(detail.canonicals),
+			];
+
+		case "canonical_target_broken":
+			return [...one(detail.url), ...one(detail.canonical)];
+
 		default:
 			// An unmapped type still counts the page it names, so a new finding
 			// never reports as affecting nothing.

@@ -408,6 +408,55 @@ describe("detectMissingVariants against the fixture site", () => {
 
 		expect(about).toEqual([]);
 	});
+
+	it("reports the one page declaring two different canonicals", async () => {
+		const { findings } = await detect();
+		const conflicting = findings.filter(
+			(f) => f.type === FINDING_TYPES.CANONICAL_CONFLICTING,
+		);
+
+		expect(conflicting).toHaveLength(1);
+		expect(conflicting[0]?.url).toBe(`${site.baseUrl}/meta/two-canonicals`);
+		expect(conflicting[0]?.detail).toMatchObject({
+			kind: "multiple",
+			canonicals: [
+				`${site.baseUrl}/meta/two-canonicals`,
+				`${site.baseUrl}/meta/complete`,
+			],
+		});
+	});
+
+	it("reports the one canonical pointing at a page that 404s", async () => {
+		const { findings } = await detect();
+		const broken = findings.filter(
+			(f) => f.type === FINDING_TYPES.CANONICAL_TARGET_BROKEN,
+		);
+
+		expect(broken).toHaveLength(1);
+		expect(broken[0]?.url).toBe(`${site.baseUrl}/meta/canonical-gone`);
+		expect(broken[0]?.detail).toMatchObject({
+			kind: "failed",
+			canonical: `${site.baseUrl}/meta/nowhere`,
+			httpStatus: 404,
+		});
+	});
+
+	it("reports the one page declaring no canonical", async () => {
+		/**
+		 * End to end, this is also the assertion that every *other* fixture page's
+		 * relative, self-referential canonical resolved against the URL it was
+		 * served from. Thirty pages write `href="/some/path"`; if any of them
+		 * resolved somewhere else, it would arrive here as a chain, a broken target
+		 * or a second missing canonical.
+		 */
+		const { findings } = await detect();
+		const missing = findings.filter(
+			(f) => f.type === FINDING_TYPES.CANONICAL_MISSING,
+		);
+
+		expect(missing).toHaveLength(1);
+		expect(missing[0]?.url).toBe(`${site.baseUrl}/meta/no-canonical`);
+	});
 });
 
 describe("detectMissingVariants edge cases", () => {
