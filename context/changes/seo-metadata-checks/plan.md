@@ -540,12 +540,12 @@ runs were judged.
 
 #### Automated
 
-- [x] 5.1 Whole suite passes: `npm run test:all`
+- [x] 5.1 Whole suite passes: `npm run test:all` — d2edf52
 
 #### Manual
 
-- [ ] 5.2 The crawl completes without aborting, at a page count consistent with previous runs
-- [ ] 5.3 The known duplicate-title defect on the legal pages is reported
+- [x] 5.2 The crawl completes without aborting, at a page count consistent with previous runs
+- [x] 5.3 The known duplicate-title defect on the legal pages is reported
 - [ ] 5.4 Every `metadata_missing` finding names a page genuinely lacking that field
 - [ ] 5.5 Every `canonical_*` finding names a real canonical problem
 - [ ] 5.6 Every `noindex_present` finding names a page that genuinely carries the directive
