@@ -1,7 +1,7 @@
 ---
 change_id: seo-metadata-checks
 title: "Title, meta description, canonical and noindex checks"
-status: preparing
+status: planned
 created: 2026-09-01
 updated: 2026-09-02
 archived_at: null
