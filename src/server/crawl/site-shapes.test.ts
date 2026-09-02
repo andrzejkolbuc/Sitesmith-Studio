@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { type ContentSummary, emptyContent } from "./content";
 import type { CrawledPage } from "./crawler";
 import { detectMissingVariants } from "./findings";
+import { emptyMetadata, type PageMetadata } from "./metadata";
 import { localeFromUrl } from "./variants";
 
 /**
@@ -43,6 +44,14 @@ const page = (
 		 * longer say which of the two was wrong.
 		 */
 		content?: Partial<ContentSummary>;
+		/**
+		 * Overrides on the metadata, for the same reason `content` takes them: a
+		 * case states the title, canonical or directive it means directly rather
+		 * than writing HTML and depending on the extractor as well as the rule.
+		 */
+		metadata?: Partial<PageMetadata>;
+		/** The `X-Robots-Tag` header, verbatim as a site would serve it. */
+		xRobotsTag?: string | null;
 	} = {},
 ): CrawledPage => ({
 	url: `${BASE}${path}`,
@@ -55,6 +64,8 @@ const page = (
 	),
 	links: [],
 	content: { ...emptyContent(true), ...options.content },
+	metadata: { ...emptyMetadata(), ...options.metadata },
+	xRobotsTag: options.xRobotsTag ?? null,
 	fetchError: null,
 });
 

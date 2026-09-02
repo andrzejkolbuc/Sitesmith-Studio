@@ -38,6 +38,36 @@ type Page = {
 	 */
 	main?: boolean;
 	status?: number;
+	/**
+	 * `<title>` text. Absent uses the path; `null` omits the tag entirely.
+	 *
+	 * A default rather than nothing, because every page here is crawled by the
+	 * metadata rules too: if titles were absent by default, the missing-title
+	 * rule would fire on thirty pages that exist to exercise something else, and
+	 * the pages that *should* fire would be invisible among them.
+	 */
+	title?: string | null;
+	/** Meta description. Absent derives one from the path; `null` omits it. */
+	description?: string | null;
+	/**
+	 * Canonical hrefs. Absent declares one self-referential canonical; `null`
+	 * declares none.
+	 *
+	 * Self-referential by default and written relative, which makes every
+	 * ordinary page of this fixture proof that a relative canonical resolves
+	 * against the URL it was served from.
+	 */
+	canonical?: string[] | null;
+	/** `content` of a `<meta name="robots">` tag. */
+	robots?: string;
+	/**
+	 * Extra response headers.
+	 *
+	 * The reason this exists is `X-Robots-Tag`: a `noindex` served at the CDN or
+	 * framework layer is invisible in page source, and a fixture that could only
+	 * express the markup channel would leave the more dangerous one untested.
+	 */
+	headers?: Record<string, string>;
 };
 
 /**
@@ -116,6 +146,17 @@ const SITE: Record<string, Page> = {
 			"/redirect-hub",
 			"/private/secret",
 			"/?utm_source=nav",
+			"/meta/bare",
+			"/meta/twin-a",
+			"/meta/twin-b",
+			"/meta/cross-en",
+			"/meta/cross-de",
+			"/meta/two-canonicals",
+			"/meta/canonical-gone",
+			"/meta/noindex-markup",
+			"/meta/noindex-header",
+			"/meta/noindex-mixed",
+			"/meta/complete",
 		],
 	},
 	"/de/": {
@@ -323,6 +364,92 @@ const SITE: Record<string, Page> = {
 	"/private/secret": { body: "<p>Should not be crawled.</p>" },
 
 	/**
+	 * The metadata shapes, for FR-021, FR-022 and FR-023.
+	 *
+	 * Every one of them sits under `/meta/`, which is deliberately not
+	 * locale-shaped: a `/de/`-style path with no hreflang would fire rule 4 as
+	 * well, and the count of rule-4 findings is pinned at one by the suite.
+	 *
+	 * Where a rule needs to know a page's language — duplicate titles are
+	 * language-scoped, or they collide with rule 7 — the page declares it with a
+	 * self-referential hreflang rather than by moving into a locale path. That is
+	 * how real sites without locale prefixes state a language, and it leaves each
+	 * page in a family of one, which is what keeps rules 1 and 5 silent about it.
+	 */
+
+	// No title and no description: the missing case, on a page nothing else
+	// speaks about.
+	"/meta/bare": { title: null, description: null },
+
+	/**
+	 * Two English pages publishing the same title. The defect confirmed on the
+	 * client site, in miniature: a template fallback that was never filled in.
+	 * Their descriptions still differ, so exactly one duplicate is on offer.
+	 */
+	"/meta/twin-a": {
+		alternates: { en: "/meta/twin-a" },
+		title: "Legal information",
+	},
+	"/meta/twin-b": {
+		alternates: { en: "/meta/twin-b" },
+		title: "Legal information",
+	},
+
+	/**
+	 * The negative assertion the duplicate rule rests on: one title, two
+	 * languages. Two locale variants legitimately share a title — a brand name,
+	 * a product name — and rule 7 already reports content that stayed in the
+	 * source language. **This pair must stay silent.**
+	 */
+	"/meta/cross-en": {
+		alternates: { en: "/meta/cross-en" },
+		title: "Yazaki",
+	},
+	"/meta/cross-de": {
+		alternates: { de: "/meta/cross-de" },
+		title: "Yazaki",
+	},
+
+	// Two canonical tags naming different URLs: the page disagrees with itself.
+	"/meta/two-canonicals": {
+		canonical: ["/meta/two-canonicals", "/meta/complete"],
+	},
+
+	/**
+	 * A canonical pointing at a page that 404s. Linked as well as declared,
+	 * because the crawler follows anchors and hreflang but not canonicals — and
+	 * a target the crawl never requested cannot be known to be broken.
+	 */
+	"/meta/canonical-gone": {
+		canonical: ["/meta/nowhere"],
+		links: ["/meta/nowhere"],
+	},
+
+	// The two channels a noindex travels on, separately and together.
+	"/meta/noindex-markup": { robots: "noindex, nofollow" },
+	"/meta/noindex-header": { headers: { "x-robots-tag": "noindex" } },
+	/**
+	 * The channels disagree. The header wins in practice, which is what makes
+	 * this the dangerous shape: everyone reading the page source sees `index`.
+	 */
+	"/meta/noindex-mixed": {
+		robots: "index, follow",
+		headers: { "x-robots-tag": "noindex" },
+	},
+
+	/**
+	 * Complete, correct and unique on every axis. **This page must produce
+	 * nothing.** It is the negative assertion for all six metadata rules at once.
+	 */
+	"/meta/complete": {
+		title: "Everything a page should say about itself",
+		description:
+			"A unique description, a self-referential canonical, and robots directives that ask to be indexed.",
+		robots: "index, follow",
+		headers: { "x-robots-tag": "index, follow" },
+	},
+
+	/**
 	 * A page linking to several always-failing URLs, so a crawl can accumulate a
 	 * *burst* of failures. A single failing URL cannot: it returns one error, has
 	 * no links, and the crawl ends before any threshold is reached.
@@ -386,6 +513,32 @@ function render(path: string, page: Page): string {
 		.map((href) => `<a href="${href}">${href}</a>`)
 		.join("\n    ");
 
+	/**
+	 * The head, assembled from the metadata fields.
+	 *
+	 * Each of the three has a sensible default and an explicit way to say "this
+	 * page publishes none", because both halves are needed: the defaults keep
+	 * the metadata rules quiet about the thirty pages that exist for other
+	 * reasons, and the opt-outs are the defects themselves.
+	 */
+	const title =
+		page.title === null ? "" : `<title>${page.title ?? path}</title>`;
+
+	const description =
+		page.description === null
+			? ""
+			: `<meta name="description" content="${
+					page.description ?? `What ${path} is for, described exactly once.`
+				}">`;
+
+	const canonicals = (page.canonical === null ? [] : (page.canonical ?? [path]))
+		.map((href) => `<link rel="canonical" href="${href}">`)
+		.join("\n    ");
+
+	const robots = page.robots
+		? `<meta name="robots" content="${page.robots}">`
+		: "";
+
 	const content = page.body ?? `<h1>${path}</h1>`;
 	/**
 	 * Links stay outside `<main>` on purpose. They are this fixture's navigation,
@@ -398,7 +551,10 @@ function render(path: string, page: Page): string {
 	return `<!doctype html>
 <html>
   <head>
-    <title>${path}</title>
+    ${title}
+    ${description}
+    ${canonicals}
+    ${robots}
     ${alternates}
   </head>
   <body>
@@ -460,7 +616,10 @@ export async function startFixtureSite(): Promise<Fixture> {
 				return;
 			}
 
-			res.writeHead(page.status ?? 200, { "content-type": "text/html" });
+			res.writeHead(page.status ?? 200, {
+				"content-type": "text/html",
+				...page.headers,
+			});
 			res.end(render(key, page));
 		} finally {
 			inFlight -= 1;

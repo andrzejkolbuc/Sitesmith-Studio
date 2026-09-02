@@ -4,6 +4,7 @@ import { type Fixture, startFixtureSite } from "../../../test/fixtures/site";
 import { emptyContent } from "./content";
 import { type CrawledPage, crawl } from "./crawler";
 import { detectMissingVariants, FINDING_TYPES } from "./findings";
+import { emptyMetadata } from "./metadata";
 import { groupVariants, localeFromUrl } from "./variants";
 
 let site: Fixture;
@@ -26,6 +27,8 @@ const page = (
 	hreflangTargets,
 	links: [],
 	content: emptyContent(true),
+	metadata: emptyMetadata(),
+	xRobotsTag: null,
 	fetchError: null,
 });
 
@@ -353,6 +356,8 @@ describe("detectMissingVariants edge cases", () => {
 			},
 			links: [],
 			content: emptyContent(true),
+			metadata: emptyMetadata(),
+			xRobotsTag: null,
 			fetchError: null,
 		};
 		// The declared German page exists but is broken, and its URL carries no
@@ -363,6 +368,8 @@ describe("detectMissingVariants edge cases", () => {
 			hreflangTargets: {},
 			links: [],
 			content: emptyContent(true),
+			metadata: emptyMetadata(),
+			xRobotsTag: null,
 			fetchError: null,
 		};
 
@@ -395,6 +402,8 @@ describe("detectMissingVariants edge cases", () => {
 			},
 			links: [],
 			content: emptyContent(true),
+			metadata: emptyMetadata(),
+			xRobotsTag: null,
 			fetchError: null,
 		};
 		const de: CrawledPage = {
@@ -406,6 +415,8 @@ describe("detectMissingVariants edge cases", () => {
 			},
 			links: [],
 			content: emptyContent(true),
+			metadata: emptyMetadata(),
+			xRobotsTag: null,
 			fetchError: null,
 		};
 
@@ -430,6 +441,8 @@ describe("detectMissingVariants edge cases", () => {
 			hreflangTargets: {},
 			links: [],
 			content: emptyContent(true),
+			metadata: emptyMetadata(),
+			xRobotsTag: null,
 			fetchError: null,
 		};
 

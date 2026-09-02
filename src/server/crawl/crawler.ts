@@ -12,6 +12,15 @@
  */
 
 import { type ContentSummary, emptyContent, extractContent } from "./content";
+import {
+	emptyMetadata,
+	extractMetadata,
+	MAX_METADATA_CHARS,
+	type PageMetadata,
+} from "./metadata";
+import { normaliseUrl } from "./url";
+
+export { normaliseUrl } from "./url";
 
 export type CrawlOptions = {
 	startUrl: string;
@@ -54,6 +63,28 @@ export type CrawledPage = {
 	 * of the text rather than the text.
 	 */
 	content: ContentSummary;
+	/**
+	 * What the page declares about itself to a search engine.
+	 *
+	 * Fixed-size for the same reason `content` is: title and description are
+	 * capped at capture, and the canonical list is deduplicated.
+	 */
+	metadata: PageMetadata;
+	/**
+	 * The `X-Robots-Tag` response header, verbatim apart from a length cap.
+	 *
+	 * The one header kept out of the whole response. `noindex` travels on two
+	 * channels and a markup-only check is blind to the one served at the CDN or
+	 * framework layer — which is the channel that deindexes a site without
+	 * leaving a trace in anybody's page source. Retaining the `Headers` object
+	 * instead would multiply an unbounded structure by the two-thousand-page
+	 * ceiling, so this is a named string and nothing more.
+	 *
+	 * Read regardless of content type: a header is the only way to mark a PDF
+	 * `noindex`, so skipping non-HTML responses would miss exactly the cases
+	 * that have no other channel available.
+	 */
+	xRobotsTag: string | null;
 	fetchError: string | null;
 };
 
@@ -82,40 +113,6 @@ const DEFAULT_FAILURE_BURST = 5;
  */
 const DEFAULT_FAILURE_RATE = 0.3;
 const DEFAULT_FAILURE_RATE_SAMPLE = 20;
-
-/**
- * Canonical form of a URL for deduplication.
- *
- * Without this the same page is crawled repeatedly under different spellings —
- * with and without a trailing slash, with a tracking parameter, with a fragment
- * — which wastes requests against a site we promised to be gentle with.
- *
- * Query strings are dropped entirely. That is a real tradeoff: a site using
- * `?page=2` for pagination will be under-crawled. It is the right default for
- * marketing sites, where query strings are overwhelmingly tracking noise, and
- * it is the kind of thing to revisit against real crawl data rather than in
- * advance.
- */
-export function normaliseUrl(raw: string, base?: string): string | null {
-	let url: URL;
-	try {
-		url = base ? new URL(raw, base) : new URL(raw);
-	} catch {
-		return null;
-	}
-
-	if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-
-	url.hash = "";
-	url.search = "";
-
-	// Treat /path and /path/ as the same page, but leave the root alone.
-	if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
-		url.pathname = url.pathname.slice(0, -1);
-	}
-
-	return url.toString();
-}
 
 function inScope(
 	url: string,
@@ -262,12 +259,16 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 			 */
 			const served = normaliseUrl(response.url) ?? url;
 
+			const xRobotsTag = response.headers.get("x-robots-tag");
+
 			return {
 				url: served,
 				httpStatus: response.status,
 				hreflangTargets: extractHreflang(html, served),
 				links: extractLinks(html, served),
 				content: extractContent(html, isHtml),
+				metadata: extractMetadata(html, served),
+				xRobotsTag: xRobotsTag?.slice(0, MAX_METADATA_CHARS) ?? null,
 				fetchError: null,
 			};
 		} catch (caught) {
@@ -277,6 +278,8 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 				hreflangTargets: {},
 				links: [],
 				content: emptyContent(false),
+				metadata: emptyMetadata(),
+				xRobotsTag: null,
 				fetchError: caught instanceof Error ? caught.message : String(caught),
 			};
 		} finally {

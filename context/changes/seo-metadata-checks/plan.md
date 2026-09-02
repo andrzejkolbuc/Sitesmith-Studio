@@ -462,13 +462,13 @@ runs were judged.
 
 #### Automated
 
-- [ ] 1.1 Extractor unit tests pass across title, description, canonical, robots tokens and absent cases
-- [ ] 1.2 A relative canonical resolves against the page URL, not the requested URL
-- [ ] 1.3 Title and description are length-capped at capture
-- [ ] 1.4 Existing crawler, politeness and run tests pass
-- [ ] 1.5 Type checking passes: `npm run typecheck`
-- [ ] 1.6 Linting passes: `npm run check`
-- [ ] 1.7 Whole suite passes: `npm run test:all`
+- [x] 1.1 Extractor unit tests pass across title, description, canonical, robots tokens and absent cases
+- [x] 1.2 A relative canonical resolves against the page URL, not the requested URL
+- [x] 1.3 Title and description are length-capped at capture
+- [x] 1.4 Existing crawler, politeness and run tests pass
+- [x] 1.5 Type checking passes: `npm run typecheck`
+- [x] 1.6 Linting passes: `npm run check`
+- [x] 1.7 Whole suite passes: `npm run test:all`
 
 #### Manual
 

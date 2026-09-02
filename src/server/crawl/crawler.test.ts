@@ -285,3 +285,65 @@ describe("page identity under redirects", () => {
 		expect(new Set(urls).size).toBe(urls.length);
 	});
 });
+
+describe("metadata capture", () => {
+	const pathOf = (url: string) => new URL(url).pathname;
+
+	async function crawled() {
+		const result = await crawl(base());
+		return new Map(result.pages.map((page) => [pathOf(page.url), page]));
+	}
+
+	it("records what a page declares about itself", async () => {
+		const pages = await crawled();
+		const complete = pages.get("/meta/complete");
+
+		expect(complete?.metadata.title).toBe(
+			"Everything a page should say about itself",
+		);
+		expect(complete?.metadata.description).toContain("A unique description");
+		expect(complete?.metadata.canonicals).toEqual([
+			`${site.baseUrl}/meta/complete`,
+		]);
+		expect(complete?.metadata.robots).toEqual([
+			{ crawler: null, directives: ["index", "follow"] },
+		]);
+	});
+
+	it("records a page that published no title and no description", async () => {
+		const pages = await crawled();
+		const bare = pages.get("/meta/bare");
+
+		expect(bare?.metadata.title).toBeNull();
+		expect(bare?.metadata.description).toBeNull();
+	});
+
+	it("records a directive that travelled only in a response header", async () => {
+		/**
+		 * The channel a markup-only check is blind to, and the reason the crawler
+		 * keeps a header at all. This page's source says nothing about robots; the
+		 * only evidence it is deindexed is the header.
+		 */
+		const pages = await crawled();
+		const headerOnly = pages.get("/meta/noindex-header");
+
+		expect(headerOnly?.metadata.robots).toEqual([]);
+		expect(headerOnly?.xRobotsTag).toBe("noindex");
+	});
+
+	it("records both channels when they disagree", async () => {
+		const pages = await crawled();
+		const mixed = pages.get("/meta/noindex-mixed");
+
+		expect(mixed?.metadata.robots).toEqual([
+			{ crawler: null, directives: ["index", "follow"] },
+		]);
+		expect(mixed?.xRobotsTag).toBe("noindex");
+	});
+
+	it("records no header for a page that served none", async () => {
+		const pages = await crawled();
+
+		expect(pages.get("/meta/bare")?.xRobotsTag).toBeNull();
+	});
+});

@@ -25,6 +25,7 @@ export default defineConfig({
 		include: [
 			"src/server/crawl/crawler.test.ts",
 			"src/server/crawl/content.test.ts",
+			"src/server/crawl/metadata.test.ts",
 			"src/server/crawl/findings.test.ts",
 			"src/server/crawl/site-shapes.test.ts",
 			"src/server/crawl/politeness.test.ts",
