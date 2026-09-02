@@ -1,10 +1,10 @@
 ---
 change_id: seo-metadata-checks
 title: "Title, meta description, canonical and noindex checks"
-status: implemented
+status: archived
 created: 2026-09-01
 updated: 2026-09-02
-archived_at: null
+archived_at: 2026-09-02T20:47:48Z
 roadmap_ref: S-05
 prd_refs: [FR-021, FR-022, FR-023]
 ---

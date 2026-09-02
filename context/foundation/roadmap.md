@@ -3,7 +3,7 @@ project: "Sitesmith-Studio"
 version: 1
 status: draft
 created: 2026-08-21
-updated: 2026-09-01
+updated: 2026-09-02
 prd_version: 1
 main_goal: market-feedback
 top_blocker: capacity
@@ -56,7 +56,7 @@ works.
 | S-02 | hreflang-and-variant-parity     | see hreflang graph problems and variants that regressed while siblings did not | S-01             | US-01, FR-025, FR-026                                                                | done     |
 | S-03 | cross-variant-content-drift     | see content drift between language variants                                    | S-02             | FR-027                                                                               | done     |
 | S-04 | crawl-technical-checks          | see broken links, sitemap and robots problems, orphans, duplicates, TLS issues | S-01             | FR-016, FR-017, FR-018, FR-019, FR-020, FR-030                                       | proposed |
-| S-05 | seo-metadata-checks             | see title, meta, canonical and noindex problems                                | S-01             | FR-021, FR-022, FR-023                                                               | proposed |
+| S-05 | seo-metadata-checks             | see title, meta, canonical and noindex problems                                | S-01             | FR-021, FR-022, FR-023                                                               | done |
 | S-06 | browser-observed-checks         | see console errors, sampled performance scores, and image weight problems      | S-01             | FR-015, FR-028, FR-029                                                               | proposed |
 | S-07 | run-history-and-comparison      | compare a run against the previous one and see only what changed               | S-01             | US-02, FR-037, FR-038                                                                | proposed |
 | S-08 | visual-regression-baselines     | set a baseline and see which pages changed visually, ignoring volatile regions | S-06, S-07       | US-02, FR-031, FR-032, FR-033, FR-034, FR-035                                        | proposed |
@@ -184,7 +184,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Blockers:** —
 - **Unknowns:** —
 - **Risk:** Small and self-contained; reads from crawled markup S-01 already has. A noindex accidentally shipped to production is among the most expensive regressions a client site can suffer and among the cheapest to detect, so the effort-to-value ratio here is the best on the roadmap.
-- **Status:** proposed
+- **Status:** done
 
 ### S-06: Browser-observed checks
 
@@ -351,6 +351,8 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Observability tooling.** Why parked: no PRD requirement demands it, so no foundation opens for it. Revisit if operating scheduled runs proves opaque.
 
 ## Done
+
+- **S-05: User can see missing, duplicated or out-of-range titles and meta descriptions, canonical tag problems, and pages carrying a noindex directive in production.** — Archived 2026-09-02 → `context/archive/2026-09-01-seo-metadata-checks/`. Lesson: —.
 
 - **S-03: User can see where language variants have diverged in substance - very different length, missing sections, or untranslated placeholder text left in production.** — Archived 2026-09-01 → `context/archive/2026-08-31-cross-variant-content-drift/`. Lesson: —.
 
