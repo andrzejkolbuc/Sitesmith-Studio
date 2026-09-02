@@ -123,6 +123,9 @@ export function pagesInvolved(finding: {
 		case "canonical_target_broken":
 			return [...one(detail.url), ...one(detail.canonical)];
 
+		case "noindex_present":
+			return one(detail.url);
+
 		default:
 			// An unmapped type still counts the page it names, so a new finding
 			// never reports as affecting nothing.

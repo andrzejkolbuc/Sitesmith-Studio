@@ -1,5 +1,6 @@
 import { BLOCK_NAMES, type ContentSummary } from "./content";
 import type { CrawledPage } from "./crawler";
+import { parseRobotsHeader } from "./metadata";
 import { normaliseUrl } from "./url";
 import {
 	groupFamilies,
@@ -45,6 +46,8 @@ export const FINDING_TYPES = {
 	CANONICAL_CONFLICTING: "canonical_conflicting",
 	/** A canonical naming a page that errored, or one the crawl never reached. */
 	CANONICAL_TARGET_BROKEN: "canonical_target_broken",
+	/** A page telling search engines not to index it, from either channel. */
+	NOINDEX_PRESENT: "noindex_present",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -97,6 +100,16 @@ const isError = (page: CrawledPage): boolean =>
 	page.fetchError !== null ||
 	page.httpStatus === null ||
 	page.httpStatus >= 400;
+
+/**
+ * The directives that keep a page out of an index.
+ *
+ * `none` is defined as equivalent to `noindex, nofollow`, so it belongs here —
+ * but the extractor deliberately leaves it as the word the page published, and
+ * the finding quotes that word back. The equivalence is vocabulary a rule
+ * applies; the evidence is what the site wrote.
+ */
+const NOINDEX_DIRECTIVES = new Set(["noindex", "none"]);
 
 /**
  * Runs all four rules over one crawl.
@@ -987,6 +1000,92 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 				detail: { kind: "unreached", url: page.url, canonical },
 			});
 		}
+	}
+
+	// ── Rule 14: a page asking not to be indexed ──────────────────────────────
+	//
+	// FR-023, and the most expensive regression a client site can suffer: a
+	// `noindex` shipped to production removes pages from search silently, and
+	// nothing on the page looks wrong until the traffic goes.
+	//
+	// Read from both channels, because the directive is equally valid in markup
+	// and in the `X-Robots-Tag` response header — and the header is the one a
+	// human reviewer cannot see. Checking only the markup would report a page as
+	// clean while it is deindexed, which is the specific failure this rule exists
+	// to prevent.
+	//
+	// No `crawlComplete` guard: the evidence is on the page in front of us, not
+	// in the shape of what we did or did not reach — the same reasoning the
+	// placeholder-marker half of rule 7 carries.
+	//
+	// No `isHtml` guard either, and that one is deliberate rather than an
+	// oversight. Serving `X-Robots-Tag` on a PDF is the header's textbook use,
+	// so a rule that skipped non-HTML responses would be blind exactly where the
+	// header is the *only* channel available.
+	//
+	// The finding makes no claim about whether this site is production. FR-023's
+	// environment qualifier is not observable from a crawl; the rule reports what
+	// the site asserted, and the operator who chose the start URL knows what they
+	// pointed it at.
+	for (const page of [...pages].sort((a, b) => a.url.localeCompare(b.url))) {
+		if (isError(page)) continue;
+
+		const declarations = [
+			...page.metadata.robots.map((robots) => ({
+				channel: "markup" as const,
+				...robots,
+			})),
+			...(page.xRobotsTag === null
+				? []
+				: parseRobotsHeader(page.xRobotsTag).map((robots) => ({
+						channel: "header" as const,
+						...robots,
+					}))),
+		];
+
+		const sources = declarations.flatMap((declaration) => {
+			const directive = declaration.directives.find((token) =>
+				NOINDEX_DIRECTIVES.has(token),
+			);
+			if (directive === undefined) return [];
+			return [
+				{
+					channel: declaration.channel,
+					/** Null for the generic form, which speaks to every crawler. */
+					crawler: declaration.crawler,
+					directive,
+				},
+			];
+		});
+
+		if (sources.length === 0) continue;
+
+		const carrying = new Set(sources.map((source) => source.channel));
+
+		/**
+		 * Channels that published directives and did *not* ask for a noindex.
+		 *
+		 * Recorded as evidence inside the one finding rather than as a finding of
+		 * its own, because a disagreement changes nothing about the outcome —
+		 * either channel asserting `noindex` deindexes the page. What it explains
+		 * is why nobody noticed: everyone reading the page source saw `index`.
+		 */
+		const indexingChannels = [
+			...new Set(declarations.map((declaration) => declaration.channel)),
+		]
+			.filter((channel) => !carrying.has(channel))
+			.sort();
+
+		findings.push({
+			type: FINDING_TYPES.NOINDEX_PRESENT,
+			url: page.url,
+			detail: {
+				url: page.url,
+				sources,
+				channels: [...carrying].sort(),
+				indexingChannels,
+			},
+		});
 	}
 
 	return findings;

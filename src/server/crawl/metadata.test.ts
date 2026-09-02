@@ -4,6 +4,7 @@ import {
 	extractMetadata,
 	MAX_METADATA_CHARS,
 	parseRobotsDirectives,
+	parseRobotsHeader,
 } from "./metadata";
 
 /**
@@ -357,6 +358,79 @@ describe("robots directives", () => {
 			"noindex",
 			"nofollow",
 		]);
+	});
+});
+
+describe("the X-Robots-Tag header", () => {
+	it("reads an unscoped header as speaking to every crawler", () => {
+		/**
+		 * A null crawler, the same shape the generic `<meta name="robots">`
+		 * produces — so a rule reading both channels compares like with like
+		 * rather than special-casing the header.
+		 */
+		expect(parseRobotsHeader("noindex, nofollow")).toEqual([
+			{ crawler: null, directives: ["noindex", "nofollow"] },
+		]);
+	});
+
+	it("reads the crawler a header names", () => {
+		/**
+		 * The form a flat comma split gets wrong: it yields the single token
+		 * `googlebot: noindex`, which matches no directive, and the page is
+		 * reported clean while it is deindexed.
+		 */
+		expect(parseRobotsHeader("googlebot: noindex")).toEqual([
+			{ crawler: "googlebot", directives: ["noindex"] },
+		]);
+	});
+
+	it("carries a scope forward to the directives after it", () => {
+		// How the value reads when a server joins two rules into one line.
+		expect(parseRobotsHeader("googlebot: noindex, nofollow")).toEqual([
+			{ crawler: "googlebot", directives: ["noindex", "nofollow"] },
+		]);
+	});
+
+	it("keeps two scopes in one header apart", () => {
+		expect(parseRobotsHeader("googlebot: nofollow, otherbot: noindex")).toEqual(
+			[
+				{ crawler: "googlebot", directives: ["nofollow"] },
+				{ crawler: "otherbot", directives: ["noindex"] },
+			],
+		);
+	});
+
+	it("does not mistake a directive's own colon for a crawler", () => {
+		/**
+		 * `unavailable_after` and the `max-*` family take values after a colon.
+		 * Reading the part before it as a crawler name would file real directives
+		 * under a crawler nobody named — and, worse, would move everything after
+		 * them into that invented scope.
+		 */
+		expect(
+			parseRobotsHeader("noindex, unavailable_after: 25 Jun 2010"),
+		).toEqual([
+			{
+				crawler: null,
+				directives: ["noindex", "unavailable_after: 25 jun 2010"],
+			},
+		]);
+	});
+
+	it("still reads a crawler it has never heard of", () => {
+		/**
+		 * The guard is a closed list of *directives*, not of crawlers, because the
+		 * two are open at opposite ends: anyone may run a crawler, and only the
+		 * specification names a directive.
+		 */
+		expect(parseRobotsHeader("some-new-bot: noindex")).toEqual([
+			{ crawler: "some-new-bot", directives: ["noindex"] },
+		]);
+	});
+
+	it("reports nothing for an empty header", () => {
+		expect(parseRobotsHeader("")).toEqual([]);
+		expect(parseRobotsHeader("  ,  ")).toEqual([]);
 	});
 });
 

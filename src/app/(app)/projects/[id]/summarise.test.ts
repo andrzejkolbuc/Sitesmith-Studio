@@ -317,4 +317,19 @@ describe("pagesInvolved for canonical findings", () => {
 			}),
 		).toEqual([`${B}/en/pricing`, `${B}/en/gone`]);
 	});
+
+	it("counts the single page a noindex finding names", () => {
+		expect(
+			pagesInvolved({
+				type: "noindex_present",
+				url: `${B}/en/staging`,
+				detail: {
+					url: `${B}/en/staging`,
+					channels: ["header"],
+					sources: [{ channel: "header", crawler: null, directive: "noindex" }],
+					indexingChannels: ["markup"],
+				},
+			}),
+		).toEqual([`${B}/en/staging`]);
+	});
 });

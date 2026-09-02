@@ -457,6 +457,57 @@ describe("detectMissingVariants against the fixture site", () => {
 		expect(missing).toHaveLength(1);
 		expect(missing[0]?.url).toBe(`${site.baseUrl}/meta/no-canonical`);
 	});
+
+	it("reports each page carrying a noindex, from whichever channel", async () => {
+		/**
+		 * Three fixture pages and no others. `/meta/complete` asks to be indexed on
+		 * both channels, so it is also the assertion that a page saying `index` is
+		 * not swept up by a rule reading the same two places.
+		 */
+		const { findings } = await detect();
+		const noindex = findings.filter(
+			(f) => f.type === FINDING_TYPES.NOINDEX_PRESENT,
+		);
+
+		expect(noindex.map((f) => f.url).sort()).toEqual([
+			`${site.baseUrl}/meta/noindex-header`,
+			`${site.baseUrl}/meta/noindex-markup`,
+			`${site.baseUrl}/meta/noindex-mixed`,
+		]);
+	});
+
+	it("names the channel that carried the directive, end to end", async () => {
+		const { findings } = await detect();
+		const at = (path: string) =>
+			findings.find(
+				(f) =>
+					f.type === FINDING_TYPES.NOINDEX_PRESENT &&
+					f.url === `${site.baseUrl}${path}`,
+			)?.detail;
+
+		expect(at("/meta/noindex-markup")).toMatchObject({
+			channels: ["markup"],
+			indexingChannels: [],
+		});
+
+		/**
+		 * Read from a real response header, which is the half of this requirement
+		 * that could not exist before the crawler kept one.
+		 */
+		expect(at("/meta/noindex-header")).toMatchObject({
+			channels: ["header"],
+			indexingChannels: [],
+		});
+
+		/**
+		 * The dangerous shape, whole: the header deindexes the page while the
+		 * markup everyone reads says `index`.
+		 */
+		expect(at("/meta/noindex-mixed")).toMatchObject({
+			channels: ["header"],
+			indexingChannels: ["markup"],
+		});
+	});
 });
 
 describe("detectMissingVariants edge cases", () => {

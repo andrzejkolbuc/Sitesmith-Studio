@@ -499,18 +499,18 @@ runs were judged.
 
 #### Automated
 
-- [x] 3.1 A page with two canonical tags naming different URLs produces exactly one finding
-- [x] 3.2 A canonical pointing at a 404 produces exactly one finding
-- [x] 3.3 A canonical chain (A→B where B→C) produces exactly one finding
-- [x] 3.4 A canonical differing from the page URL only by a trailing slash produces no finding
-- [x] 3.5 A canonical differing only by a query string produces no finding
-- [x] 3.6 A page with no canonical on a site using none produces no finding
-- [x] 3.7 A page with no canonical on a site using them elsewhere produces exactly one finding
-- [x] 3.8 A canonical pointing outside the crawl scope produces no unreached finding
-- [x] 3.9 Mutation: comparing un-normalised URLs fails the trailing-slash case
-- [x] 3.10 Mutation: removing the site-uses-canonicals narrowing fails the no-canonicals case
-- [x] 3.11 Every existing site-shape case passes unchanged
-- [x] 3.12 Type checking, linting and the whole suite pass
+- [x] 3.1 A page with two canonical tags naming different URLs produces exactly one finding — 96b43a8
+- [x] 3.2 A canonical pointing at a 404 produces exactly one finding — 96b43a8
+- [x] 3.3 A canonical chain (A→B where B→C) produces exactly one finding — 96b43a8
+- [x] 3.4 A canonical differing from the page URL only by a trailing slash produces no finding — 96b43a8
+- [x] 3.5 A canonical differing only by a query string produces no finding — 96b43a8
+- [x] 3.6 A page with no canonical on a site using none produces no finding — 96b43a8
+- [x] 3.7 A page with no canonical on a site using them elsewhere produces exactly one finding — 96b43a8
+- [x] 3.8 A canonical pointing outside the crawl scope produces no unreached finding — 96b43a8
+- [x] 3.9 Mutation: comparing un-normalised URLs fails the trailing-slash case — 96b43a8
+- [x] 3.10 Mutation: removing the site-uses-canonicals narrowing fails the no-canonicals case — 96b43a8
+- [x] 3.11 Every existing site-shape case passes unchanged — 96b43a8
+- [x] 3.12 Type checking, linting and the whole suite pass — 96b43a8
 
 #### Manual
 
@@ -520,17 +520,17 @@ runs were judged.
 
 #### Automated
 
-- [ ] 4.1 A page with `<meta name="robots" content="noindex">` produces exactly one finding naming markup as the source
-- [ ] 4.2 A page with only `X-Robots-Tag: noindex` produces exactly one finding naming the header
-- [ ] 4.3 A page with both produces exactly one finding naming both sources
-- [ ] 4.4 A page whose markup says index and header says noindex produces one finding recording the disagreement
-- [ ] 4.5 `content="none"` produces a finding
-- [ ] 4.6 A googlebot-scoped noindex produces a finding naming the crawler
-- [ ] 4.7 A page with `index,follow` on both channels produces no finding
-- [ ] 4.8 A broken page produces no finding
-- [ ] 4.9 Mutation: ignoring the header fails the header-only case
-- [ ] 4.10 Every existing site-shape case passes unchanged
-- [ ] 4.11 Type checking, linting and the whole suite pass
+- [x] 4.1 A page with `<meta name="robots" content="noindex">` produces exactly one finding naming markup as the source
+- [x] 4.2 A page with only `X-Robots-Tag: noindex` produces exactly one finding naming the header
+- [x] 4.3 A page with both produces exactly one finding naming both sources
+- [x] 4.4 A page whose markup says index and header says noindex produces one finding recording the disagreement
+- [x] 4.5 `content="none"` produces a finding
+- [x] 4.6 A googlebot-scoped noindex produces a finding naming the crawler
+- [x] 4.7 A page with `index,follow` on both channels produces no finding
+- [x] 4.8 A broken page produces no finding
+- [x] 4.9 Mutation: ignoring the header fails the header-only case
+- [x] 4.10 Every existing site-shape case passes unchanged
+- [x] 4.11 Type checking, linting and the whole suite pass
 
 #### Manual
 

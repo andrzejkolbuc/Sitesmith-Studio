@@ -52,6 +52,19 @@ const FINDING_LABEL: Record<string, string> = {
 	canonical_missing: "Pages declaring no canonical URL",
 	canonical_conflicting: "Canonical tags that disagree",
 	canonical_target_broken: "Canonical pointing somewhere broken",
+	noindex_present: "Pages asking not to be indexed",
+};
+
+/**
+ * The two channels a robots directive travels on, in the reader's words.
+ *
+ * Naming the channel is the whole instruction: the fix is to edit a template or
+ * a server config, and which one differs entirely by channel. "Header" alone
+ * would leave them looking for it in the page source.
+ */
+const CHANNEL_LABEL: Record<string, string> = {
+	markup: "the page markup",
+	header: "the X-Robots-Tag response header",
 };
 
 /**
@@ -856,6 +869,59 @@ function Evidence({
 					</div>
 				</>
 			);
+
+		case "noindex_present": {
+			const sources = Array.isArray(detail.sources)
+				? (detail.sources as Array<Record<string, unknown>>)
+				: [];
+			const indexing = Array.isArray(detail.indexingChannels)
+				? (detail.indexingChannels as string[])
+				: [];
+
+			/**
+			 * One line per source, naming the channel, the word found, and the
+			 * crawler when the directive was scoped to one. A reader has to know
+			 * which file to open, and a `googlebot`-scoped directive has a different
+			 * blast radius from a generic one.
+			 */
+			const lines = sources.map((source) => {
+				const channel = String(source.channel ?? "");
+				const crawler = source.crawler;
+				const scope =
+					typeof crawler === "string" ? ` (scoped to ${crawler})` : "";
+
+				return `${CHANNEL_LABEL[channel] ?? channel}${scope} — ${String(
+					source.directive ?? "noindex",
+				)}`;
+			});
+
+			return (
+				<>
+					<span className="text-ink">
+						This page asks search engines not to index it
+					</span>
+					<Listed items={lines} />
+					{indexing.length > 0 ? (
+						/**
+						 * The disagreement, stated rather than left implicit. It is why
+						 * nobody noticed: everyone reading the page source saw `index`,
+						 * and the channel that actually deindexed the page is one they
+						 * cannot see.
+						 */
+						<div className="mt-2 text-flag text-xs">
+							…while{" "}
+							{indexing
+								.map((channel) => CHANNEL_LABEL[channel] ?? channel)
+								.join(" and ")}{" "}
+							asks for it to be indexed
+						</div>
+					) : null}
+					<div className="mt-1.5 break-all font-mono text-ink-soft text-xs">
+						{pathOf(str("url"))}
+					</div>
+				</>
+			);
+		}
 
 		default:
 			return (

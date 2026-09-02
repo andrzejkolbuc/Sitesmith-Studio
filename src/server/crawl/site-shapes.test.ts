@@ -1859,3 +1859,203 @@ describe("canonical URLs", () => {
 		expect(findings[0]?.url).toBe(`${BASE}/en/b`);
 	});
 });
+
+describe("pages asking not to be indexed", () => {
+	const noindex = (finding: { type: string }) =>
+		finding.type === "noindex_present";
+
+	/** A generic `<meta name="robots">`, the shape the extractor produces. */
+	const markup = (...directives: string[]) => ({
+		robots: [{ crawler: null, directives }],
+	});
+
+	it("reports a noindex in markup, naming the channel", () => {
+		const findings = detailedFindingsFor({
+			pages: [page("/en/staging", { metadata: markup("noindex") })],
+		}).filter(noindex);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBe(`${BASE}/en/staging`);
+		expect(findings[0]?.detail).toMatchObject({
+			channels: ["markup"],
+			sources: [{ channel: "markup", crawler: null, directive: "noindex" }],
+			indexingChannels: [],
+		});
+	});
+
+	it("reports a noindex carried only by the response header", () => {
+		/**
+		 * The case a markup-only check is blind to, and the reason `CrawledPage`
+		 * keeps a header at all. A `noindex` served at the CDN or framework layer
+		 * is invisible in page source — everyone reviewing the page sees nothing
+		 * wrong while the site is being removed from search.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [page("/en/staging", { xRobotsTag: "noindex" })],
+		}).filter(noindex);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail).toMatchObject({
+			channels: ["header"],
+			sources: [{ channel: "header", crawler: null, directive: "noindex" }],
+			indexingChannels: [],
+		});
+	});
+
+	it("reports both channels in one finding when both carry it", () => {
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/en/staging", {
+					metadata: markup("noindex"),
+					xRobotsTag: "noindex",
+				}),
+			],
+		}).filter(noindex);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail).toMatchObject({
+			channels: ["header", "markup"],
+			indexingChannels: [],
+		});
+	});
+
+	it("records the disagreement when the markup says index and the header does not", () => {
+		/**
+		 * The dangerous shape, and the reason disagreement is evidence rather than
+		 * a finding of its own: the outcome is identical — the page is deindexed —
+		 * but this is what explains why nobody noticed.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/en/staging", {
+					metadata: markup("index", "follow"),
+					xRobotsTag: "noindex",
+				}),
+			],
+		}).filter(noindex);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail).toMatchObject({
+			channels: ["header"],
+			indexingChannels: ["markup"],
+		});
+	});
+
+	it("treats content=none as a noindex, quoting the word published", () => {
+		/**
+		 * `none` is defined as equivalent to `noindex, nofollow`. The equivalence
+		 * is vocabulary the rule applies; the evidence stays the word the site
+		 * actually wrote, so a reader searching their template can find it.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [page("/en/staging", { metadata: markup("none") })],
+		}).filter(noindex);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail).toMatchObject({
+			sources: [{ channel: "markup", crawler: null, directive: "none" }],
+		});
+	});
+
+	it("names the crawler a scoped directive was addressed to", () => {
+		/**
+		 * A `googlebot`-scoped noindex and a generic one have different blast
+		 * radii, and a finding that cannot say which it saw is asking the reader
+		 * to go and look.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/en/staging", {
+					metadata: {
+						robots: [{ crawler: "googlebot", directives: ["noindex"] }],
+					},
+				}),
+			],
+		}).filter(noindex);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail).toMatchObject({
+			sources: [
+				{ channel: "markup", crawler: "googlebot", directive: "noindex" },
+			],
+		});
+	});
+
+	it("names the crawler a scoped header was addressed to", () => {
+		const findings = detailedFindingsFor({
+			pages: [page("/en/staging", { xRobotsTag: "googlebot: noindex" })],
+		}).filter(noindex);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail).toMatchObject({
+			sources: [
+				{ channel: "header", crawler: "googlebot", directive: "noindex" },
+			],
+		});
+	});
+
+	it("says nothing about a page both channels ask to be indexed", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/pricing", {
+						metadata: markup("index", "follow"),
+						xRobotsTag: "index, follow",
+					}),
+				],
+			}).filter(noindex),
+		).toEqual([]);
+	});
+
+	it("says nothing about a page that declared nothing either way", () => {
+		expect(
+			detailedFindingsFor({ pages: [page("/en/pricing")] }).filter(noindex),
+		).toEqual([]);
+	});
+
+	it("says nothing about a page that failed", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/gone", {
+						status: 404,
+						metadata: markup("noindex"),
+						xRobotsTag: "noindex",
+					}),
+				],
+			}).filter(noindex),
+		).toEqual([]);
+	});
+
+	it("still reports a header noindex on a response that was not HTML", () => {
+		/**
+		 * Deliberately *not* skipped, unlike every other metadata rule. Serving
+		 * `X-Robots-Tag` on a PDF is the header's textbook use, so this is exactly
+		 * where it is the only channel available — a rule skipping non-HTML would
+		 * be blind precisely where the header matters most.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/brochure", {
+						content: { isHtml: false },
+						xRobotsTag: "noindex",
+					}),
+				],
+			}).filter(noindex),
+		).toHaveLength(1);
+	});
+
+	it("still reports what it saw on a crawl that stopped early", () => {
+		/**
+		 * No `crawlComplete` guard, and none is wanted: the evidence is on the page
+		 * in front of us rather than in the shape of what we reached.
+		 */
+		expect(
+			detailedFindingsFor({
+				crawlComplete: false,
+				pages: [page("/en/staging", { xRobotsTag: "noindex" })],
+			}).filter(noindex),
+		).toHaveLength(1);
+	});
+});

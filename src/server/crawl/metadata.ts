@@ -192,6 +192,91 @@ export function parseRobotsDirectives(content: string): string[] {
 	return [...seen];
 }
 
+/**
+ * Directive names the robots vocabulary defines.
+ *
+ * Closed around *directives* rather than around crawler names — the opposite
+ * way round from `ROBOTS_META_NAMES` above, because the two lists are open at
+ * opposite ends. Anyone may name a crawler; only the specification names a
+ * directive. Read only by the header parser below, which needs to tell
+ * `googlebot: noindex` (a crawler and its instruction) from
+ * `unavailable_after: 25 Jun 2010` (one instruction that happens to contain a
+ * colon).
+ */
+const ROBOTS_DIRECTIVE_NAMES = new Set([
+	"all",
+	"noindex",
+	"index",
+	"nofollow",
+	"follow",
+	"none",
+	"noarchive",
+	"nosnippet",
+	"notranslate",
+	"noimageindex",
+	"nositelinkssearchbox",
+	"indexifembedded",
+	"max-snippet",
+	"max-image-preview",
+	"max-video-preview",
+	"unavailable_after",
+]);
+
+/**
+ * `X-Robots-Tag`, which carries the meta tag's vocabulary plus a scope.
+ *
+ * The header may name the crawler it speaks to — `googlebot: noindex` — and a
+ * server joining several rules into one response line produces a value holding
+ * more than one scope. A flat comma split reads `googlebot: noindex` as a
+ * single unrecognised token and finds no `noindex` in it, which is the one
+ * failure this whole requirement exists to prevent: a page reported clean while
+ * it is deindexed.
+ *
+ * A scope applies from where it appears until the next one, which is how the
+ * header reads when those rules are joined. Directives before any scope speak
+ * to everyone, and arrive with a null crawler — the same shape the generic
+ * `<meta name="robots">` produces, so a rule reading both channels compares
+ * like with like.
+ */
+export function parseRobotsHeader(value: string): RobotsDirective[] {
+	const scopes: RobotsDirective[] = [];
+	let crawler: string | null = null;
+
+	const record = (directive: string): void => {
+		if (directive === "") return;
+		let scope = scopes.find((entry) => entry.crawler === crawler);
+		if (!scope) {
+			scope = { crawler, directives: [] };
+			scopes.push(scope);
+		}
+		if (!scope.directives.includes(directive)) scope.directives.push(directive);
+	};
+
+	for (const token of value.split(",")) {
+		const trimmed = token.trim().toLowerCase();
+		if (trimmed === "") continue;
+
+		const colon = trimmed.indexOf(":");
+		const prefix = colon > 0 ? trimmed.slice(0, colon).trim() : null;
+
+		/**
+		 * A colon after something that is not a directive name is a crawler
+		 * saying who the rest is for. Guarding on the directive list rather than
+		 * on a list of crawlers keeps an unfamiliar crawler working — its `noindex`
+		 * still counts — while `max-snippet: 50` stays one directive.
+		 */
+		if (prefix !== null && !ROBOTS_DIRECTIVE_NAMES.has(prefix)) {
+			crawler = prefix;
+			record(trimmed.slice(colon + 1).trim());
+			continue;
+		}
+
+		record(trimmed);
+	}
+
+	return scopes;
+}
+
 /** The metadata of a page that published none — and of one that never loaded. */
 export function emptyMetadata(): PageMetadata {
 	return { title: null, description: null, canonicals: [], robots: [] };
