@@ -218,3 +218,38 @@ describe("pagesInvolved for a structure difference", () => {
 		).toHaveLength(3);
 	});
 });
+
+describe("pagesInvolved for metadata findings", () => {
+	const B = "https://shop.test";
+
+	it("counts every page carrying a duplicated string", () => {
+		/**
+		 * A duplicate is a problem about a set of pages, and this kind carries no
+		 * `url` at all — so without a case here it would fall through to the
+		 * default and report a problem touching nothing, which is the failure this
+		 * mapping exists to prevent.
+		 */
+		expect(
+			pagesInvolved({
+				type: "metadata_duplicated",
+				url: null,
+				detail: {
+					field: "title",
+					language: "en",
+					value: "Legal information",
+					urls: [`${B}/en/legal`, `${B}/en/privacy`, `${B}/en/terms`],
+				},
+			}),
+		).toHaveLength(3);
+	});
+
+	it("counts the single page a missing-metadata finding names", () => {
+		expect(
+			pagesInvolved({
+				type: "metadata_missing",
+				url: `${B}/en/bare`,
+				detail: { url: `${B}/en/bare`, fields: ["title", "description"] },
+			}),
+		).toEqual([`${B}/en/bare`]);
+	});
+});

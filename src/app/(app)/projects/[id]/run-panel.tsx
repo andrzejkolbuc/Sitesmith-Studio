@@ -47,6 +47,19 @@ const FINDING_LABEL: Record<string, string> = {
 	variant_diverged: "One variant broken, its siblings fine",
 	content_untranslated: "Content that was never translated",
 	content_structure_differs: "Variants that do not contain the same things",
+	metadata_missing: "Pages missing a title or description",
+	metadata_duplicated: "One title or description on several pages",
+};
+
+/**
+ * Metadata fields in the reader's words.
+ *
+ * The stored value is the markup's name for the thing; what to call it on
+ * screen is a presentation decision, the same split `MARKER_LABEL` makes.
+ */
+const FIELD_LABEL: Record<string, string> = {
+	title: "title",
+	description: "meta description",
 };
 
 /** Block types in the reader's words, for the structure comparison. */
@@ -710,6 +723,50 @@ function Evidence({
 						things
 					</span>
 					<Listed items={lines} />
+				</>
+			);
+		}
+
+		case "metadata_missing": {
+			const fields = Array.isArray(detail.fields)
+				? (detail.fields as string[])
+				: [];
+
+			return (
+				<>
+					<span className="text-ink">
+						This page publishes no{" "}
+						{fields
+							.map((field) => FIELD_LABEL[field] ?? field)
+							.join(" and no ")}
+					</span>
+					<div className="mt-1.5 break-all font-mono text-ink-soft text-xs">
+						{pathOf(str("url"))}
+					</div>
+				</>
+			);
+		}
+
+		case "metadata_duplicated": {
+			const urls = Array.isArray(detail.urls) ? (detail.urls as string[]) : [];
+			const field = str("field") ?? "";
+
+			/**
+			 * The shared string itself, quoted. Which pages and which field are only
+			 * half an instruction — the reader has to know *what* they are looking
+			 * for before opening any of them, and the value is the thing they will
+			 * search their CMS for.
+			 */
+			return (
+				<>
+					<span className="text-ink">
+						{urls.length} <Tag tone="flag">{str("language") ?? "?"}</Tag> pages
+						share one {FIELD_LABEL[field] ?? field}
+					</span>
+					<div className="mt-1.5 max-w-prose text-ink-soft text-xs italic">
+						“{str("value")}”
+					</div>
+					<Listed items={urls.map(pathOf)} />
 				</>
 			);
 		}

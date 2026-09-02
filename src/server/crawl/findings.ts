@@ -34,6 +34,10 @@ export const FINDING_TYPES = {
 	CONTENT_UNTRANSLATED: "content_untranslated",
 	/** A family whose variants disagree about what their content contains. */
 	CONTENT_STRUCTURE_DIFFERS: "content_structure_differs",
+	/** A page that published no title, or no meta description. */
+	METADATA_MISSING: "metadata_missing",
+	/** Pages in one language publishing the same title or description. */
+	METADATA_DUPLICATED: "metadata_duplicated",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -670,6 +674,119 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 					groupKey: family.groupKey,
 					memberUrls: comparable.map((m) => m.url).sort(),
 					differences,
+				},
+			});
+		}
+	}
+
+	// ── Rule 9: a page that published no title or no description ──────────────
+	//
+	// FR-021's plainest signal and entirely the site's own assertion: the tag is
+	// absent, or it is there and empty. Those are the same fact to a search
+	// engine, so the extractor already reduces both to null and this rule does
+	// not need to know there were ever two shapes.
+	//
+	// One finding per page, never one per field. A head that was never filled in
+	// is one defect, and splitting it would put the same page in the same list
+	// twice — the double-report the rest of this file spends its length
+	// avoiding.
+	for (const page of [...pages].sort((a, b) => a.url.localeCompare(b.url))) {
+		if (isError(page)) continue;
+		/**
+		 * A PDF or a feed has no `<title>` element and never should. Reporting one
+		 * as missing its title would be a finding about the format the URL serves
+		 * rather than about anything the site got wrong.
+		 */
+		if (!page.content.isHtml) continue;
+
+		const fields: string[] = [];
+		if (page.metadata.title === null) fields.push("title");
+		if (page.metadata.description === null) fields.push("description");
+		if (fields.length === 0) continue;
+
+		findings.push({
+			type: FINDING_TYPES.METADATA_MISSING,
+			url: page.url,
+			detail: { url: page.url, fields },
+		});
+	}
+
+	// ── Rule 10: one title or description published on several pages ──────────
+	//
+	// FR-021's second signal, and the one with a confirmed defect behind it: a
+	// template fallback nobody filled in serves the homepage's title on a legal
+	// page. Reported once per duplicated *string* and never once per page,
+	// following rule 7's shape — two pages sharing a title is one problem, and
+	// naming it from each side would be the double-report rule 6 was written to
+	// collapse.
+	//
+	// **Scoped to a language.** Two locale variants legitimately share a title —
+	// a brand or product name — and a page whose German copy is byte-identical
+	// to its English is already reported by rule 7. Without this scope the same
+	// defect arrives twice under two headings, and honest translations that
+	// share a proper noun arrive as a defect at all.
+	//
+	// Compared on the primary subtag, for the reason `satisfies` treats a
+	// regional refinement as answering for its language: `en` and `en-gb` pages
+	// sharing a title compete for the same query, which is the whole reason
+	// duplicate titles matter.
+	//
+	// Only on a crawl that finished. The finding's substance is a list of every
+	// page carrying the string, and a truncated run can hold one member of a
+	// pair and not the other — so the list would describe where we stopped
+	// rather than what the site publishes.
+	if (crawlComplete) {
+		const byValue = new Map<
+			string,
+			{ field: string; language: string; value: string; urls: string[] }
+		>();
+
+		for (const page of [...pages].sort((a, b) => a.url.localeCompare(b.url))) {
+			if (isError(page)) continue;
+
+			/**
+			 * A page whose language nothing established cannot be said to duplicate
+			 * another *in that language* — there is no language to have shared. The
+			 * same refusal rule 7 makes, and for the same reason: comparing them
+			 * anyway would be a claim about our guess rather than about the site.
+			 */
+			const locale = variants.get(page.url)?.locale;
+			if (!locale) continue;
+			const language = locale.split(/[-_]/)[0] ?? locale;
+
+			for (const [field, value] of [
+				["title", page.metadata.title],
+				["description", page.metadata.description],
+			] as const) {
+				if (value === null) continue;
+
+				/**
+				 * Serialised rather than concatenated with a separator. A title can
+				 * contain any character at all, so any delimiter chosen here is a
+				 * delimiter a page could publish — and two different strings would
+				 * then key alike and be reported as one duplicate.
+				 */
+				const key = JSON.stringify([field, language, value]);
+				const entry = byValue.get(key) ?? { field, language, value, urls: [] };
+				entry.urls.push(page.url);
+				byValue.set(key, entry);
+			}
+		}
+
+		for (const [, entry] of [...byValue.entries()].sort(([a], [b]) =>
+			a.localeCompare(b),
+		)) {
+			// One page publishing a string is a page publishing a string.
+			if (entry.urls.length < 2) continue;
+
+			findings.push({
+				type: FINDING_TYPES.METADATA_DUPLICATED,
+				url: null,
+				detail: {
+					field: entry.field,
+					language: entry.language,
+					value: entry.value,
+					urls: [...entry.urls].sort(),
 				},
 			});
 		}

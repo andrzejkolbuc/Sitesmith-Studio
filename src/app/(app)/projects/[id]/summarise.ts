@@ -92,6 +92,18 @@ export function pagesInvolved(finding: {
 		case "content_structure_differs":
 			return strings(detail.memberUrls);
 
+		case "metadata_missing":
+			return one(detail.url);
+
+		/**
+		 * Every page carrying the duplicated string, not the one the finding is
+		 * filed against — it is filed against none. A duplicate is a problem about
+		 * a set of pages, and counting one of them would understate exactly the
+		 * thing that makes it a problem.
+		 */
+		case "metadata_duplicated":
+			return strings(detail.urls);
+
 		default:
 			// An unmapped type still counts the page it names, so a new finding
 			// never reports as affecting nothing.

@@ -64,7 +64,22 @@ const page = (
 	),
 	links: [],
 	content: { ...emptyContent(true), ...options.content },
-	metadata: { ...emptyMetadata(), ...options.metadata },
+	metadata: {
+		...emptyMetadata(),
+		/**
+		 * A unique title and description by default, so the metadata rules stay
+		 * quiet about the many cases here that exist to exercise something else.
+		 * Without them every hreflang shape below would also report a missing
+		 * title, and the cases that *are* about metadata would be lost among them.
+		 *
+		 * A case that means "this page published none" says so with an explicit
+		 * null, which is the shape the extractor produces for both an absent tag
+		 * and an empty one.
+		 */
+		title: `Title of ${path}`,
+		description: `Description of ${path}`,
+		...options.metadata,
+	},
 	xRobotsTag: options.xRobotsTag ?? null,
 	fetchError: null,
 });
@@ -1339,5 +1354,230 @@ describe("variants that do not contain the same things", () => {
 
 		expect(findings).toHaveLength(1);
 		expect(findings[0]?.detail.differences).toHaveLength(2);
+	});
+});
+
+/**
+ * Rules 9 and 10, against shapes they were not written for.
+ *
+ * FR-021's two trustworthy signals. Both are the site's own assertion — a tag is
+ * absent, or one string appears on two pages — which is what makes them
+ * shippable while the length signal is not. The risk they carry is the usual
+ * one: reporting a legitimate practice as a defect, and in particular calling
+ * two locale variants that share a brand name a duplicate.
+ */
+describe("titles and descriptions", () => {
+	const missing = (finding: { type: string }) =>
+		finding.type === "metadata_missing";
+	const duplicated = (finding: { type: string }) =>
+		finding.type === "metadata_duplicated";
+
+	it("reports a page that published no title, naming the field", () => {
+		const findings = detailedFindingsFor({
+			pages: [page("/en/pricing", { metadata: { title: null } })],
+		}).filter(missing);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBe(`${BASE}/en/pricing`);
+		expect(findings[0]?.detail.fields).toEqual(["title"]);
+	});
+
+	it("reports a description tag that is present but empty", () => {
+		/**
+		 * `content=""` and no tag at all are the same fact to a search engine, and
+		 * the extractor already reduces both to null — so by the time a rule sees
+		 * one there is a single shape rather than two. That is deliberate: a rule
+		 * that had to know about both would eventually handle only one.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [page("/en/pricing", { metadata: { description: null } })],
+		}).filter(missing);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail.fields).toEqual(["description"]);
+	});
+
+	it("reports a page missing both fields once, not twice", () => {
+		/**
+		 * A head that was never filled in is one defect. Two findings would put the
+		 * same page in the same list twice, which is the double-report this file
+		 * spends its length avoiding.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/en/pricing", { metadata: { title: null, description: null } }),
+			],
+		}).filter(missing);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail.fields).toEqual(["title", "description"]);
+	});
+
+	it("says nothing about a page that published both", () => {
+		expect(
+			detailedFindingsFor({ pages: [page("/en/pricing")] }).filter(missing),
+		).toEqual([]);
+	});
+
+	it("says nothing about a page that failed", () => {
+		/**
+		 * A page that 404s served no head, so every metadata rule would rank it as
+		 * maximally defective — while rule 2 is already describing it correctly and
+		 * more usefully.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/gone", {
+						status: 404,
+						metadata: { title: null, description: null },
+					}),
+					page("/en/down", {
+						status: 500,
+						metadata: { title: null, description: null },
+					}),
+				],
+			}).filter(missing),
+		).toEqual([]);
+	});
+
+	it("says nothing about a response that was never HTML", () => {
+		/**
+		 * A PDF has no `<title>` element and never should. Reporting one would be a
+		 * finding about the format the URL serves rather than about the site.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/brochure", {
+						content: { isHtml: false },
+						metadata: { title: null, description: null },
+					}),
+				],
+			}).filter(missing),
+		).toEqual([]);
+	});
+
+	it("reports two same-language pages sharing a title, once, naming both", () => {
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/en/legal", { metadata: { title: "Yazaki EMEA" } }),
+				page("/en/privacy", { metadata: { title: "Yazaki EMEA" } }),
+			],
+		}).filter(duplicated);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBeNull();
+		expect(findings[0]?.detail).toMatchObject({
+			field: "title",
+			language: "en",
+			value: "Yazaki EMEA",
+			urls: [`${BASE}/en/legal`, `${BASE}/en/privacy`],
+		});
+	});
+
+	it("reports a shared description the same way", () => {
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/en/legal", {
+					metadata: { description: "Discover Yazaki EMEA" },
+				}),
+				page("/en/privacy", {
+					metadata: { description: "Discover Yazaki EMEA" },
+				}),
+			],
+		}).filter(duplicated);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail.field).toBe("description");
+	});
+
+	it("says nothing about two languages sharing one title", () => {
+		/**
+		 * The negative assertion this rule rests on. A brand or product name is the
+		 * same word in every locale, and a page whose German copy really is the
+		 * English one is already reported by rule 7 — so an unscoped rule would
+		 * report honest translations as defective and genuine ones twice.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/about", { metadata: { title: "Yazaki" } }),
+					page("/de/about", { metadata: { title: "Yazaki" } }),
+				],
+			}).filter(duplicated),
+		).toEqual([]);
+	});
+
+	it("treats a regional refinement as the language it refines", () => {
+		/**
+		 * `en` and `en-gb` pages sharing a title compete for the same query, which
+		 * is the whole reason duplicate titles matter. The same reading `satisfies`
+		 * applies when deciding whether a family publishes a language.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/legal", { metadata: { title: "Legal information" } }),
+					page("/en-gb/legal", { metadata: { title: "Legal information" } }),
+				],
+			}).filter(duplicated),
+		).toHaveLength(1);
+	});
+
+	it("never reports a page whose language nothing established", () => {
+		/**
+		 * Two pages with no locale in the URL and no hreflang. They may well share a
+		 * title, but "in the same language" is our guess rather than the site's
+		 * statement — and a finding resting on a guess is a claim about us.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/legal", { metadata: { title: "Legal information" } }),
+					page("/privacy", { metadata: { title: "Legal information" } }),
+				],
+			}).filter(duplicated),
+		).toEqual([]);
+	});
+
+	it("says nothing about a duplicate on a truncated crawl", () => {
+		/**
+		 * The finding's substance is the list of pages carrying the string, and a
+		 * run that stopped at its ceiling can hold one member of a pair and not the
+		 * other — so the list would describe where we stopped rather than what the
+		 * site publishes.
+		 */
+		expect(
+			detailedFindingsFor({
+				crawlComplete: false,
+				pages: [
+					page("/en/legal", { metadata: { title: "Yazaki EMEA" } }),
+					page("/en/privacy", { metadata: { title: "Yazaki EMEA" } }),
+				],
+			}).filter(duplicated),
+		).toEqual([]);
+	});
+
+	it("does not count a failed page towards a duplicate", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/legal", { metadata: { title: "Yazaki EMEA" } }),
+					page("/en/privacy", {
+						status: 404,
+						metadata: { title: "Yazaki EMEA" },
+					}),
+				],
+			}).filter(duplicated),
+		).toEqual([]);
+	});
+
+	it("says nothing when every page published its own title", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [page("/en/legal"), page("/en/privacy"), page("/de/impressum")],
+			}).filter(duplicated),
+		).toEqual([]);
 	});
 });

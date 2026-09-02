@@ -27,7 +27,14 @@ const page = (
 	hreflangTargets,
 	links: [],
 	content: emptyContent(true),
-	metadata: emptyMetadata(),
+	/**
+	 * A title and description by default, unique to the URL.
+	 *
+	 * Without them every page built here would also report a missing title, and
+	 * the cases below — which are about grouping and about locales — would be
+	 * asserting on a metadata rule they were never written for.
+	 */
+	metadata: { ...emptyMetadata(), title: url, description: `About ${url}` },
 	xRobotsTag: null,
 	fetchError: null,
 });
@@ -317,6 +324,86 @@ describe("detectMissingVariants against the fixture site", () => {
 				? (f.detail.memberUrls as string[])
 				: [];
 			return members.some((url) => family.includes(url));
+		});
+
+		expect(about).toEqual([]);
+	});
+
+	it("reports the one page that published no title and no description", async () => {
+		const { findings } = await detect();
+		const missing = findings.filter(
+			(f) => f.type === FINDING_TYPES.METADATA_MISSING,
+		);
+
+		/**
+		 * Every other fixture page carries a title and a description, so this is
+		 * also the assertion that the rule stays quiet about the thirty pages that
+		 * exist to exercise something else.
+		 */
+		expect(missing).toHaveLength(1);
+		expect(missing[0]?.url).toBe(`${site.baseUrl}/meta/bare`);
+		expect(missing[0]?.detail.fields).toEqual(["title", "description"]);
+	});
+
+	it("reports the two English pages sharing a title, once", async () => {
+		/**
+		 * End to end from real HTML: the fixture serves `/meta/twin-a` and
+		 * `/meta/twin-b` one title between them, which is the defect confirmed on
+		 * the client site in miniature. One finding naming both pages — not one
+		 * finding per page.
+		 */
+		const { findings } = await detect();
+		const duplicated = findings.filter(
+			(f) => f.type === FINDING_TYPES.METADATA_DUPLICATED,
+		);
+
+		expect(duplicated).toHaveLength(1);
+		expect(duplicated[0]?.detail).toMatchObject({
+			field: "title",
+			language: "en",
+			value: "Legal information",
+			urls: [`${site.baseUrl}/meta/twin-a`, `${site.baseUrl}/meta/twin-b`],
+		});
+	});
+
+	it("says nothing about two languages sharing one title", async () => {
+		/**
+		 * `/meta/cross-en` and `/meta/cross-de` both publish "Yazaki". A brand name
+		 * is the same word in every locale, and rule 7 already reports a page whose
+		 * German copy really is the English one — so this pair must stay silent, or
+		 * the rule reports honest translations as defective.
+		 */
+		const { findings } = await detect();
+		const pair = [
+			`${site.baseUrl}/meta/cross-en`,
+			`${site.baseUrl}/meta/cross-de`,
+		];
+
+		const about = findings.filter((f) => {
+			const urls = Array.isArray(f.detail.urls)
+				? (f.detail.urls as string[])
+				: [];
+			return pair.includes(f.url ?? "") || urls.some((u) => pair.includes(u));
+		});
+
+		expect(about).toEqual([]);
+	});
+
+	it("says nothing about the page whose metadata is complete", async () => {
+		/**
+		 * The negative assertion for the whole slice. `/meta/complete` publishes a
+		 * unique title, a unique description, a self-referential canonical and
+		 * directives asking to be indexed. If it ever appears in a finding, a rule
+		 * has started reporting a correctly configured page.
+		 */
+		const { findings } = await detect();
+		const complete = `${site.baseUrl}/meta/complete`;
+
+		const about = findings.filter((f) => {
+			const urls = Array.isArray(f.detail.urls)
+				? (f.detail.urls as string[])
+				: [];
+			return f.url === complete || urls.includes(complete);
 		});
 
 		expect(about).toEqual([]);

@@ -462,13 +462,13 @@ runs were judged.
 
 #### Automated
 
-- [x] 1.1 Extractor unit tests pass across title, description, canonical, robots tokens and absent cases
-- [x] 1.2 A relative canonical resolves against the page URL, not the requested URL
-- [x] 1.3 Title and description are length-capped at capture
-- [x] 1.4 Existing crawler, politeness and run tests pass
-- [x] 1.5 Type checking passes: `npm run typecheck`
-- [x] 1.6 Linting passes: `npm run check`
-- [x] 1.7 Whole suite passes: `npm run test:all`
+- [x] 1.1 Extractor unit tests pass across title, description, canonical, robots tokens and absent cases — 0bdf817
+- [x] 1.2 A relative canonical resolves against the page URL, not the requested URL — 0bdf817
+- [x] 1.3 Title and description are length-capped at capture — 0bdf817
+- [x] 1.4 Existing crawler, politeness and run tests pass — 0bdf817
+- [x] 1.5 Type checking passes: `npm run typecheck` — 0bdf817
+- [x] 1.6 Linting passes: `npm run check` — 0bdf817
+- [x] 1.7 Whole suite passes: `npm run test:all` — 0bdf817
 
 #### Manual
 
@@ -478,18 +478,18 @@ runs were judged.
 
 #### Automated
 
-- [ ] 2.1 A page with no title produces exactly one finding naming the title
-- [ ] 2.2 A page with an empty-string description produces a finding
-- [ ] 2.3 Two same-language pages sharing a title produce exactly one finding naming both
-- [ ] 2.4 Two different-language pages sharing a title produce no finding
-- [ ] 2.5 A page whose language is unknown is never reported as a duplicate
-- [ ] 2.6 A broken page produces no metadata findings
-- [ ] 2.7 A truncated crawl produces no duplicate findings
-- [ ] 2.8 Mutation: removing the language scope fails the cross-language case
-- [ ] 2.9 Mutation: reporting per page rather than per string fails the pair case
-- [ ] 2.10 Every existing site-shape case passes unchanged
-- [ ] 2.11 `pagesInvolved` counts every page of a duplicate finding
-- [ ] 2.12 Type checking, linting and the whole suite pass
+- [x] 2.1 A page with no title produces exactly one finding naming the title
+- [x] 2.2 A page with an empty-string description produces a finding
+- [x] 2.3 Two same-language pages sharing a title produce exactly one finding naming both
+- [x] 2.4 Two different-language pages sharing a title produce no finding
+- [x] 2.5 A page whose language is unknown is never reported as a duplicate
+- [x] 2.6 A broken page produces no metadata findings
+- [x] 2.7 A truncated crawl produces no duplicate findings
+- [x] 2.8 Mutation: removing the language scope fails the cross-language case
+- [x] 2.9 Mutation: reporting per page rather than per string fails the pair case
+- [x] 2.10 Every existing site-shape case passes unchanged
+- [x] 2.11 `pagesInvolved` counts every page of a duplicate finding
+- [x] 2.12 Type checking, linting and the whole suite pass
 
 #### Manual
 
