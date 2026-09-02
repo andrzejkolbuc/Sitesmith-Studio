@@ -472,7 +472,7 @@ runs were judged.
 
 #### Manual
 
-- [ ] 1.8 A fixture crawl records metadata matching what each fixture page declares, including the header-only page
+- [x] 1.8 A fixture crawl records metadata matching what each fixture page declares, including the header-only page
 
 ### Phase 2: FR-021 — missing and duplicated metadata
 
@@ -493,7 +493,7 @@ runs were judged.
 
 #### Manual
 
-- [ ] 2.13 The duplicate finding reads as actionable — which pages, which field, and what they share
+- [x] 2.13 The duplicate finding reads as actionable — which pages, which field, and what they share
 
 ### Phase 3: FR-022 — canonical problems
 
@@ -514,7 +514,7 @@ runs were judged.
 
 #### Manual
 
-- [ ] 3.13 A canonical finding names both the page and the target without the reader opening the crawl
+- [x] 3.13 A canonical finding names both the page and the target without the reader opening the crawl
 
 ### Phase 4: FR-023 — noindex
 
@@ -534,7 +534,7 @@ runs were judged.
 
 #### Manual
 
-- [ ] 4.12 The finding makes clear which channel to edit to fix it
+- [x] 4.12 The finding makes clear which channel to edit to fix it
 
 ### Phase 5: Proof against a real client site
 
@@ -546,9 +546,9 @@ runs were judged.
 
 - [x] 5.2 The crawl completes without aborting, at a page count consistent with previous runs
 - [x] 5.3 The known duplicate-title defect on the legal pages is reported
-- [ ] 5.4 Every `metadata_missing` finding names a page genuinely lacking that field
-- [ ] 5.5 Every `canonical_*` finding names a real canonical problem
-- [ ] 5.6 Every `noindex_present` finding names a page that genuinely carries the directive
-- [ ] 5.7 No page a human considers correctly configured is reported
-- [ ] 5.8 The findings list is still readable — six new rules have not swamped the existing eight
-- [ ] 5.9 The S-05 outcome is recorded and `change.md` moved to `implemented`
+- [x] 5.4 Every `metadata_missing` finding names a page genuinely lacking that field
+- [x] 5.5 Every `canonical_*` finding names a real canonical problem
+- [x] 5.6 Every `noindex_present` finding names a page that genuinely carries the directive
+- [x] 5.7 No page a human considers correctly configured is reported
+- [x] 5.8 The findings list is still readable — six new rules have not swamped the existing eight
+- [x] 5.9 The S-05 outcome is recorded and `change.md` moved to `implemented`
