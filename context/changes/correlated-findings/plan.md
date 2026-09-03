@@ -495,11 +495,11 @@ the next time they are viewed, because the rule reads only rows the crawl alread
 
 #### Automated
 
-- [x] 2.1 Unit tests pass: `npm run test:unit`
-- [x] 2.2 Type checking passes: `npm run typecheck`
-- [x] 2.3 Lint and format pass: `npm run check`
-- [x] 2.4 The partition invariant is asserted: every input finding appears in exactly one of `problems` or `remainder`
-- [x] 2.5 Every `CorrelationShape` variant is exercised by at least one shape test
+- [x] 2.1 Unit tests pass: `npm run test:unit` — af8bf57
+- [x] 2.2 Type checking passes: `npm run typecheck` — af8bf57
+- [x] 2.3 Lint and format pass: `npm run check` — af8bf57
+- [x] 2.4 The partition invariant is asserted: every input finding appears in exactly one of `problems` or `remainder` — af8bf57
+- [x] 2.5 Every `CorrelationShape` variant is exercised by at least one shape test — af8bf57
 
 #### Manual
 
@@ -509,10 +509,10 @@ the next time they are viewed, because the rule reads only rows the crawl alread
 
 #### Automated
 
-- [ ] 3.1 Type checking passes: `npm run typecheck`
-- [ ] 3.2 Lint and format pass: `npm run check`
-- [ ] 3.3 Unit tests pass: `npm run test:unit`
-- [ ] 3.4 Integration tests pass: `npm run test:integration`
+- [x] 3.1 Type checking passes: `npm run typecheck`
+- [x] 3.2 Lint and format pass: `npm run check`
+- [x] 3.3 Unit tests pass: `npm run test:unit`
+- [x] 3.4 Integration tests pass: `npm run test:integration`
 
 #### Manual
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { api } from "~/trpc/react";
+import { type CorrelatedProblem, correlate } from "./correlate";
 import { buildParity, type Cell } from "./parity";
 import { countPages, summariseList } from "./summarise";
 
@@ -192,6 +193,20 @@ export function RunPanel({
 		{ enabled: settled },
 	);
 
+	/**
+	 * The domain rule, run over rows both queries already fetched.
+	 *
+	 * Read time rather than at detection: the rule is young, and freezing its
+	 * output into the run would mean every improvement to it left old runs
+	 * describing a site by a rule nobody would write today. Cheap enough that the
+	 * question does not arise — a few hundred findings against a few hundred
+	 * pages, with a hash lookup per URL.
+	 */
+	const correlated = useMemo(
+		() => correlate(findings.data ?? [], pages.data ?? []),
+		[findings.data, pages.data],
+	);
+
 	const startRun = api.project.startRun.useMutation({
 		onMutate: () => setStartError(null),
 		onSuccess: async () => {
@@ -269,10 +284,21 @@ export function RunPanel({
 				<ParityGrid expectedLocales={expectedLocales} pages={pages.data} />
 			) : null}
 
-			{settled ? (
+			{settled && correlated.problems.length > 0 ? (
+				<Problems problems={correlated.problems} />
+			) : null}
+
+			{/*
+			 * The list below shows what was not folded into a problem, so that every
+			 * finding appears exactly once. It is skipped entirely when correlation
+			 * accounted for all of them — otherwise its own empty state would read
+			 * "Nothing found" on a run that found plenty.
+			 */}
+			{settled &&
+			(correlated.remainder.length > 0 || correlated.problems.length === 0) ? (
 				<Findings
 					isLoading={findings.isLoading}
-					items={findings.data ?? []}
+					items={correlated.remainder}
 					runFailed={run?.status === "failed" || run?.status === "interrupted"}
 				/>
 			) : null}
@@ -468,6 +494,112 @@ function Mark({ cell, locale }: { cell: Cell; locale: string }) {
 			<span aria-hidden>·</span>
 			<span className="sr-only">{locale} published</span>
 		</span>
+	);
+}
+
+/**
+ * Why a problem's findings are one problem, said in words.
+ *
+ * The requirement is that the product *infers* a shared cause and says so, not
+ * that it collates. "28 findings" is a grouping; "one page family emits all of
+ * these" is the claim, and a reader who disagrees with it can see what it rests
+ * on and dismiss it. The vocabulary is deliberately three sentences long,
+ * because three is how many relationships the evidence can actually support.
+ *
+ * None of them names the defect. That the language switcher builds its sibling
+ * URLs from the wrong slug is true, and is our diagnosis rather than anything
+ * the site asserted — so the product stops at what it can stand behind.
+ */
+function problemSentence(problem: CorrelatedProblem): string {
+	const families = problem.families.length;
+	const pages = problem.originPages.length;
+
+	switch (problem.shape) {
+		case "one-family":
+			return "One page family emits all of these";
+		case "family-set":
+			return `The same ${families} page families exhibit all of these`;
+		case "same-pages":
+			return `The same ${pages} ${pages === 1 ? "page" : "pages"} emit all of these`;
+	}
+}
+
+function Problems({ problems }: { problems: CorrelatedProblem[] }) {
+	return (
+		<section className="mt-12">
+			<header className="flex flex-wrap items-baseline justify-between gap-3">
+				<h2 className="font-display font-semibold text-ink text-xl">
+					Problems
+				</h2>
+				<p className="tnum text-ink-faint text-xs">
+					{problems.length} {problems.length === 1 ? "problem" : "problems"}
+				</p>
+			</header>
+
+			<p className="mt-2 max-w-prose text-ink-soft text-sm leading-relaxed">
+				Findings the site's own language declarations say share a cause,
+				reported once. Each is listed here instead of below, so nothing appears
+				twice.
+			</p>
+
+			<div className="mt-6 flex flex-col gap-8">
+				{problems.map((problem) => {
+					const where = summariseList(problem.originPages);
+
+					return (
+						<article className="border-rule border-l-2 pl-5" key={problem.key}>
+							<h3 className="flex flex-wrap items-baseline gap-x-3 font-display font-semibold text-base text-ink">
+								{problemSentence(problem)}
+								<span className="tnum font-mono font-normal text-ink-faint text-xs">
+									{problem.findings.length} findings
+									{" · "}
+									{problem.originPages.length}{" "}
+									{problem.originPages.length === 1 ? "page" : "pages"} to edit
+								</span>
+							</h3>
+
+							{/*
+							 * Where the work is. A template fault can put every page of every
+							 * family behind one problem, so the list is capped for the same
+							 * reason the finding evidence is — one problem must not push the
+							 * rest off the screen.
+							 */}
+							<ul className="mt-3 flex flex-col gap-1">
+								{where.shown.map((url) => (
+									<li
+										className="break-all font-mono text-ink text-xs"
+										key={url}
+									>
+										{url}
+									</li>
+								))}
+								{where.hidden > 0 ? (
+									<li className="text-ink-faint text-xs">
+										and {where.hidden} more
+									</li>
+								) : null}
+							</ul>
+
+							{/*
+							 * The findings themselves, rendered exactly as they read in the
+							 * list below. A reader who distrusts the grouping still gets the
+							 * evidence as it was filed.
+							 */}
+							<ul className="mt-4 divide-y divide-rule-soft border-rule-soft border-t">
+								{problem.findings.map((finding) => (
+									<li className="py-3 text-sm" key={finding.id}>
+										<span className="mr-2 font-mono text-ink-faint text-xs">
+											{FINDING_LABEL[finding.type] ?? finding.type}
+										</span>
+										<Evidence detail={finding.detail} type={finding.type} />
+									</li>
+								))}
+							</ul>
+						</article>
+					);
+				})}
+			</div>
+		</section>
 	);
 }
 
