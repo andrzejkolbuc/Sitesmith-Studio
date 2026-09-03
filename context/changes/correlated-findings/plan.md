@@ -481,11 +481,11 @@ the next time they are viewed, because the rule reads only rows the crawl alread
 
 #### Automated
 
-- [ ] 1.1 Unit tests pass: `npm run test:unit`
-- [ ] 1.2 Type checking passes: `npm run typecheck`
-- [ ] 1.3 Lint and format pass: `npm run check`
-- [ ] 1.4 Existing `pagesInvolved` and `countPages` tests pass without modification
-- [ ] 1.5 Every type in `FINDING_TYPES` has an `evidenceRoles` case asserted
+- [x] 1.1 Unit tests pass: `npm run test:unit`
+- [x] 1.2 Type checking passes: `npm run typecheck`
+- [x] 1.3 Lint and format pass: `npm run check`
+- [x] 1.4 Existing `pagesInvolved` and `countPages` tests pass without modification
+- [x] 1.5 Every type in `FINDING_TYPES` has an `evidenceRoles` case asserted
 
 #### Manual
 

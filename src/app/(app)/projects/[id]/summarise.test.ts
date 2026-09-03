@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { FINDING_TYPES } from "~/server/crawl/findings";
 import {
 	countPages,
+	evidenceRoles,
 	MAX_LISTED,
 	pagesInvolved,
 	summariseList,
@@ -517,5 +519,364 @@ describe("pagesInvolved for canonical findings", () => {
 				},
 			}),
 		).toEqual([`${B}/circle`]);
+	});
+});
+
+/**
+ * The role split, type by type.
+ *
+ * Two properties are worth more than the individual cases. The first is
+ * exhaustiveness: the table below is asserted to cover `FINDING_TYPES` exactly,
+ * so a rule added later cannot quietly fall through to the default and arrive at
+ * correlation with no origin. The second is that `origin` is empty for exactly
+ * the five types that speak about the corpus rather than about a page — that
+ * emptiness is what keeps them out of correlation structurally, so it is
+ * asserted rather than assumed.
+ */
+
+const R = "https://roles.example";
+
+type RoleCase = {
+	url?: string | null;
+	detail: Record<string, unknown>;
+	subject: string[];
+	origin: string[];
+};
+
+const ROLE_CASES: Record<string, RoleCase> = {
+	missing_locale: {
+		url: `${R}/a`,
+		detail: {
+			groupKey: `${R}/a`,
+			missingLocale: "fr",
+			presentLocales: ["en", "de"],
+			memberUrls: [`${R}/a`, `${R}/de/a`],
+		},
+		subject: [`${R}/a`, `${R}/de/a`],
+		origin: [`${R}/a`, `${R}/de/a`],
+	},
+	hreflang_target_failed: {
+		url: `${R}/en`,
+		detail: {
+			declaredBy: `${R}/en`,
+			locale: "de",
+			target: `${R}/de`,
+			httpStatus: 500,
+			fetchError: null,
+		},
+		subject: [`${R}/de`],
+		origin: [`${R}/en`],
+	},
+	hreflang_target_unreached: {
+		url: `${R}/en`,
+		detail: { declaredBy: `${R}/en`, locale: "de", target: `${R}/de` },
+		subject: [`${R}/de`],
+		origin: [`${R}/en`],
+	},
+	no_hreflang: {
+		url: `${R}/en/solo`,
+		detail: { url: `${R}/en/solo`, impliedLocale: "en" },
+		subject: [`${R}/en/solo`],
+		origin: [`${R}/en/solo`],
+	},
+	hreflang_family_inconsistent: {
+		url: null,
+		detail: {
+			groupKey: `${R}/a`,
+			memberUrls: [`${R}/a`, `${R}/de/a`],
+			defects: [],
+		},
+		subject: [`${R}/a`, `${R}/de/a`],
+		origin: [`${R}/a`, `${R}/de/a`],
+	},
+	variant_diverged: {
+		url: null,
+		detail: {
+			locale: "fr",
+			groupKey: `${R}/a`,
+			brokenUrl: `${R}/fr/a`,
+			declaredBy: [`${R}/en/a`, `${R}/de/a`],
+			healthyUrls: [`${R}/en/a`, `${R}/de/a`],
+		},
+		subject: [`${R}/fr/a`],
+		origin: [`${R}/en/a`, `${R}/de/a`],
+	},
+	content_untranslated: {
+		url: `${R}/en/draft`,
+		detail: {
+			kind: "placeholder_markers",
+			url: `${R}/en/draft`,
+			locale: "en",
+			markers: ["lorem ipsum"],
+		},
+		subject: [`${R}/en/draft`],
+		origin: [`${R}/en/draft`],
+	},
+	content_structure_differs: {
+		url: null,
+		detail: {
+			groupKey: `${R}/a`,
+			memberUrls: [`${R}/en/a`, `${R}/de/a`],
+			differences: [],
+		},
+		subject: [`${R}/en/a`, `${R}/de/a`],
+		origin: [`${R}/en/a`, `${R}/de/a`],
+	},
+	metadata_missing: {
+		url: `${R}/en/bare`,
+		detail: { url: `${R}/en/bare`, fields: ["title"] },
+		subject: [`${R}/en/bare`],
+		origin: [`${R}/en/bare`],
+	},
+	metadata_duplicated: {
+		url: null,
+		detail: {
+			field: "title",
+			language: "en",
+			value: "Home",
+			urls: [`${R}/en/a`, `${R}/en/b`],
+		},
+		subject: [`${R}/en/a`, `${R}/en/b`],
+		origin: [`${R}/en/a`, `${R}/en/b`],
+	},
+	canonical_missing: {
+		url: `${R}/en/pricing`,
+		detail: { url: `${R}/en/pricing`, pagesDeclaringCanonical: 12 },
+		subject: [`${R}/en/pricing`],
+		origin: [`${R}/en/pricing`],
+	},
+	canonical_conflicting: {
+		url: `${R}/en/pricing`,
+		detail: {
+			kind: "multiple",
+			url: `${R}/en/pricing`,
+			canonicals: [`${R}/en/pricing`, `${R}/en/plans`],
+		},
+		subject: [`${R}/en/pricing`, `${R}/en/plans`],
+		origin: [`${R}/en/pricing`],
+	},
+	canonical_target_broken: {
+		url: `${R}/en/pricing`,
+		detail: {
+			kind: "failed",
+			url: `${R}/en/pricing`,
+			canonical: `${R}/en/gone`,
+			httpStatus: 404,
+			fetchError: null,
+		},
+		subject: [`${R}/en/gone`],
+		origin: [`${R}/en/pricing`],
+	},
+	noindex_present: {
+		url: `${R}/en/staging`,
+		detail: {
+			url: `${R}/en/staging`,
+			sources: [],
+			channels: ["meta"],
+			indexingChannels: ["meta"],
+		},
+		subject: [`${R}/en/staging`],
+		origin: [`${R}/en/staging`],
+	},
+	content_duplicated: {
+		url: null,
+		detail: {
+			digest: "abc",
+			textLength: 900,
+			urls: [`${R}/en/a`, `${R}/en/b`],
+		},
+		subject: [`${R}/en/a`, `${R}/en/b`],
+		origin: [`${R}/en/a`, `${R}/en/b`],
+	},
+	link_broken: {
+		url: null,
+		detail: {
+			target: `${R}/gone`,
+			httpStatus: 404,
+			fetchError: null,
+			confirmed: false,
+			linkedFrom: [`${R}/`, `${R}/about`],
+		},
+		subject: [`${R}/gone`],
+		origin: [`${R}/`, `${R}/about`],
+	},
+	certificate_problem: {
+		url: null,
+		detail: {
+			kind: "expiring",
+			origin: R,
+			validTo: "2026-10-01T00:00:00Z",
+			daysRemaining: 5,
+			issuer: "Test CA",
+			subject: R,
+			authorizationError: null,
+		},
+		subject: [],
+		origin: [],
+	},
+	security_header_contradiction: {
+		url: null,
+		detail: {
+			kind: "inconsistent",
+			header: "strict-transport-security",
+			pagesPublishing: 40,
+			affectedUrls: [`${R}/en/a`, `${R}/en/b`],
+		},
+		subject: [`${R}/en/a`, `${R}/en/b`],
+		origin: [`${R}/en/a`, `${R}/en/b`],
+	},
+	sitemap_url_failed: {
+		url: null,
+		detail: {
+			sitemapSource: `${R}/sitemap.xml`,
+			discovery: "robots",
+			entries: [{ loc: `${R}/gone/`, normalised: `${R}/gone` }],
+		},
+		subject: [`${R}/gone`],
+		origin: [],
+	},
+	page_missing_from_sitemap: {
+		url: null,
+		detail: {
+			sitemapSource: `${R}/sitemap.xml`,
+			discovery: "robots",
+			sitemapEntryCount: 120,
+			urls: [`${R}/en/a`, `${R}/en/b`],
+		},
+		subject: [`${R}/en/a`, `${R}/en/b`],
+		origin: [],
+	},
+	robots_blocks_indexable: {
+		url: null,
+		detail: {
+			rule: "/private",
+			ruleLine: "Disallow: /private",
+			ruleLineNumber: 4,
+			userAgentGroup: "*",
+			sitemapSource: `${R}/sitemap.xml`,
+			discovery: "robots",
+			urls: [`${R}/private/a`],
+		},
+		subject: [`${R}/private/a`],
+		origin: [],
+	},
+	page_orphaned: {
+		url: null,
+		detail: {
+			sitemapSource: `${R}/sitemap.xml`,
+			discovery: "robots",
+			urls: [`${R}/en/lonely`],
+		},
+		subject: [`${R}/en/lonely`],
+		origin: [],
+	},
+	link_external_broken: {
+		url: null,
+		detail: {
+			target: "https://partner.example/gone",
+			httpStatus: 410,
+			fetchError: null,
+			confirmed: true,
+			linkedFrom: [`${R}/`, `${R}/about`],
+		},
+		subject: ["https://partner.example/gone"],
+		origin: [`${R}/`, `${R}/about`],
+	},
+	redirect_chain: {
+		url: null,
+		detail: {
+			kind: "chain",
+			from: `${R}/old`,
+			to: `${R}/new`,
+			hops: [],
+			linkedFrom: [`${R}/`],
+		},
+		subject: [],
+		origin: [`${R}/`],
+	},
+};
+
+describe("evidenceRoles", () => {
+	it("covers every finding type the crawl can produce", () => {
+		/**
+		 * The guard that makes the rest of this suite mean something. A type added
+		 * to `FINDING_TYPES` and not described here would fall through to the
+		 * default, arrive at correlation with no origin, and never be correlated —
+		 * silently, and in the direction that looks like the rule working.
+		 */
+		expect(new Set(Object.keys(ROLE_CASES))).toEqual(
+			new Set(Object.values(FINDING_TYPES)),
+		);
+	});
+
+	for (const [type, expected] of Object.entries(ROLE_CASES)) {
+		it(`splits ${type} into what is wrong and who emits it`, () => {
+			expect(
+				evidenceRoles({ type, url: expected.url, detail: expected.detail }),
+			).toEqual({ subject: expected.subject, origin: expected.origin });
+		});
+	}
+
+	it("gives the corpus-level types no origin, and only those", () => {
+		/**
+		 * Asserted as a set rather than one type at a time, because the property
+		 * that matters is the boundary: exactly these five speak about the corpus
+		 * rather than about a page, and correlation excludes exactly these five.
+		 */
+		const withoutOrigin = Object.entries(ROLE_CASES)
+			.filter(([, c]) => c.origin.length === 0)
+			.map(([type]) => type);
+
+		expect(new Set(withoutOrigin)).toEqual(
+			new Set([
+				"certificate_problem",
+				"sitemap_url_failed",
+				"page_missing_from_sitemap",
+				"robots_blocks_indexable",
+				"page_orphaned",
+			]),
+		);
+	});
+
+	it("reads the identical-content shape of an untranslated finding", () => {
+		/**
+		 * The one type with two detail shapes under it. The table above carries the
+		 * marker kind; this is the other.
+		 */
+		expect(
+			evidenceRoles({
+				type: "content_untranslated",
+				url: null,
+				detail: {
+					kind: "identical_to_siblings",
+					groupKey: `${R}/a`,
+					urls: [`${R}/en/a`, `${R}/de/a`],
+					locales: ["de", "en"],
+				},
+			}),
+		).toEqual({
+			subject: [`${R}/en/a`, `${R}/de/a`],
+			origin: [`${R}/en/a`, `${R}/de/a`],
+		});
+	});
+
+	it("makes the chain entry the subject only when nothing links to it", () => {
+		expect(
+			evidenceRoles({
+				type: "redirect_chain",
+				url: null,
+				detail: { kind: "loop", from: `${R}/circle`, to: null, hops: [] },
+			}),
+		).toEqual({ subject: [`${R}/circle`], origin: [] });
+	});
+
+	it("gives an unmapped type a subject but never an origin", () => {
+		/**
+		 * A new rule still counts the page it names, and still cannot be correlated
+		 * on evidence nobody has described yet. Failing safe in both directions.
+		 */
+		expect(
+			evidenceRoles({ type: "something_new", url: `${R}/x`, detail: {} }),
+		).toEqual({ subject: [`${R}/x`], origin: [] });
 	});
 });
