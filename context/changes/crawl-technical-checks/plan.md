@@ -926,7 +926,11 @@ of them in the phase's own spec, all of them required to get the gate green:
   simply had nowhere to go. The rule is now silent unless the crawl requested at
   least half the sitemap's comparable URLs, and says so in a comment with the
   trade it accepts — a mostly-orphaned site is reported as nothing rather than
-  as a flood.
+  as a flood. **Phase 10 found that trade to be the wrong one**: yazaki-emea.com
+  is 41% crawled *because* 71 of its sitemap URLs are orphaned, so the gate
+  silenced the rule exactly where it was right. The threshold is gone, replaced
+  by a per-URL test for a recorded ancestor — see the Phase 10 results in
+  `change.md`.
 - **The empty-state journey needed a site with no robots.txt and no sitemap.**
   The shared fixture disallows a path its own sitemap submits, which is a true
   finding on every crawl of it whichever page the run starts from, so "nothing
@@ -1230,15 +1234,15 @@ duration of a run, following the precedent S-05 set when it declined to persist 
 
 #### Automated
 
-- [ ] 10.1 Full suite passes: `npm run test:all`
-- [ ] 10.2 The crawl completes without aborting
+- [x] 10.1 Full suite passes: `npm run test:all`
+- [x] 10.2 The crawl completes without aborting — run `29fa2fc7`, status done, no abort reason
 
 #### Manual
 
-- [ ] 10.3 Page count is 533, unchanged from the three prior runs
-- [ ] 10.4 The 34 `metadata_duplicated` findings persist unchanged
-- [ ] 10.5 Every new finding is spot-checked live and judged true
-- [ ] 10.6 No false positive is found in any of the ten new rules
-- [ ] 10.7 Run duration is within the prior band plus a stated allowance for the new requests
-- [ ] 10.8 Readability: ten new rules have not swamped the existing fourteen
-- [ ] 10.9 Per-rule verdict recorded — true positive, or correctly silent — with no blurring
+- [x] 10.3 Page count is 533, unchanged from the three prior runs
+- [x] 10.4 The 34 `metadata_duplicated` findings persist unchanged
+- [x] 10.5 Every new finding is spot-checked live and judged true — all 23 broken-link targets re-requested (404), 8 orphans sampled (200), section index and sitemap re-fetched
+- [x] 10.6 No false positive is found in any of the ten new rules — one false *negative* was found in `page_orphaned` and fixed; see change.md
+- [x] 10.7 Run duration is within the prior band plus a stated allowance for the new requests — 449s against 305–412s, allowance stated in change.md
+- [ ] 10.8 Readability: ten new rules have not swamped the existing fourteen — 3 new findings beside the 2 existing ones in the rendered list; needs a human read of the results page
+- [x] 10.9 Per-rule verdict recorded — true positive, or correctly silent — with no blurring

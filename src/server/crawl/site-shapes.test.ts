@@ -3156,8 +3156,9 @@ describe("pages the sitemap lists that nothing links to", () => {
 		 * them would be dozens of defects invented by our own start URL.
 		 *
 		 * `crawlComplete` does not catch this: the run was not cut short, it simply
-		 * never had anywhere to go. The gate is coverage of the sitemap, and below
-		 * half of it the crawl's silence about inbound links is evidence of nothing.
+		 * never had anywhere to go. What the rule wants is a page that would have
+		 * carried the link — the section index, or the root — and here it recorded
+		 * neither, so there is no absence to reason from.
 		 */
 		expect(
 			detailedFindingsFor({
@@ -3173,6 +3174,27 @@ describe("pages the sitemap lists that nothing links to", () => {
 				),
 			}).filter(orphaned),
 		).toEqual([]);
+	});
+
+	it("reports an article its own section index does not link to", () => {
+		/**
+		 * The shape the real client site turned out to have: a news index listing
+		 * the seven most recent articles, and sixty more still live and submitted
+		 * by the sitemap with nothing pointing at them. The index was crawled and
+		 * does not link here, which is exactly the evidence an orphan claim needs.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				linking("/", ["/news"]),
+				linking("/news", [`/news/latest`]),
+				page("/news/latest"),
+			],
+			requested: [`${BASE}/`, `${BASE}/news`, `${BASE}/news/latest`],
+			entryUrl: `${BASE}/`,
+			sitemap: sitemapOf("/", "/news", "/news/latest", "/news/from-2019"),
+		}).filter(orphaned);
+
+		expect(findings[0]?.detail.urls).toEqual([`${BASE}/news/from-2019`]);
 	});
 
 	it("reports a page reached only because a sibling declared it", () => {

@@ -1848,26 +1848,53 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 			// as eighteen defects on a live client site, naming URLs that all
 			// returned 200.
 			//
-			// **And gated on the crawl having covered the sitemap.** `crawlComplete`
+			// **And gated on having looked where a link would be.** `crawlComplete`
 			// says the run was not cut short; it does not say the run looked at the
-			// site. A project whose start URL is a leaf — a single blog post, a
-			// section landing page — finishes in one page and has still visited
-			// nothing that could have linked anywhere, so every other URL in the
-			// sitemap looks unlinked. That is a fact about where we started, and
-			// reporting it would be forty-four defects invented by our own entry
-			// point. Half the sitemap is the line: below it the crawl saw a corner
-			// of the site, and its silence about inbound links carries no evidence.
-			// Above it the rule may still be quiet about a site that is mostly
-			// orphaned — silence chosen over a flood, the same way every other rule
-			// here resolves the trade.
-			const covered = [...reconciled.comparable.keys()].filter((url) =>
-				new Set(requested).has(url),
-			).length;
-			const sawEnoughOfTheSitemap =
-				reconciled.comparable.size === 0 ||
-				covered * 2 >= reconciled.comparable.size;
+			// site. A project whose start URL is a leaf — one blog post, one section
+			// page — finishes in a single page having visited nothing that could
+			// have linked anywhere, and every other URL in the sitemap then looks
+			// unlinked. That is a fact about where we started, and it once produced
+			// forty-four defects invented by our own entry point.
+			//
+			// So a URL is only called an orphan when the crawl recorded a page that
+			// would be expected to link to it: its section index, or any ancestor up
+			// to the site root. "We looked at `/news-press` and it does not point at
+			// this article" is evidence; "we looked at one unrelated page" is not.
+			// The test is per URL rather than a share of the sitemap, because
+			// coverage of the sitemap is the wrong denominator — a site can be
+			// mostly orphaned, and a rule that went quiet in proportion would go
+			// quiet exactly when it mattered most. It also needs no threshold, which
+			// is what `lessons.md` asks of any inference we make ourselves.
+			const recordedAncestor = (url: string): boolean => {
+				let parsed: URL;
+				try {
+					parsed = new URL(url);
+				} catch {
+					return false;
+				}
 
-			if (crawlComplete && sawEnoughOfTheSitemap) {
+				const segments = parsed.pathname.split("/").filter(Boolean);
+				for (let depth = segments.length - 1; depth >= 0; depth -= 1) {
+					const path =
+						depth === 0 ? "" : `/${segments.slice(0, depth).join("/")}`;
+					/**
+					 * Both spellings of the same page. `normaliseUrl` drops a trailing
+					 * slash, but a root recorded as `https://site/` and one recorded as
+					 * `https://site` are the same front door, and looking up only one of
+					 * them would decide this by punctuation.
+					 */
+					for (const ancestor of [
+						`${parsed.origin}${path}`,
+						`${parsed.origin}${path}/`,
+					]) {
+						const page = byUrl.get(ancestor);
+						if (page && !isError(page)) return true;
+					}
+				}
+				return false;
+			};
+
+			if (crawlComplete) {
 				const orphans: string[] = [];
 				const everRequested = new Set(requested);
 
@@ -1878,6 +1905,12 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 					 * would be a finding about where we chose to start.
 					 */
 					if (url === entryUrl) continue;
+
+					/**
+					 * Nothing was looked at that would have carried a link here, so
+					 * there is no absence to reason from.
+					 */
+					if (!recordedAncestor(url)) continue;
 
 					const page = byUrl.get(url);
 
