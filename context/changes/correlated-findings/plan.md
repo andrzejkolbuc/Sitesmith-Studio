@@ -509,10 +509,10 @@ the next time they are viewed, because the rule reads only rows the crawl alread
 
 #### Automated
 
-- [x] 3.1 Type checking passes: `npm run typecheck`
-- [x] 3.2 Lint and format pass: `npm run check`
-- [x] 3.3 Unit tests pass: `npm run test:unit`
-- [x] 3.4 Integration tests pass: `npm run test:integration`
+- [x] 3.1 Type checking passes: `npm run typecheck` — 39222c7
+- [x] 3.2 Lint and format pass: `npm run check` — 39222c7
+- [x] 3.3 Unit tests pass: `npm run test:unit` — 39222c7
+- [x] 3.4 Integration tests pass: `npm run test:integration` — 39222c7
 
 #### Manual
 
@@ -526,11 +526,11 @@ the next time they are viewed, because the rule reads only rows the crawl alread
 
 #### Automated
 
-- [ ] 4.1 Full unit suite passes: `npm run test:unit`
-- [ ] 4.2 Integration tests pass: `npm run test:integration`
-- [ ] 4.3 Type checking passes: `npm run typecheck`
-- [ ] 4.4 Lint and format pass: `npm run check`
-- [ ] 4.5 No temporary scripts or harnesses remain in the working tree
+- [x] 4.1 Full unit suite passes: `npm run test:unit`
+- [x] 4.2 Integration tests pass: `npm run test:integration`
+- [x] 4.3 Type checking passes: `npm run typecheck`
+- [x] 4.4 Lint and format pass: `npm run check`
+- [x] 4.5 No temporary scripts or harnesses remain in the working tree
 
 #### Manual
 

@@ -60,3 +60,29 @@ correlation would come from.
 it: **a threshold that scales with the defect it hunts goes quiet exactly when it
 matters.** A correlation confidence score would be that shape of mistake if it
 were tuned rather than derived.
+
+## The stated limit: this rule rests on hreflang
+
+Decided during planning, recorded here so it is a known limit rather than a
+discovered one.
+
+Correlation groups findings by the set of hreflang variant families their origin
+pages occupy. That axis exists because the *site* asserts it — two pages are
+siblings because the site's own tags say so — which is what lets the rule claim a
+shared cause without any inference of ours, and without a threshold.
+
+The cost is that the rule is worth much less on a site that declares no siblings.
+On yazaki-emea.com, 510 of 533 pages sit in 51 ten-member families, and 67
+findings became 8 list entries. On a monolingual site every page is its own
+family, so an equal family set means an equal page set and the rule degrades to
+correlating only findings emitted by literally the same pages — still correct,
+still useful for a shared template, but far short of the above.
+
+This was accepted rather than worked around. US-01 is explicitly the multilingual
+story and FR-040 sits under it, and the only other grouping available in the
+crawl would be URL path shape — our inference, and the same class that produced
+four of the false positives already on the lessons register.
+
+**What would reopen it:** a real run against a monolingual client project showing
+that the raw list is the problem there too. Until such a run exists the question
+cannot be answered honestly, so it is not left open as a hypothetical.
