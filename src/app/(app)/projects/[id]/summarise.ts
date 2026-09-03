@@ -161,10 +161,12 @@ export function pagesInvolved(finding: {
 			return [];
 
 		/**
-		 * Live pages the sitemap omits, and the URLs a robots.txt rule blocks.
-		 * Both are about a set of URLs and neither is filed against one.
+		 * Live pages the sitemap omits, pages nothing links to, and the URLs a
+		 * robots.txt rule blocks. Each is about a set of URLs and none is filed
+		 * against one.
 		 */
 		case "page_missing_from_sitemap":
+		case "page_orphaned":
 		case "robots_blocks_indexable":
 			return strings(detail.urls);
 

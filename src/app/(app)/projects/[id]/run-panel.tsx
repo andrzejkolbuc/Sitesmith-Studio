@@ -61,6 +61,7 @@ const FINDING_LABEL: Record<string, string> = {
 	sitemap_url_failed: "Sitemap URLs that do not load",
 	page_missing_from_sitemap: "Live pages the sitemap does not list",
 	robots_blocks_indexable: "robots.txt blocks a page the sitemap submits",
+	page_orphaned: "Pages the sitemap lists that nothing links to",
 };
 
 /** Security headers in the reader's words, the same split `FIELD_LABEL` makes. */
@@ -1124,6 +1125,25 @@ function Evidence({
 					<span className="text-ink">
 						{urls.length} live {urls.length === 1 ? "page" : "pages"} are absent
 						from a sitemap of {Number(detail.sitemapEntryCount ?? 0)}
+					</span>
+					<Listed items={urls.map(pathOf)} />
+				</>
+			);
+		}
+
+		case "page_orphaned": {
+			const urls = Array.isArray(detail.urls) ? (detail.urls as string[]) : [];
+
+			/**
+			 * Named as unreachable by navigation rather than as broken. The pages
+			 * load; what is missing is any route a reader could take to them, which
+			 * is a different fix from a dead link and belongs in different words.
+			 */
+			return (
+				<>
+					<span className="text-ink">
+						{urls.length} {urls.length === 1 ? "page" : "pages"} in the sitemap
+						with nothing linking to {urls.length === 1 ? "it" : "them"}
 					</span>
 					<Listed items={urls.map(pathOf)} />
 				</>

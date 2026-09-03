@@ -155,6 +155,10 @@ const HANDBOOK_FR = `<h2>Configurer un projet</h2>
  *   the crawler's job rather than the parser's, so they need a server.
  * - `/sitemap-corrupt.xml.gz` — gzip magic bytes over a body that is not gzip.
  *   Must be refused without throwing; only reachable as a start URL.
+ * - `/archive/unlinked` — in the sitemap, linked from nowhere, so the crawl
+ *   never requests it. Fires rule 22 (orphan), and is the only page here that
+ *   does. Every translated page is linked from `/` the way a language switcher
+ *   links them, which is what keeps that rule to one finding.
  * - `/private/secret` — only reachable if excludePaths is ignored.
  * - `/slow`, `/flaky` — timing and abort behaviour.
  */
@@ -194,6 +198,24 @@ const SITE: Record<string, Page> = {
 			"/library/guide-archived",
 			"/legal/imprint",
 			"/legal/privacy",
+			/**
+			 * The translated pages, linked the way a language switcher links them.
+			 *
+			 * Added for the orphan rule, and the omission it exposed was a real
+			 * unfaithfulness in this fixture: every variant here was reachable only
+			 * through an hreflang `<link>`, which is a machine channel no reader
+			 * navigates. The rule was right to call them unlinked; real multilingual
+			 * sites simply do not publish translations that way.
+			 */
+			"/de/hilfe",
+			"/fr/aide",
+			"/de/karriere",
+			"/de/handbuch",
+			"/fr/manuel",
+			"/de/angebot",
+			"/fr/devis",
+			"/de/geschichte",
+			"/fr/histoire",
 		],
 	},
 	"/de/": {
@@ -508,6 +530,17 @@ const SITE: Record<string, Page> = {
 	"/library/guide-archived": { body: ARCHIVE_NOTE, main: true },
 
 	/**
+	 * An orphan: submitted by the sitemap, linked from nowhere.
+	 *
+	 * Deliberately absent from `/`'s link list and from every other page's, which
+	 * is what makes it one — and which also means the crawl never requests it at
+	 * all. That is exactly why the rule reads the requested-URL set rather than
+	 * the recorded pages: a link-following crawl can only ever see this shape by
+	 * its absence.
+	 */
+	"/archive/unlinked": {},
+
+	/**
 	 * Two pages sharing a title, in no established language: no hreflang, and no
 	 * locale segment in either path. Every page of a monolingual site looks like
 	 * this, and until S-04 the duplicate rule skipped them entirely.
@@ -615,7 +648,16 @@ const OMITTED_FROM_SITEMAP = "/library/guide-archived";
  */
 const sitemapPaths = (): string[] => [
 	...Object.keys(SITE).filter(
-		(path) => !path.startsWith("/private") && path !== OMITTED_FROM_SITEMAP,
+		(path) =>
+			!path.startsWith("/private") &&
+			path !== OMITTED_FROM_SITEMAP &&
+			/**
+			 * A route rather than a published page: it exists only to be a start URL
+			 * for the alias-ordering test, and nothing links to it on purpose. A real
+			 * sitemap would not submit it, and submitting it here would make the
+			 * orphan rule report a page the fixture deliberately keeps unlinked.
+			 */
+			path !== "/redirect-hub-reversed",
 	),
 	"/library/removed",
 	"/private/secret",

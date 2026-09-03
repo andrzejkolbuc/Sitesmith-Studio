@@ -139,6 +139,8 @@ describe("detectMissingVariants against the fixture site", () => {
 				 */
 				robots: result.robots,
 				sitemap: result.sitemap,
+				entryUrl: result.entryUrl,
+				requested: result.requested,
 			}),
 		};
 	}
@@ -474,6 +476,32 @@ describe("detectMissingVariants against the fixture site", () => {
 		expect(missing[0]?.detail.discovery).toBe("robots");
 	});
 
+	it("reports the sitemap page nothing on the site links to", async () => {
+		/**
+		 * `/archive/unlinked` is served, is in the sitemap, and appears in no page's
+		 * link list — so the crawl never requests it at all.
+		 *
+		 * That is the whole point of the case. An orphan is by definition not
+		 * linked, so a link-following crawl can only ever see one by its absence,
+		 * and a rule inspecting recorded pages for a missing inbound link could
+		 * never fire on the common shape.
+		 */
+		const { pages, findings } = await detect();
+		const orphaned = findings.filter(
+			(f) => f.type === FINDING_TYPES.PAGE_ORPHANED,
+		);
+
+		expect(
+			pages.some((p) => p.url === `${site.baseUrl}/archive/unlinked`),
+		).toBe(false);
+
+		expect(orphaned).toHaveLength(1);
+		expect(orphaned[0]?.url).toBeNull();
+		expect(orphaned[0]?.detail.urls).toEqual([
+			`${site.baseUrl}/archive/unlinked`,
+		]);
+	});
+
 	it("reports the robots.txt rule blocking a URL the sitemap submits", async () => {
 		/**
 		 * The fixture disallows `/private` and its sitemap submits
@@ -694,6 +722,8 @@ describe("detectMissingVariants edge cases", () => {
 			certificate: null,
 			robots: null,
 			sitemap: null,
+			entryUrl: null,
+			requested: [],
 			inScope: allInScope,
 		});
 
@@ -744,6 +774,8 @@ describe("detectMissingVariants edge cases", () => {
 			certificate: null,
 			robots: null,
 			sitemap: null,
+			entryUrl: null,
+			requested: [],
 			inScope: allInScope,
 		});
 
@@ -797,6 +829,8 @@ describe("detectMissingVariants edge cases", () => {
 			certificate: null,
 			robots: null,
 			sitemap: null,
+			entryUrl: null,
+			requested: [],
 			inScope: allInScope,
 		});
 
@@ -828,6 +862,8 @@ describe("detectMissingVariants edge cases", () => {
 			certificate: null,
 			robots: null,
 			sitemap: null,
+			entryUrl: null,
+			requested: [],
 			inScope: allInScope,
 		});
 

@@ -107,6 +107,13 @@ function findingsFor(options: {
 	robots?: RobotsFile | null;
 	/** Defaults to none: most cases describe a site with no sitemap. */
 	sitemap?: SitemapDocument | null;
+	/** Defaults to none: most cases are not about the crawl's entry point. */
+	entryUrl?: string | null;
+	/**
+	 * Defaults to every page given, which is what a case built by hand means: it
+	 * states the crawl it wants, so nothing in it was silently unreachable.
+	 */
+	requested?: string[];
 }): Summary[] {
 	return detectMissingVariants({
 		pages: options.pages,
@@ -117,6 +124,8 @@ function findingsFor(options: {
 		certificate: options.certificate ?? null,
 		robots: options.robots ?? null,
 		sitemap: options.sitemap ?? null,
+		entryUrl: options.entryUrl ?? null,
+		requested: options.requested ?? options.pages.map((p) => p.url),
 	})
 		.map((finding) => ({ type: finding.type, url: finding.url }))
 		.sort(
@@ -147,6 +156,13 @@ function detailedFindingsFor(options: {
 	robots?: RobotsFile | null;
 	/** Defaults to none: most cases describe a site with no sitemap. */
 	sitemap?: SitemapDocument | null;
+	/** Defaults to none: most cases are not about the crawl's entry point. */
+	entryUrl?: string | null;
+	/**
+	 * Defaults to every page given, which is what a case built by hand means: it
+	 * states the crawl it wants, so nothing in it was silently unreachable.
+	 */
+	requested?: string[];
 }) {
 	return detectMissingVariants({
 		pages: options.pages,
@@ -157,6 +173,8 @@ function detailedFindingsFor(options: {
 		certificate: options.certificate ?? null,
 		robots: options.robots ?? null,
 		sitemap: options.sitemap ?? null,
+		entryUrl: options.entryUrl ?? null,
+		requested: options.requested ?? options.pages.map((p) => p.url),
 	});
 }
 
@@ -3062,5 +3080,158 @@ describe("what the sitemap submits, and what robots.txt blocks", () => {
 		expect(findings.filter(sitemapFailed)).toEqual([]);
 		expect(findings.filter(missingFromSitemap)).toEqual([]);
 		expect(findings.filter(blocked)).toEqual([]);
+	});
+});
+
+describe("pages the sitemap lists that nothing links to", () => {
+	const orphaned = (f: { type: string }) => f.type === "page_orphaned";
+
+	const sitemapOf = (...paths: string[]): SitemapDocument => ({
+		discovery: "robots",
+		sources: [`${BASE}/sitemap.xml`],
+		entries: paths.map((path) => ({
+			raw: `${BASE}${path}`,
+			url: `${BASE}${path}`,
+			source: `${BASE}/sitemap.xml`,
+		})),
+		truncated: false,
+	});
+
+	const linking = (path: string, links: string[]): CrawledPage => ({
+		...page(path),
+		links: links.map((href) => `${BASE}${href}`),
+	});
+
+	it("reports a sitemap URL the crawl never even requested", () => {
+		/**
+		 * The common orphan, and the only shape a link-following crawl can see —
+		 * by its absence. Nothing on the site points at the page, so the frontier
+		 * never held it and no page record exists to inspect.
+		 *
+		 * This is why the rule reads the requested-URL set rather than `pages`. An
+		 * earlier draft checked `pages` for a record with no inbound link, which
+		 * could never fire on this case at all: being absent from the crawl is
+		 * precisely what being an orphan means.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [linking("/", ["/about"]), page("/about")],
+			requested: [`${BASE}/`, `${BASE}/about`],
+			entryUrl: `${BASE}/`,
+			sitemap: sitemapOf("/", "/about", "/archive/unlinked"),
+		}).filter(orphaned);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBeNull();
+		expect(findings[0]?.detail.urls).toEqual([`${BASE}/archive/unlinked`]);
+	});
+
+	it("reports a page reached only because a sibling declared it", () => {
+		/**
+		 * The rarer shape: the crawl found it through the hreflang graph, which is
+		 * a channel no reader navigates. It loads, it is submitted, and nothing
+		 * links to it.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				linking("/", ["/about"]),
+				page("/about"),
+				page("/de/nur-hreflang"),
+			],
+			requested: [`${BASE}/`, `${BASE}/about`, `${BASE}/de/nur-hreflang`],
+			entryUrl: `${BASE}/`,
+			sitemap: sitemapOf("/", "/about", "/de/nur-hreflang"),
+		}).filter(orphaned);
+
+		expect(findings[0]?.detail.urls).toEqual([`${BASE}/de/nur-hreflang`]);
+	});
+
+	it("says nothing about a page something links to", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [linking("/", ["/about"]), page("/about")],
+				requested: [`${BASE}/`, `${BASE}/about`],
+				entryUrl: `${BASE}/`,
+				sitemap: sitemapOf("/", "/about"),
+			}).filter(orphaned),
+		).toEqual([]);
+	});
+
+	it("never reports the page the crawl started from", () => {
+		/**
+		 * An entry page has no inbound link by construction — that is what makes it
+		 * the entry. Reporting it would be a finding about where we chose to start.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [linking("/", ["/about"]), page("/about")],
+				requested: [`${BASE}/`, `${BASE}/about`],
+				entryUrl: `${BASE}/`,
+				sitemap: sitemapOf("/"),
+			}).filter(orphaned),
+		).toEqual([]);
+	});
+
+	it("says nothing about a URL the sitemap does not list", () => {
+		/**
+		 * FR-019 asks about pages "reachable via sitemap but linked from nowhere".
+		 * An unlinked page the sitemap also omits is not published at all, which is
+		 * a different thing and not this rule's claim.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [linking("/", ["/about"]), page("/about")],
+				requested: [`${BASE}/`, `${BASE}/about`],
+				entryUrl: `${BASE}/`,
+				sitemap: sitemapOf("/", "/about"),
+			}).filter(orphaned),
+		).toEqual([]);
+	});
+
+	it("says nothing about a sitemap URL that redirected somewhere linked", () => {
+		/**
+		 * The alias trap once more. A sitemap URL that 301s to a page already
+		 * recorded *was* linked to — it is simply recorded under the name the
+		 * server served. Judging by `pages` alone would call the site's own
+		 * redirects orphans, which is the false-positive class `lessons.md` exists
+		 * to prevent.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [linking("/", ["/alias"]), page("/target")],
+				// The alias was requested; only its target was recorded.
+				requested: [`${BASE}/`, `${BASE}/alias`],
+				entryUrl: `${BASE}/`,
+				sitemap: sitemapOf("/alias"),
+			}).filter(orphaned),
+		).toEqual([]);
+	});
+
+	it("says nothing on a truncated crawl", () => {
+		/**
+		 * The guard every absence-reasoning rule here carries. A run that stopped
+		 * early has not seen the pages that might link to this one, and reporting
+		 * anyway would blame the site for where we stopped — which once produced
+		 * eighteen false findings on a live client site.
+		 */
+		expect(
+			detailedFindingsFor({
+				crawlComplete: false,
+				pages: [linking("/", ["/about"]), page("/about")],
+				requested: [`${BASE}/`, `${BASE}/about`],
+				entryUrl: `${BASE}/`,
+				sitemap: sitemapOf("/", "/archive/unlinked"),
+			}).filter(orphaned),
+		).toEqual([]);
+	});
+
+	it("says nothing when the site published no sitemap", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [linking("/", []), page("/unlinked")],
+				requested: [`${BASE}/`, `${BASE}/unlinked`],
+				entryUrl: `${BASE}/`,
+				sitemap: null,
+			}).filter(orphaned),
+		).toEqual([]);
 	});
 });

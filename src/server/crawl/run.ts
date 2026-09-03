@@ -227,6 +227,8 @@ async function execute(
 		certificate: result.certificate,
 		robots: result.robots,
 		sitemap: result.sitemap,
+		entryUrl: result.entryUrl,
+		requested: result.requested,
 	});
 
 	if (detected.length > 0) {

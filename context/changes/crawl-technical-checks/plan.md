@@ -1123,32 +1123,32 @@ duration of a run, following the precedent S-05 set when it declined to persist 
 
 #### Automated
 
-- [x] 6.1 Type checking passes: `npm run typecheck`
-- [x] 6.2 Linting and formatting pass: `npm run check`
-- [x] 6.3 Unit tests pass: `npm run test:unit`
-- [x] 6.4 Integration tests pass: `npm run test:integration`
-- [x] 6.5 A `Disallow` matching four sitemap URLs produces one finding listing four
-- [x] 6.6 A `googlebot` group is preferred over a permissive `*`
-- [x] 6.7 A noindex page absent from the sitemap produces no finding
-- [x] 6.8 `page_missing_from_sitemap` still reports on a truncated crawl
-- [x] 6.9 `sitemap_url_failed` reports nothing on a truncated crawl
+- [x] 6.1 Type checking passes: `npm run typecheck` — eeb4fc3
+- [x] 6.2 Linting and formatting pass: `npm run check` — eeb4fc3
+- [x] 6.3 Unit tests pass: `npm run test:unit` — eeb4fc3
+- [x] 6.4 Integration tests pass: `npm run test:integration` — eeb4fc3
+- [x] 6.5 A `Disallow` matching four sitemap URLs produces one finding listing four — eeb4fc3
+- [x] 6.6 A `googlebot` group is preferred over a permissive `*` — eeb4fc3
+- [x] 6.7 A noindex page absent from the sitemap produces no finding — eeb4fc3
+- [x] 6.8 `page_missing_from_sitemap` still reports on a truncated crawl — eeb4fc3
+- [x] 6.9 `sitemap_url_failed` reports nothing on a truncated crawl — eeb4fc3
 
 #### Manual
 
-- [x] 6.10 The blocked-pages finding reads as the site contradicting itself, not as our judgement
-- [x] 6.11 The three findings together do not swamp the existing eight on a real crawl
+- [x] 6.10 The blocked-pages finding reads as the site contradicting itself, not as our judgement — eeb4fc3
+- [x] 6.11 The three findings together do not swamp the existing eight on a real crawl — eeb4fc3
 
 ### Phase 7: Orphan pages
 
 #### Automated
 
-- [ ] 7.1 Type checking passes: `npm run typecheck`
-- [ ] 7.2 Linting and formatting pass: `npm run check`
-- [ ] 7.3 Unit tests pass: `npm run test:unit`
-- [ ] 7.4 A sitemap-listed page with no inbound link is reported
-- [ ] 7.5 A page linked once is not reported
-- [ ] 7.6 The start URL is never reported
-- [ ] 7.7 No orphan findings are produced on a truncated crawl
+- [x] 7.1 Type checking passes: `npm run typecheck`
+- [x] 7.2 Linting and formatting pass: `npm run check`
+- [x] 7.3 Unit tests pass: `npm run test:unit`
+- [x] 7.4 A sitemap-listed page with no inbound link is reported
+- [x] 7.5 A page linked once is not reported
+- [x] 7.6 The start URL is never reported
+- [x] 7.7 No orphan findings are produced on a truncated crawl
 
 #### Manual
 

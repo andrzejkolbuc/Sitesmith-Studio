@@ -65,6 +65,8 @@ export const FINDING_TYPES = {
 	PAGE_MISSING_FROM_SITEMAP: "page_missing_from_sitemap",
 	/** A robots.txt rule blocking a URL the site's own sitemap submits. */
 	ROBOTS_BLOCKS_INDEXABLE: "robots_blocks_indexable",
+	/** A page the sitemap submits that nothing on the site links to. */
+	PAGE_ORPHANED: "page_orphaned",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -120,6 +122,16 @@ export type DetectOptions = {
 	 * Null is silence, never permission to infer anything.
 	 */
 	sitemap: SitemapDocument | null;
+	/** Where the crawl entered, so the orphan rule can exempt it. */
+	entryUrl: string | null;
+	/**
+	 * Every in-scope URL the crawl put on its frontier.
+	 *
+	 * The orphan rule reads this rather than `pages`: a URL absent from here was
+	 * never linked to by anything, while one present but unrecorded was reached
+	 * and redirected somewhere already known.
+	 */
+	requested: string[];
 };
 
 /**
@@ -170,6 +182,8 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		certificate,
 		robots,
 		sitemap,
+		entryUrl,
+		requested,
 	} = options;
 
 	const variants = groupVariants(pages);
@@ -1795,6 +1809,75 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 							sitemapSource: source,
 							discovery: sitemap.discovery,
 							urls: [...entry.urls].sort(),
+						},
+					});
+				}
+			}
+
+			// ── Rule 22: a page the sitemap submits that nothing links to ─────────
+			//
+			// FR-019. By the requirement's own wording an orphan is "reachable via
+			// sitemap but linked from nowhere", so both channels are load-bearing:
+			// the sitemap is the site asserting the page matters, and the link graph
+			// is the site never pointing at it. Either alone says nothing — a page
+			// absent from the sitemap and unlinked is simply not published, and a
+			// page in the sitemap that is linked is ordinary.
+			//
+			// **Gated on `crawlComplete`**, because this reasons from absence: a
+			// truncated run has not seen the pages that might link here. That guard
+			// exists because a run stopping at its ceiling once reported the ceiling
+			// as eighteen defects on a live client site, naming URLs that all
+			// returned 200.
+			if (crawlComplete) {
+				const orphans: string[] = [];
+				const everRequested = new Set(requested);
+
+				for (const url of [...reconciled.comparable.keys()].sort()) {
+					/**
+					 * The entry page is reachable by definition and has no inbound link
+					 * by construction — that is what makes it the entry. Reporting it
+					 * would be a finding about where we chose to start.
+					 */
+					if (url === entryUrl) continue;
+
+					const page = byUrl.get(url);
+
+					/**
+					 * The common orphan, and the one a link-following crawl can only see
+					 * by its absence: the sitemap submits this URL and nothing on the
+					 * site ever pointed at it, so the frontier never held it.
+					 *
+					 * Read from the requested set rather than from `pages`, because a
+					 * URL that redirected to an already-recorded page *was* linked to —
+					 * it is simply recorded under the name the server served. Judging by
+					 * `pages` alone would report the site's own redirects as orphans,
+					 * which is the alias false positive under yet another name.
+					 */
+					if (!everRequested.has(url)) {
+						orphans.push(url);
+						continue;
+					}
+
+					/**
+					 * The rarer orphan: reached, but only because a sibling's hreflang
+					 * declared it. No page links to it, which is what the requirement
+					 * asks about — the crawl found it through a channel a reader never
+					 * uses.
+					 */
+					if (!page || isError(page)) continue;
+					if ((linkedFrom.get(url) ?? []).length > 0) continue;
+
+					orphans.push(url);
+				}
+
+				if (orphans.length > 0) {
+					findings.push({
+						type: FINDING_TYPES.PAGE_ORPHANED,
+						url: null,
+						detail: {
+							sitemapSource: source,
+							discovery: sitemap.discovery,
+							urls: orphans,
 						},
 					});
 				}

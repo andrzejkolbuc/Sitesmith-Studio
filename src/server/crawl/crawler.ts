@@ -168,6 +168,25 @@ export type CrawlResult = {
 	 * found. Null is silence: a guessed path returning 404 says nothing.
 	 */
 	sitemap: SitemapDocument | null;
+	/**
+	 * The served URL of the first page recorded — where the crawl entered.
+	 *
+	 * Recorded explicitly rather than left as `pages[0]`, because a rule reading
+	 * it needs the fact and not an assumption about array order. The orphan rule
+	 * uses it: an entry page has no inbound link by construction, and reporting
+	 * it as unreachable would be a finding about how we started.
+	 */
+	entryUrl: string | null;
+	/**
+	 * Every in-scope URL the crawl ever put on its frontier.
+	 *
+	 * Not the same set as the pages recorded: a URL that redirected is here under
+	 * the name it was requested by, and its target is in `pages` under another.
+	 * The orphan rule needs precisely this distinction — a URL absent from
+	 * here was never linked to by anything, while one present but unrecorded was
+	 * reached and led somewhere already known.
+	 */
+	requested: string[];
 };
 
 /**
@@ -310,6 +329,8 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 			certificate: null,
 			robots: null,
 			sitemap: null,
+			entryUrl: null,
+			requested: [],
 		};
 	}
 
@@ -736,5 +757,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 		certificate,
 		robots,
 		sitemap,
+		entryUrl: pages[0]?.url ?? null,
+		requested: [...seen],
 	};
 }
