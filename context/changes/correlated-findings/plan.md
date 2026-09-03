@@ -481,11 +481,11 @@ the next time they are viewed, because the rule reads only rows the crawl alread
 
 #### Automated
 
-- [x] 1.1 Unit tests pass: `npm run test:unit`
-- [x] 1.2 Type checking passes: `npm run typecheck`
-- [x] 1.3 Lint and format pass: `npm run check`
-- [x] 1.4 Existing `pagesInvolved` and `countPages` tests pass without modification
-- [x] 1.5 Every type in `FINDING_TYPES` has an `evidenceRoles` case asserted
+- [x] 1.1 Unit tests pass: `npm run test:unit` — 350eec6
+- [x] 1.2 Type checking passes: `npm run typecheck` — 350eec6
+- [x] 1.3 Lint and format pass: `npm run check` — 350eec6
+- [x] 1.4 Existing `pagesInvolved` and `countPages` tests pass without modification — 350eec6
+- [x] 1.5 Every type in `FINDING_TYPES` has an `evidenceRoles` case asserted — 350eec6
 
 #### Manual
 
@@ -495,11 +495,11 @@ the next time they are viewed, because the rule reads only rows the crawl alread
 
 #### Automated
 
-- [ ] 2.1 Unit tests pass: `npm run test:unit`
-- [ ] 2.2 Type checking passes: `npm run typecheck`
-- [ ] 2.3 Lint and format pass: `npm run check`
-- [ ] 2.4 The partition invariant is asserted: every input finding appears in exactly one of `problems` or `remainder`
-- [ ] 2.5 Every `CorrelationShape` variant is exercised by at least one shape test
+- [x] 2.1 Unit tests pass: `npm run test:unit`
+- [x] 2.2 Type checking passes: `npm run typecheck`
+- [x] 2.3 Lint and format pass: `npm run check`
+- [x] 2.4 The partition invariant is asserted: every input finding appears in exactly one of `problems` or `remainder`
+- [x] 2.5 Every `CorrelationShape` variant is exercised by at least one shape test
 
 #### Manual
 
