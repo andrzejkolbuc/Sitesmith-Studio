@@ -4,6 +4,7 @@ import { type ContentSummary, emptyContent } from "./content";
 import type { CrawledPage, Reverification } from "./crawler";
 import { detectMissingVariants } from "./findings";
 import { emptyMetadata, type PageMetadata } from "./metadata";
+import type { CertificateObservation } from "./tls";
 import { localeFromUrl } from "./variants";
 
 /**
@@ -50,6 +51,8 @@ const page = (
 		 * than writing HTML and depending on the extractor as well as the rule.
 		 */
 		metadata?: Partial<PageMetadata>;
+		/** Response headers this case is about, by lowercase name. */
+		securityHeaders?: Record<string, string>;
 		/** The `X-Robots-Tag` header, verbatim as a site would serve it. */
 		xRobotsTag?: string | null;
 	} = {},
@@ -81,6 +84,7 @@ const page = (
 		...options.metadata,
 	},
 	xRobotsTag: options.xRobotsTag ?? null,
+	securityHeaders: options.securityHeaders ?? {},
 	fetchError: null,
 });
 
@@ -95,6 +99,8 @@ function findingsFor(options: {
 	crawlComplete?: boolean;
 	/** Defaults to none: most cases describe a crawl with no transient failure. */
 	reverified?: Reverification[];
+	/** Defaults to none: most cases are not about the transport layer. */
+	certificate?: CertificateObservation | null;
 }): Summary[] {
 	return detectMissingVariants({
 		pages: options.pages,
@@ -102,6 +108,7 @@ function findingsFor(options: {
 		inScope: options.inScope ?? ((url) => url.startsWith(BASE)),
 		crawlComplete: options.crawlComplete ?? true,
 		reverified: options.reverified ?? [],
+		certificate: options.certificate ?? null,
 	})
 		.map((finding) => ({ type: finding.type, url: finding.url }))
 		.sort(
@@ -126,6 +133,8 @@ function detailedFindingsFor(options: {
 	crawlComplete?: boolean;
 	/** Defaults to none: most cases describe a crawl with no transient failure. */
 	reverified?: Reverification[];
+	/** Defaults to none: most cases are not about the transport layer. */
+	certificate?: CertificateObservation | null;
 }) {
 	return detectMissingVariants({
 		pages: options.pages,
@@ -133,6 +142,7 @@ function detailedFindingsFor(options: {
 		inScope: options.inScope ?? ((url) => url.startsWith(BASE)),
 		crawlComplete: options.crawlComplete ?? true,
 		reverified: options.reverified ?? [],
+		certificate: options.certificate ?? null,
 	});
 }
 
@@ -2511,5 +2521,274 @@ describe("links to a page that does not load", () => {
 		}).filter(broken);
 
 		expect(findings[0]?.detail.linkedFrom).toEqual([`${BASE}/`]);
+	});
+});
+
+describe("a certificate that is not what it should be", () => {
+	const certProblem = (f: { type: string }) => f.type === "certificate_problem";
+
+	/**
+	 * An observation stated directly, the way `page` states a content digest.
+	 *
+	 * Minting a real certificate would need OpenSSL or a certificate authority,
+	 * and would make every case here depend on the probe as well as on the rule —
+	 * so a failure would no longer say which of the two was wrong. `tls.test.ts`
+	 * covers the reading; this covers the judging.
+	 */
+	const observed = (days: number | null, error: string | null = null) => ({
+		origin: BASE,
+		issuer: "Test CA",
+		subject: "shop.test",
+		validFrom: new Date(Date.now() - 86_400_000 * 300).toISOString(),
+		validTo:
+			days === null
+				? null
+				: new Date(Date.now() + 86_400_000 * days).toISOString(),
+		subjectAltNames: ["shop.test"],
+		authorizationError: error,
+	});
+
+	it("reports a certificate that has already expired", () => {
+		const findings = detailedFindingsFor({
+			pages: [page("/")],
+			certificate: observed(-3),
+		}).filter(certProblem);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBeNull();
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "expired",
+			origin: BASE,
+			issuer: "Test CA",
+		});
+	});
+
+	it("reports a certificate inside the renewal window", () => {
+		/**
+		 * Thirty days is anchored outside our own taste: Let's Encrypt issues
+		 * ninety-day certificates and renews at thirty remaining, so a certificate
+		 * inside that window on an automated site has already missed a renewal.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [page("/")],
+			certificate: observed(10),
+		}).filter(certProblem);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "expiring_soon",
+			daysRemaining: 10,
+		});
+	});
+
+	it("says nothing about a certificate with months left", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [page("/")],
+				certificate: observed(60),
+			}).filter(certProblem),
+		).toEqual([]);
+	});
+
+	it("reports a certificate issued for a different hostname", () => {
+		const findings = detailedFindingsFor({
+			pages: [page("/")],
+			certificate: observed(60, "ERR_TLS_CERT_ALTNAME_INVALID"),
+		}).filter(certProblem);
+
+		expect(findings[0]?.detail.kind).toBe("hostname_mismatch");
+	});
+
+	it("reports a chain that could not be verified", () => {
+		/**
+		 * Usually a missing intermediate, which is why the code travels with the
+		 * finding: the fix differs from a name mismatch entirely.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [page("/")],
+			certificate: observed(60, "UNABLE_TO_VERIFY_LEAF_SIGNATURE"),
+		}).filter(certProblem);
+
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "untrusted_chain",
+			authorizationError: "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+		});
+	});
+
+	it("calls an expired certificate expired even when the chain also rejected it", () => {
+		/**
+		 * One certificate to replace is one finding. Reporting expiry and rejection
+		 * separately would be two headings for one job.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [page("/")],
+			certificate: observed(-1, "CERT_HAS_EXPIRED"),
+		}).filter(certProblem);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail.kind).toBe("expired");
+	});
+
+	it("says nothing when there was no certificate to read", () => {
+		/**
+		 * A plain-http origin, or a probe that could not connect. Reporting "we
+		 * could not check" as a defect would be a claim about us.
+		 */
+		expect(
+			detailedFindingsFor({ pages: [page("/")], certificate: null }).filter(
+				certProblem,
+			),
+		).toEqual([]);
+	});
+});
+
+describe("security headers the site disagrees with itself about", () => {
+	const headerIssue = (f: { type: string }) =>
+		f.type === "security_header_contradiction";
+
+	const withHeaders = (path: string, securityHeaders: Record<string, string>) =>
+		page(path, { securityHeaders });
+
+	it("says nothing about a header the site never sends", () => {
+		/**
+		 * The negative assertion this whole rule rests on. "Every page should carry
+		 * a Content Security Policy" is our standard, not the site's assertion, and
+		 * a rule resting on it would be a claim about our preferences rather than a
+		 * finding about anybody's site.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [withHeaders("/", {}), withHeaders("/about", {})],
+			}).filter(headerIssue),
+		).toEqual([]);
+	});
+
+	it("says nothing when every page carries the same header", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					withHeaders("/", { "x-frame-options": "SAMEORIGIN" }),
+					withHeaders("/about", { "x-frame-options": "SAMEORIGIN" }),
+				],
+			}).filter(headerIssue),
+		).toEqual([]);
+	});
+
+	it("reports a header the site sends on some pages and not others", () => {
+		/**
+		 * Rule 11's narrowing applied to a second optional thing: the site using the
+		 * header somewhere is what makes its absence elsewhere evidence rather than
+		 * a preference of ours. This is the real defect in the area — a template or
+		 * edge rule that covers most routes and misses a few.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				withHeaders("/", {
+					"strict-transport-security": "max-age=63072000",
+				}),
+				withHeaders("/about", {
+					"strict-transport-security": "max-age=63072000",
+				}),
+				withHeaders("/legacy", {}),
+			],
+		}).filter(headerIssue);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBeNull();
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "inconsistent",
+			header: "strict-transport-security",
+			pagesPublishing: 2,
+			affectedUrls: [`${BASE}/legacy`],
+		});
+	});
+
+	it("says nothing about an inconsistency on a truncated crawl", () => {
+		/**
+		 * This half reasons from absence — the pages that did not carry the header —
+		 * and a truncated run can hold exactly the subset that omits it. The guard
+		 * written after a page ceiling was reported as eighteen defects on a live
+		 * client site.
+		 */
+		expect(
+			detailedFindingsFor({
+				crawlComplete: false,
+				pages: [
+					withHeaders("/", { "referrer-policy": "no-referrer" }),
+					withHeaders("/legacy", {}),
+				],
+			}).filter(headerIssue),
+		).toEqual([]);
+	});
+
+	it("reports an HSTS header with no max-age", () => {
+		/**
+		 * `max-age` is the header's one required directive, so a value without it
+		 * cannot mean what it says. Anchored in the specification rather than in a
+		 * preference about how long the policy should last.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				withHeaders("/", { "strict-transport-security": "includeSubDomains" }),
+			],
+		}).filter(headerIssue);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "malformed",
+			header: "strict-transport-security",
+			value: "includeSubDomains",
+		});
+	});
+
+	it("accepts an HSTS header that does carry a max-age", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					withHeaders("/", {
+						"strict-transport-security": "max-age=31536000; includeSubDomains",
+					}),
+				],
+			}).filter(headerIssue),
+		).toEqual([]);
+	});
+
+	it("reports an X-Content-Type-Options that is not nosniff", () => {
+		/** The specification defines exactly one value for this header. */
+		const findings = detailedFindingsFor({
+			pages: [withHeaders("/", { "x-content-type-options": "sniff" })],
+		}).filter(headerIssue);
+
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "malformed",
+			header: "x-content-type-options",
+		});
+	});
+
+	it("reports a header published with an empty value", () => {
+		/**
+		 * Different from absence, and the reason the crawler records an absent
+		 * header as an absent key: the site published this one and put nothing in
+		 * it, which no specification allows.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [withHeaders("/", { "content-security-policy": "   " })],
+		}).filter(headerIssue);
+
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "malformed",
+			header: "content-security-policy",
+		});
+	});
+
+	it("does not judge a page that failed", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					withHeaders("/", { "referrer-policy": "no-referrer" }),
+					page("/gone", { status: 404 }),
+				],
+			}).filter(headerIssue),
+		).toEqual([]);
 	});
 });

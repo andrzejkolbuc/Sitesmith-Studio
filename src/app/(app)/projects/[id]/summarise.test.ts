@@ -293,6 +293,43 @@ describe("pagesInvolved for metadata findings", () => {
 		).toHaveLength(3);
 	});
 
+	it("counts the pages a security-header contradiction names", () => {
+		expect(
+			pagesInvolved({
+				type: "security_header_contradiction",
+				url: null,
+				detail: {
+					kind: "inconsistent",
+					header: "strict-transport-security",
+					pagesPublishing: 12,
+					affectedUrls: [`${B}/legacy`, `${B}/old`],
+				},
+			}),
+		).toHaveLength(2);
+	});
+
+	it("counts no pages for a certificate problem", () => {
+		/**
+		 * Deliberately zero, and pinned so it cannot be mistaken for a type somebody
+		 * forgot to map. A certificate belongs to the origin rather than to any
+		 * page, so "how many pages does this touch" has no honest answer — and the
+		 * tempting answer, all of them, would put the entire site behind one finding
+		 * and drown every other row in the list.
+		 */
+		expect(
+			pagesInvolved({
+				type: "certificate_problem",
+				url: null,
+				detail: {
+					kind: "expired",
+					origin: B,
+					validTo: "2026-01-01T00:00:00.000Z",
+					daysRemaining: -30,
+				},
+			}),
+		).toEqual([]);
+	});
+
 	it("counts every URL serving duplicated content", () => {
 		/**
 		 * Filed against no page, like every duplicate finding. Without a case here

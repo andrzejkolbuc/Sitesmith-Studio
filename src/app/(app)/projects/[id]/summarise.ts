@@ -142,6 +142,24 @@ export function pagesInvolved(finding: {
 		case "link_broken":
 			return [...one(detail.target), ...strings(detail.linkedFrom)];
 
+		/**
+		 * The pages that did not carry the header, or carried it malformed. The
+		 * finding is about a set of responses, so counting the one it is filed
+		 * against — none — would report it as touching nothing.
+		 */
+		case "security_header_contradiction":
+			return strings(detail.affectedUrls);
+
+		/**
+		 * Deliberately none. A certificate belongs to the origin rather than to any
+		 * page, so "how many pages does this touch" has no honest answer — and
+		 * inventing one would put every page on the site behind a single finding.
+		 * Listed explicitly so this reads as a decision rather than as a type
+		 * somebody forgot.
+		 */
+		case "certificate_problem":
+			return [];
+
 		default:
 			// An unmapped type still counts the page it names, so a new finding
 			// never reports as affecting nothing.

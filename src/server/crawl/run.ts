@@ -224,6 +224,7 @@ async function execute(
 		expectedLocales: project.locales,
 		inScope,
 		reverified: result.reverified,
+		certificate: result.certificate,
 	});
 
 	if (detected.length > 0) {

@@ -382,13 +382,28 @@ quotes `validTo` regardless, so the reader can judge the window themselves.
 
 `security_header_contradiction` emits `url: null`,
 `detail: { kind, header, value, affectedUrls }` with `kind` in
-`"malformed" | "hsts_absent_on_https_only"`. Two cases only. A malformed value is the site
-publishing something that cannot mean what it says. `hsts_absent_on_https_only` fires when
-every crawled http URL redirected to https and no page carries an HSTS header — the site
-asserted https-only by its own redirects and did not tell browsers to remember it. **A merely
-absent CSP, X-Frame-Options or Referrer-Policy is not a finding**: that would be our standard
-rather than the site's assertion, which is the failure `lessons.md` was written after four
-false-positive classes to prevent.
+`"malformed" | "inconsistent"`. Two cases only.
+
+**Revised during implementation, with the decision re-put to the user.** The planned second
+kind was `hsts_absent_on_https_only`, and it is not computable: `origin` is fixed from the
+start URL before any fetch and `inScope` rejects any origin mismatch, so a crawl of an
+`https://` site never records a single http URL and the condition is vacuously false. As
+specified it would have shipped dead code rather than a correctly silent rule.
+
+`inconsistent` replaces it: the site publishes the header on some pages and omits it on
+others. This is rule 11's narrowing applied to a second optional thing — the site using the
+header *somewhere* is what makes its absence elsewhere evidence rather than a preference of
+ours — and it catches the real defect in this area, a template or edge rule that covers most
+routes and misses a few. It reasons from absence, so it gates on `crawlComplete`.
+
+A malformed value is the site publishing something that cannot mean what it says, and each
+check is anchored in the header's own specification: `Strict-Transport-Security` has exactly
+one required directive, `X-Content-Type-Options` exactly one defined value, and an empty
+value is allowed by neither.
+
+**A merely absent CSP, X-Frame-Options or Referrer-Policy is still not a finding**: that
+would be our standard rather than the site's assertion, which is the failure `lessons.md` was
+written after four false-positive classes to prevent.
 
 #### 4. UI, summary and tests
 
@@ -410,9 +425,9 @@ plain-http origin to assert silence.
 - Integration tests pass: `npm run test:integration`
 - A malformed HSTS value produces one `security_header_contradiction`
 - A site with no CSP and no other contradiction produces no finding
-- An https-only fixture without HSTS produces `hsts_absent_on_https_only`
+- A header the site sends on some pages and omits on others produces `kind: "inconsistent"`
 - `probeCertificate` returns null on a plain-http origin and on a connection error
-- An expired self-signed certificate produces `kind: "expired"`
+- An expired certificate produces `kind: "expired"`
 
 #### Manual Verification
 
@@ -1037,38 +1052,38 @@ duration of a run, following the precedent S-05 set when it declined to persist 
 
 #### Automated
 
-- [x] 2.1 Type checking passes: `npm run typecheck`
-- [x] 2.2 Linting and formatting pass: `npm run check`
-- [x] 2.3 Unit tests pass: `npm run test:unit`
-- [x] 2.4 Integration tests pass: `npm run test:integration`
-- [x] 2.5 A 404 linked from three fixture pages yields one finding naming all three
-- [x] 2.6 A flapping 5xx that recovers on re-verification yields no finding
-- [x] 2.7 A target already reported by `canonical_target_broken` yields no `link_broken`
-- [x] 2.8 The re-verification pass issues no requests on an aborted crawl
+- [x] 2.1 Type checking passes: `npm run typecheck` — a35db97
+- [x] 2.2 Linting and formatting pass: `npm run check` — a35db97
+- [x] 2.3 Unit tests pass: `npm run test:unit` — a35db97
+- [x] 2.4 Integration tests pass: `npm run test:integration` — a35db97
+- [x] 2.5 A 404 linked from three fixture pages yields one finding naming all three — a35db97
+- [x] 2.6 A flapping 5xx that recovers on re-verification yields no finding — a35db97
+- [x] 2.7 A target already reported by `canonical_target_broken` yields no `link_broken` — a35db97
+- [x] 2.8 The re-verification pass issues no requests on an aborted crawl — a35db97
 
 #### Manual
 
-- [x] 2.9 A long linker list truncates readably rather than flooding the panel
-- [x] 2.10 Re-verification does not noticeably lengthen a run on a healthy site
+- [x] 2.9 A long linker list truncates readably rather than flooding the panel — a35db97
+- [x] 2.10 Re-verification does not noticeably lengthen a run on a healthy site — a35db97
 
 ### Phase 3: Security headers and certificate
 
 #### Automated
 
-- [ ] 3.1 Type checking passes: `npm run typecheck`
-- [ ] 3.2 Linting and formatting pass: `npm run check`
-- [ ] 3.3 Unit tests pass: `npm run test:unit`
-- [ ] 3.4 Integration tests pass: `npm run test:integration`
-- [ ] 3.5 A malformed HSTS value produces one `security_header_contradiction`
-- [ ] 3.6 A site with no CSP and no other contradiction produces no finding
-- [ ] 3.7 An https-only fixture without HSTS produces `hsts_absent_on_https_only`
-- [ ] 3.8 `probeCertificate` returns null on a plain-http origin and on a connection error
-- [ ] 3.9 An expired self-signed certificate produces `kind: "expired"`
+- [x] 3.1 Type checking passes: `npm run typecheck`
+- [x] 3.2 Linting and formatting pass: `npm run check`
+- [x] 3.3 Unit tests pass: `npm run test:unit`
+- [x] 3.4 Integration tests pass: `npm run test:integration`
+- [x] 3.5 A malformed HSTS value produces one `security_header_contradiction`
+- [x] 3.6 A site with no CSP and no other contradiction produces no finding
+- [x] 3.7 A header the site sends on some pages and omits on others produces `kind: "inconsistent"`
+- [x] 3.8 `probeCertificate` returns null on a plain-http origin and on a connection error
+- [x] 3.9 An expired certificate produces `kind: "expired"`
 
 #### Manual
 
-- [ ] 3.10 The certificate finding reads as a fact about the site, not as a security opinion
-- [ ] 3.11 A well-configured real site produces no security-header findings
+- [x] 3.10 The certificate finding reads as a fact about the site, not as a security opinion
+- [x] 3.11 A well-configured real site produces no security-header findings
 
 ### Phase 4: robots.txt fetch and parser
 

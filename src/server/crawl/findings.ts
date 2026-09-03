@@ -1,6 +1,7 @@
 import { BLOCK_NAMES, type ContentSummary } from "./content";
 import type { CrawledPage, Reverification } from "./crawler";
 import { parseRobotsHeader } from "./metadata";
+import type { CertificateObservation } from "./tls";
 import { normaliseUrl } from "./url";
 import {
 	groupFamilies,
@@ -52,6 +53,10 @@ export const FINDING_TYPES = {
 	CONTENT_DUPLICATED: "content_duplicated",
 	/** A page linked from somewhere on the site that does not load. */
 	LINK_BROKEN: "link_broken",
+	/** A certificate that has expired, is about to, or was not accepted. */
+	CERTIFICATE_PROBLEM: "certificate_problem",
+	/** A security header the site contradicts itself about. */
+	SECURITY_HEADER_CONTRADICTION: "security_header_contradiction",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -90,6 +95,11 @@ export type DetectOptions = {
 	 * reporting one on a single observation.
 	 */
 	reverified: Reverification[];
+	/**
+	 * The certificate the origin presented, or null when there was none to read.
+	 * Null is silence: a probe that could not run is a fact about us.
+	 */
+	certificate: CertificateObservation | null;
 };
 
 /**
@@ -131,8 +141,14 @@ const NOINDEX_DIRECTIVES = new Set(["noindex", "none"]);
  * which matters because a later slice diffs runs against each other.
  */
 export function detectMissingVariants(options: DetectOptions): Finding[] {
-	const { pages, expectedLocales, inScope, crawlComplete, reverified } =
-		options;
+	const {
+		pages,
+		expectedLocales,
+		inScope,
+		crawlComplete,
+		reverified,
+		certificate,
+	} = options;
 
 	const variants = groupVariants(pages);
 
@@ -1333,6 +1349,177 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 				linkedFrom: [...new Set(linkedFrom.get(target) ?? [])].sort(),
 			},
 		});
+	}
+
+	// ── Rule 17: a certificate that is not what it should be ──────────────────
+	//
+	// FR-030's transport half, and the least inferential finding in the product: a
+	// certificate states its own expiry date and the chain either verifies or does
+	// not. Nothing here is our standard.
+	//
+	// One finding per origin, naming the most severe problem observed. A
+	// certificate that is both expired and self-signed is one certificate to
+	// replace, and two findings would be two headings for one job.
+	if (certificate) {
+		const validTo = certificate.validTo ? new Date(certificate.validTo) : null;
+		const daysRemaining =
+			validTo && !Number.isNaN(validTo.getTime())
+				? Math.floor((validTo.getTime() - Date.now()) / 86_400_000)
+				: null;
+
+		/**
+		 * Node's own verdict, translated into what a reader would do about it.
+		 * `ERR_TLS_CERT_ALTNAME_INVALID` is a certificate issued for a different
+		 * hostname; everything else it reports at this point is the chain.
+		 */
+		const rejection = certificate.authorizationError;
+		const expiredByClock = daysRemaining !== null && daysRemaining < 0;
+		const expiredByChain = rejection === "CERT_HAS_EXPIRED";
+		const mismatched = rejection === "ERR_TLS_CERT_ALTNAME_INVALID";
+		const untrusted = rejection !== null && !expiredByChain && !mismatched;
+
+		/**
+		 * Thirty days, and anchored outside our own taste.
+		 *
+		 * Let's Encrypt issues ninety-day certificates and its clients renew at
+		 * thirty days remaining, which is the renewal cadence most of the web now
+		 * runs on. A certificate inside that window on an automated site has
+		 * already missed a renewal it was supposed to make — so the number marks a
+		 * missed event rather than a preference. The finding quotes `validTo`
+		 * regardless, so a reader on a different cadence can judge for themselves.
+		 */
+		const expiringSoon =
+			daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 30;
+
+		const kind =
+			expiredByClock || expiredByChain
+				? "expired"
+				: mismatched
+					? "hostname_mismatch"
+					: untrusted
+						? "untrusted_chain"
+						: expiringSoon
+							? "expiring_soon"
+							: null;
+
+		if (kind !== null) {
+			findings.push({
+				type: FINDING_TYPES.CERTIFICATE_PROBLEM,
+				url: null,
+				detail: {
+					kind,
+					origin: certificate.origin,
+					validTo: certificate.validTo,
+					daysRemaining,
+					issuer: certificate.issuer,
+					subject: certificate.subject,
+					authorizationError: rejection,
+				},
+			});
+		}
+	}
+
+	// ── Rule 18: a security header the site contradicts itself about ──────────
+	//
+	// FR-030's header half, and the shape of it is the whole decision. **A header
+	// the site never sends is not reported.** "Every page should carry a Content
+	// Security Policy" is our standard, not the site's assertion, and a rule
+	// resting on it would be the fifth entry in `lessons.md` rather than a finding
+	// about anybody's site.
+	//
+	// What is reportable is the site disagreeing with itself, in two ways.
+	//
+	// `malformed` — a header present with a value that cannot mean what it says.
+	// Each check below is anchored in the header's own specification, not in a
+	// preference: `Strict-Transport-Security` has exactly one required directive,
+	// and `X-Content-Type-Options` has exactly one defined value.
+	//
+	// `inconsistent` — published on some pages and omitted on others. This is
+	// rule 11's narrowing applied to a second optional thing: the site using the
+	// header *somewhere* is what makes its absence elsewhere evidence rather than
+	// a preference of ours. It catches the real defect in this area — a template
+	// or edge rule that covers most routes and misses a few.
+	const headerPages = [...pages]
+		.filter((page) => !isError(page))
+		.sort((a, b) => a.url.localeCompare(b.url));
+
+	/** Names in the order the crawler collects them, so output is stable. */
+	const headerNames = [
+		...new Set(
+			headerPages.flatMap((page) => Object.keys(page.securityHeaders)),
+		),
+	].sort();
+
+	for (const header of headerNames) {
+		const malformed: Array<{ url: string; value: string }> = [];
+
+		for (const page of headerPages) {
+			const value = page.securityHeaders[header];
+			if (value === undefined) continue;
+
+			const trimmed = value.trim();
+			const invalid =
+				trimmed === "" ||
+				(header === "strict-transport-security" &&
+					!/(^|[;\s])max-age\s*=\s*\d+/i.test(trimmed)) ||
+				(header === "x-content-type-options" &&
+					trimmed.toLowerCase() !== "nosniff");
+
+			if (invalid) malformed.push({ url: page.url, value });
+		}
+
+		if (malformed.length > 0) {
+			findings.push({
+				type: FINDING_TYPES.SECURITY_HEADER_CONTRADICTION,
+				url: null,
+				detail: {
+					kind: "malformed",
+					header,
+					/** The value as published, so the reader can see what is wrong. */
+					value: malformed[0]?.value ?? "",
+					affectedUrls: malformed.map((entry) => entry.url).sort(),
+				},
+			});
+		}
+	}
+
+	/**
+	 * Only on a crawl that finished.
+	 *
+	 * This half reasons from absence — the pages that did *not* carry the header —
+	 * and a truncated run can hold exactly the subset that omits it. That is the
+	 * guard written after a ceiling was reported as eighteen defects on a live
+	 * client site.
+	 */
+	if (crawlComplete) {
+		for (const header of headerNames) {
+			const publishing = headerPages.filter(
+				(page) => page.securityHeaders[header] !== undefined,
+			);
+			const omitting = headerPages.filter(
+				(page) => page.securityHeaders[header] === undefined,
+			);
+
+			// Agreement, either way, is not a contradiction.
+			if (publishing.length === 0 || omitting.length === 0) continue;
+
+			findings.push({
+				type: FINDING_TYPES.SECURITY_HEADER_CONTRADICTION,
+				url: null,
+				detail: {
+					kind: "inconsistent",
+					header,
+					/**
+					 * The narrowing's own evidence, carried into the finding — the same
+					 * reason rule 11 carries `pagesDeclaringCanonical`. Without it the
+					 * reader is told a page lacks something optional and cannot see why
+					 * that was worth reporting.
+					 */
+					pagesPublishing: publishing.length,
+					affectedUrls: omitting.map((page) => page.url).sort(),
+				},
+			});
+		}
 	}
 
 	return findings;

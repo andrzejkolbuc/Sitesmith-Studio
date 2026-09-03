@@ -521,6 +521,23 @@ const SITE: Record<string, Page> = {
 	},
 
 	/**
+	 * Security headers on the wire, for the capture test.
+	 *
+	 * Placed under `/private/` and linked from nothing, so it is reachable only as
+	 * an explicit start URL. Every detection crawl excludes this prefix — which
+	 * matters, because a single page carrying a header the rest of the site does
+	 * not would make the whole fixture inconsistent about that header and put a
+	 * thirty-URL finding in front of every other assertion here.
+	 */
+	"/private/security-headers": {
+		headers: {
+			"strict-transport-security": "max-age=63072000; includeSubDomains",
+			"x-content-type-options": "nosniff",
+			"referrer-policy": "strict-origin-when-cross-origin",
+		},
+	},
+
+	/**
 	 * A page linking to several always-failing URLs, so a crawl can accumulate a
 	 * *burst* of failures. A single failing URL cannot: it returns one error, has
 	 * no links, and the crawl ends before any threshold is reached.

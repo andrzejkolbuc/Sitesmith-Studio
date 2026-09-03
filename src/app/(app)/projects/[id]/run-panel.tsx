@@ -55,6 +55,28 @@ const FINDING_LABEL: Record<string, string> = {
 	noindex_present: "Pages asking not to be indexed",
 	content_duplicated: "One page's content at several URLs",
 	link_broken: "Links to a page that does not load",
+	certificate_problem: "Certificate problems",
+	security_header_contradiction:
+		"Security headers the site disagrees with itself about",
+};
+
+/** Security headers in the reader's words, the same split `FIELD_LABEL` makes. */
+const HEADER_LABEL: Record<string, string> = {
+	"strict-transport-security": "HSTS (Strict-Transport-Security)",
+	"content-security-policy": "Content-Security-Policy",
+	"x-frame-options": "X-Frame-Options",
+	"x-content-type-options": "X-Content-Type-Options",
+	"referrer-policy": "Referrer-Policy",
+	"permissions-policy": "Permissions-Policy",
+};
+
+/** What each certificate problem means, in a sentence the reader can act on. */
+const CERTIFICATE_LABEL: Record<string, string> = {
+	expired: "has expired",
+	expiring_soon: "expires soon",
+	hostname_mismatch: "was issued for a different hostname",
+	untrusted_chain:
+		"could not be verified — the chain is incomplete or untrusted",
 };
 
 /**
@@ -994,6 +1016,69 @@ function Evidence({
 						{linkedFrom.length === 1 ? "page" : "pages"}
 					</div>
 					<Listed items={linkedFrom.map(pathOf)} />
+				</>
+			);
+		}
+
+		case "certificate_problem": {
+			const kind = str("kind") ?? "";
+			const days = detail.daysRemaining;
+
+			/**
+			 * The expiry date itself, always, whatever the kind. The thirty-day
+			 * window is a cadence most of the web happens to run on rather than a
+			 * law, so a reader on a different one needs the date to judge from.
+			 */
+			return (
+				<>
+					<span className="text-ink">
+						The certificate for {str("origin")}{" "}
+						{CERTIFICATE_LABEL[kind] ?? kind}
+					</span>
+					<div className="mt-1.5 text-ink-soft text-xs">
+						{str("validTo") ? `Valid until ${str("validTo")}` : null}
+						{typeof days === "number"
+							? ` · ${days < 0 ? `${-days} days ago` : `${days} days from now`}`
+							: null}
+					</div>
+					{str("issuer") ? (
+						<div className="mt-1 text-ink-faint text-xs">
+							Issued by {str("issuer")}
+						</div>
+					) : null}
+				</>
+			);
+		}
+
+		case "security_header_contradiction": {
+			const affected = Array.isArray(detail.affectedUrls)
+				? (detail.affectedUrls as string[])
+				: [];
+			const header = str("header") ?? "";
+			const malformed = detail.kind === "malformed";
+
+			return (
+				<>
+					<span className="text-ink">
+						<Tag tone="flag">{HEADER_LABEL[header] ?? header}</Tag>{" "}
+						{malformed
+							? `published with a value that cannot be read, on ${affected.length} ${
+									affected.length === 1 ? "page" : "pages"
+								}`
+							: `missing from ${affected.length} ${
+									affected.length === 1 ? "page" : "pages"
+								} the site sends it on elsewhere`}
+					</span>
+					{malformed ? (
+						<div className="mt-1.5 max-w-prose break-all text-ink-soft text-xs italic">
+							“{str("value")}”
+						</div>
+					) : (
+						<div className="mt-1.5 text-ink-soft text-xs">
+							Sent on {Number(detail.pagesPublishing ?? 0)} other pages
+						</div>
+					)}
+					<Listed items={affected.map(pathOf)} />
 				</>
 			);
 		}

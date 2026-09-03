@@ -310,6 +310,46 @@ describe("metadata capture", () => {
 		]);
 	});
 
+	it("records the security headers on the closed list, and only those", async () => {
+		/**
+		 * The capture, over real HTTP rather than through a hand-built record. The
+		 * rules are tested against stated headers; this is the half that proves the
+		 * headers arrive at all.
+		 *
+		 * Reached by pointing the crawl at it directly: the page lives under
+		 * `/private/`, so no detection crawl sees it and one page carrying headers
+		 * the rest of the fixture lacks cannot make the whole site look
+		 * inconsistent.
+		 */
+		const result = await crawl({
+			...base(),
+			startUrl: `${site.baseUrl}/private/security-headers`,
+			excludePaths: [],
+			maxPages: 1,
+		});
+
+		const headers = result.pages[0]?.securityHeaders ?? {};
+
+		expect(headers["strict-transport-security"]).toBe(
+			"max-age=63072000; includeSubDomains",
+		);
+		expect(headers["x-content-type-options"]).toBe("nosniff");
+		expect(headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+
+		/**
+		 * An absent header is an absent key, never an empty string. The rules read
+		 * that distinction to tell a site saying nothing from a site publishing a
+		 * header with nothing in it, and only the second is a defect.
+		 */
+		expect("content-security-policy" in headers).toBe(false);
+		// Nothing outside the closed list is retained, whatever the server sent.
+		expect(Object.keys(headers).sort()).toEqual([
+			"referrer-policy",
+			"strict-transport-security",
+			"x-content-type-options",
+		]);
+	});
+
 	it("records a page that published no title and no description", async () => {
 		const pages = await crawled();
 		const bare = pages.get("/meta/bare");

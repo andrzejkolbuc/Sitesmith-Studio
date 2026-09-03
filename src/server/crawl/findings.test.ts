@@ -36,6 +36,7 @@ const page = (
 	 */
 	metadata: { ...emptyMetadata(), title: url, description: `About ${url}` },
 	xRobotsTag: null,
+	securityHeaders: {},
 	fetchError: null,
 });
 
@@ -129,6 +130,7 @@ describe("detectMissingVariants against the fixture site", () => {
 				// The fixture is small enough that every crawl here reaches the end.
 				crawlComplete: true,
 				reverified: [],
+				certificate: null,
 			}),
 		};
 	}
@@ -593,6 +595,7 @@ describe("detectMissingVariants edge cases", () => {
 			expectedLocales: ["en", "de", "fr"],
 			crawlComplete: true,
 			reverified: [],
+			certificate: null,
 			inScope: allInScope,
 		});
 
@@ -618,6 +621,7 @@ describe("detectMissingVariants edge cases", () => {
 			content: emptyContent(true),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
+			securityHeaders: {},
 			fetchError: null,
 		};
 		// The declared German page exists but is broken, and its URL carries no
@@ -630,6 +634,7 @@ describe("detectMissingVariants edge cases", () => {
 			content: emptyContent(true),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
+			securityHeaders: {},
 			fetchError: null,
 		};
 
@@ -638,6 +643,7 @@ describe("detectMissingVariants edge cases", () => {
 			expectedLocales: ["en", "de"],
 			crawlComplete: true,
 			reverified: [],
+			certificate: null,
 			inScope: allInScope,
 		});
 
@@ -665,6 +671,7 @@ describe("detectMissingVariants edge cases", () => {
 			content: emptyContent(true),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
+			securityHeaders: {},
 			fetchError: null,
 		};
 		const de: CrawledPage = {
@@ -678,6 +685,7 @@ describe("detectMissingVariants edge cases", () => {
 			content: emptyContent(true),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
+			securityHeaders: {},
 			fetchError: null,
 		};
 
@@ -686,6 +694,7 @@ describe("detectMissingVariants edge cases", () => {
 			expectedLocales: ["en", "de", "fr"],
 			crawlComplete: true,
 			reverified: [],
+			certificate: null,
 			inScope: allInScope,
 		});
 
@@ -705,6 +714,7 @@ describe("detectMissingVariants edge cases", () => {
 			content: emptyContent(true),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
+			securityHeaders: {},
 			fetchError: null,
 		};
 
@@ -713,6 +723,7 @@ describe("detectMissingVariants edge cases", () => {
 			expectedLocales: ["en", "de"],
 			crawlComplete: true,
 			reverified: [],
+			certificate: null,
 			inScope: allInScope,
 		});
 

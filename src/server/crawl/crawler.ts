@@ -18,6 +18,7 @@ import {
 	MAX_METADATA_CHARS,
 	type PageMetadata,
 } from "./metadata";
+import { type CertificateObservation, probeCertificate } from "./tls";
 import { normaliseUrl } from "./url";
 
 export { normaliseUrl } from "./url";
@@ -92,6 +93,18 @@ export type CrawledPage = {
 	 * that have no other channel available.
 	 */
 	xRobotsTag: string | null;
+	/**
+	 * The security-relevant response headers, by lowercase name.
+	 *
+	 * A named, closed set rather than the `Headers` object, for the reason
+	 * `xRobotsTag` is a string: retaining an unbounded structure would multiply it
+	 * by the two-thousand-page ceiling. Each value is capped the same way.
+	 *
+	 * An absent header is an absent key, never an empty string. The two are
+	 * different claims — one is the site saying nothing, the other is the site
+	 * publishing a header with nothing in it — and only the second is a defect.
+	 */
+	securityHeaders: Record<string, string>;
 	fetchError: string | null;
 };
 
@@ -128,7 +141,28 @@ export type CrawlResult = {
 	 * ask again.
 	 */
 	reverified: Reverification[];
+	/**
+	 * The certificate the origin presented, or null when there was none to read —
+	 * a plain-http origin, or a probe that could not connect.
+	 */
+	certificate: CertificateObservation | null;
 };
+
+/**
+ * The response headers worth keeping, lowercased.
+ *
+ * A closed list, following the same discipline the robots vocabulary follows:
+ * the set of headers we are willing to say anything about is fixed here, so a
+ * rule cannot quietly start judging a header nobody decided to collect.
+ */
+const SECURITY_HEADERS = [
+	"strict-transport-security",
+	"content-security-policy",
+	"x-frame-options",
+	"x-content-type-options",
+	"referrer-policy",
+	"permissions-policy",
+] as const;
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_FAILURE_BURST = 5;
@@ -251,10 +285,22 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 			abortedReason: `Start URL is not a valid http(s) URL: ${options.startUrl}`,
 			reachedPageLimit: false,
 			reverified: [],
+			certificate: null,
 		};
 	}
 
 	const origin = new URL(start).origin;
+
+	/**
+	 * One handshake, before any page is fetched.
+	 *
+	 * Per origin rather than per page, so it costs a single connection against a
+	 * run that already makes hundreds of requests — which is why it does not go
+	 * through the pacer: there is nothing to pace. It runs first so that a run
+	 * aborting early still carries the observation.
+	 */
+	const certificate = await probeCertificate(origin, requestTimeoutMs);
+
 	const frontier: string[] = [start];
 	const seen = new Set<string>([start]);
 	/**
@@ -310,6 +356,20 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 
 			const xRobotsTag = response.headers.get("x-robots-tag");
 
+			/**
+			 * Only the names on the closed list, and only the ones actually sent. A
+			 * header the site did not publish leaves no key, so a rule can tell
+			 * "absent" from "present and empty" — which is the only distinction that
+			 * makes a defect out of either.
+			 */
+			const securityHeaders: Record<string, string> = {};
+			for (const name of SECURITY_HEADERS) {
+				const value = response.headers.get(name);
+				if (value !== null) {
+					securityHeaders[name] = value.slice(0, MAX_METADATA_CHARS);
+				}
+			}
+
 			return {
 				url: served,
 				httpStatus: response.status,
@@ -318,6 +378,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 				content: extractContent(html, isHtml),
 				metadata: extractMetadata(html, served),
 				xRobotsTag: xRobotsTag?.slice(0, MAX_METADATA_CHARS) ?? null,
+				securityHeaders,
 				fetchError: null,
 			};
 		} catch (caught) {
@@ -329,6 +390,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 				content: emptyContent(false),
 				metadata: emptyMetadata(),
 				xRobotsTag: null,
+				securityHeaders: {},
 				fetchError: caught instanceof Error ? caught.message : String(caught),
 			};
 		} finally {
@@ -487,5 +549,5 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 		}
 	}
 
-	return { pages, abortedReason, reachedPageLimit, reverified };
+	return { pages, abortedReason, reachedPageLimit, reverified, certificate };
 }
