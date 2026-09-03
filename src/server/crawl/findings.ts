@@ -48,6 +48,8 @@ export const FINDING_TYPES = {
 	CANONICAL_TARGET_BROKEN: "canonical_target_broken",
 	/** A page telling search engines not to index it, from either channel. */
 	NOINDEX_PRESENT: "noindex_present",
+	/** Several URLs serving byte-identical content, in any language. */
+	CONTENT_DUPLICATED: "content_duplicated",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -562,6 +564,18 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 	 * family, and the members it did not reach are the ones most likely to carry
 	 * the real translation.
 	 */
+
+	/**
+	 * The identical sets this rule has already spoken for.
+	 *
+	 * Read by rule 15, which asks a wider question over the same digests and would
+	 * otherwise report the same URLs a second time under a second heading. Keyed on
+	 * the digest *and* the exact set of URLs rather than the digest alone: if a page
+	 * outside the family carries the same content, that is a larger fact than this
+	 * rule observed, and rule 15 should still be free to say so.
+	 */
+	const identicalSetsReported = new Set<string>();
+
 	if (crawlComplete) {
 		for (const family of variantFamilies) {
 			if (family.members.length < 2) continue;
@@ -593,7 +607,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 				]);
 			}
 
-			for (const [, sharing] of [...byDigest.entries()].sort(([a], [b]) =>
+			for (const [digest, sharing] of [...byDigest.entries()].sort(([a], [b]) =>
 				a.localeCompare(b),
 			)) {
 				/**
@@ -615,6 +629,9 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 				if (languages.size < 2) continue;
 
 				const locales = new Set(sharing.map((m) => m.locale));
+				const urls = sharing.map((m) => m.url).sort();
+
+				identicalSetsReported.add(JSON.stringify([digest, urls]));
 
 				findings.push({
 					type: FINDING_TYPES.CONTENT_UNTRANSLATED,
@@ -622,7 +639,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 					detail: {
 						kind: "identical_to_siblings",
 						groupKey: family.groupKey,
-						urls: sharing.map((m) => m.url).sort(),
+						urls,
 						locales: [...locales].sort(),
 					},
 				});
@@ -751,6 +768,20 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 	// sharing a title compete for the same query, which is the whole reason
 	// duplicate titles matter.
 	//
+	// **Pages with no established language form their own bucket** rather than
+	// being skipped. The original refusal was right about what it was refusing:
+	// calling two pages duplicates *in a language* neither of them declared is a
+	// claim about our guess. But it also made the rule silent on a site that
+	// publishes one language and says so nowhere — no hreflang, no locale path
+	// segment — which is every monolingual site, and FR-020 asks about duplicates
+	// "across URLs" without qualifying by language at all.
+	//
+	// Bucketing rather than merging keeps both readings honest. Two unlocalised
+	// pages sharing a title share it, and that is the site's own assertion with no
+	// guess in it. An unlocalised page and a `de` page sharing one are not compared,
+	// because deciding they are the same language would be the guess the original
+	// refusal named.
+	//
 	// Only on a crawl that finished. The finding's substance is a list of every
 	// page carrying the string, and a truncated run can hold one member of a
 	// pair and not the other — so the list would describe where we stopped
@@ -758,21 +789,25 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 	if (crawlComplete) {
 		const byValue = new Map<
 			string,
-			{ field: string; language: string; value: string; urls: string[] }
+			{
+				field: string;
+				language: string | null;
+				value: string;
+				urls: string[];
+			}
 		>();
 
 		for (const page of [...pages].sort((a, b) => a.url.localeCompare(b.url))) {
 			if (isError(page)) continue;
 
 			/**
-			 * A page whose language nothing established cannot be said to duplicate
-			 * another *in that language* — there is no language to have shared. The
-			 * same refusal rule 7 makes, and for the same reason: comparing them
-			 * anyway would be a claim about our guess rather than about the site.
+			 * Null when nothing established a language, and carried as null rather
+			 * than as a placeholder string. A page could publish a title in a locale
+			 * literally named `unknown`, and collapsing the two would report a real
+			 * language and our absence of one as the same bucket.
 			 */
 			const locale = variants.get(page.url)?.locale;
-			if (!locale) continue;
-			const language = locale.split(/[-_]/)[0] ?? locale;
+			const language = locale ? (locale.split(/[-_]/)[0] ?? locale) : null;
 
 			for (const [field, value] of [
 				["title", page.metadata.title],
@@ -1086,6 +1121,108 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 				indexingChannels,
 			},
 		});
+	}
+
+	// ── Rule 15: several URLs serving the same content ────────────────────────
+	//
+	// FR-020's content half. Rule 7 asks whether a family's *languages* were
+	// translated; this asks the wider question the requirement actually poses —
+	// whether the same content is published at more than one address — and it is
+	// deliberately indifferent to language, because whether two URLs serve the
+	// same bytes has nothing to do with what language those bytes are in.
+	//
+	// Exact digest equality, and no similarity metric. Two URLs serving identical
+	// content is something the site did; two URLs at ninety-odd percent similarity
+	// is our tokenisation, our region selection, our similarity function and our
+	// threshold — four of our decisions and none of the site's. A ratio is
+	// deferred for the same reason the word-count signal was deferred out of S-03,
+	// and any future proposal has to state its number *and* its measured firing
+	// rate against a real client crawl before it is planned.
+	//
+	// One finding per identical set, never per page — rule 7's shape, for rule 7's
+	// reason. A CMS serving one article at four addresses is one defect.
+	if (crawlComplete) {
+		const byDigest = new Map<string, string[]>();
+
+		for (const page of [...pages].sort((a, b) => a.url.localeCompare(b.url))) {
+			if (isError(page)) continue;
+			if (!page.content.isHtml) continue;
+
+			/**
+			 * Only pages whose content we actually isolated — and the guard matters
+			 * more here than it does in rule 8.
+			 *
+			 * Within a family the members share a template, so a fallback summary at
+			 * least carries the same navigation on both sides. Across arbitrary URLs
+			 * it does not: a listing page declines isolation while an article page
+			 * isolates, so comparing the two compares a `<main>` against a whole body.
+			 * Any finding from that describes our extraction rather than the site.
+			 */
+			if (!page.content.isolated) continue;
+
+			/**
+			 * Null below the comparable-length floor, which is inherited rather than
+			 * restated. Two nearly-empty pages match by accident.
+			 */
+			const digest = page.content.textDigest;
+			if (!digest) continue;
+
+			byDigest.set(digest, [...(byDigest.get(digest) ?? []), page.url]);
+		}
+
+		for (const [digest, sharing] of [...byDigest.entries()].sort(([a], [b]) =>
+			a.localeCompare(b),
+		)) {
+			// One page serving its own content is a page serving its own content.
+			if (sharing.length < 2) continue;
+
+			const urls = [...sharing].sort();
+
+			/**
+			 * Already said, for this exact set. Rule 7 reached the same URLs from the
+			 * family side and named the more specific defect — that a translation was
+			 * never made — so repeating it here would be one problem under two
+			 * headings. A set rule 7 did not report, or reported with fewer members,
+			 * still belongs to this rule.
+			 */
+			if (identicalSetsReported.has(JSON.stringify([digest, urls]))) continue;
+
+			/**
+			 * Resolved by the site itself. Two URLs serving identical content where
+			 * both name the same canonical is not a defect — it is a site telling
+			 * search engines which address counts, which is the documented remedy for
+			 * duplicate content. Reporting it anyway would blame a site for doing the
+			 * thing this finding exists to ask for, and would repeat the redirect-alias
+			 * false positive under a third name.
+			 */
+			const addresses = new Set(
+				urls.map((url) => {
+					const page = byUrl.get(url);
+					if (!page) return url;
+					const canonicals = canonicalsOf(page);
+					return canonicals.length === 1
+						? (canonicals[0] ?? selfUrl(page))
+						: selfUrl(page);
+				}),
+			);
+			if (addresses.size === 1) continue;
+
+			findings.push({
+				type: FINDING_TYPES.CONTENT_DUPLICATED,
+				url: null,
+				detail: {
+					digest,
+					/**
+					 * The same on every member by definition — the digests matched — so
+					 * it is read from whichever came first. Carried because "these pages
+					 * are identical" reads very differently for three hundred characters
+					 * than for three thousand.
+					 */
+					textLength: byUrl.get(urls[0] ?? "")?.content.textLength ?? 0,
+					urls,
+				},
+			});
+		}
 	}
 
 	return findings;

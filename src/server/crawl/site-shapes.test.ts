@@ -1525,17 +1525,47 @@ describe("titles and descriptions", () => {
 		).toHaveLength(1);
 	});
 
-	it("never reports a page whose language nothing established", () => {
+	it("reports two pages whose language nothing established, as their own bucket", () => {
 		/**
-		 * Two pages with no locale in the URL and no hreflang. They may well share a
-		 * title, but "in the same language" is our guess rather than the site's
-		 * statement — and a finding resting on a guess is a claim about us.
+		 * Two pages with no locale in the URL and no hreflang — every page of a
+		 * monolingual site.
+		 *
+		 * This expectation is the reverse of the one that shipped with S-05, and the
+		 * reversal is a change of requirement rather than a rule fitted to its own
+		 * output. S-05 refused these pages because calling them duplicates *in a
+		 * language* neither declared is a claim about our guess, and that reasoning
+		 * still holds — it is why the bucket is separate rather than merged. What it
+		 * did not cover is FR-020, which asks about duplicates "across URLs" and
+		 * qualifies by nothing at all. Sharing a title is the site's own assertion
+		 * whether or not it ever named a language.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/legal", { metadata: { title: "Legal information" } }),
+				page("/privacy", { metadata: { title: "Legal information" } }),
+			],
+		}).filter(duplicated);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail).toMatchObject({
+			field: "title",
+			language: null,
+			value: "Legal information",
+			urls: [`${BASE}/legal`, `${BASE}/privacy`],
+		});
+	});
+
+	it("does not compare an unlocalised page against a localised one", () => {
+		/**
+		 * The guess S-05's refusal was actually about, and it is still refused.
+		 * Deciding that a page declaring no language shares German's bucket would be
+		 * our inference; the buckets stay apart and neither page is reported.
 		 */
 		expect(
 			detailedFindingsFor({
 				pages: [
-					page("/legal", { metadata: { title: "Legal information" } }),
-					page("/privacy", { metadata: { title: "Legal information" } }),
+					page("/legal", { metadata: { title: "Impressum" } }),
+					page("/de/impressum", { metadata: { title: "Impressum" } }),
 				],
 			}).filter(duplicated),
 		).toEqual([]);
@@ -2057,5 +2087,214 @@ describe("pages asking not to be indexed", () => {
 				pages: [page("/en/staging", { xRobotsTag: "noindex" })],
 			}).filter(noindex),
 		).toHaveLength(1);
+	});
+});
+
+describe("one page's content at several URLs", () => {
+	const duplicatedContent = (f: { type: string }) =>
+		f.type === "content_duplicated";
+
+	/**
+	 * A page whose content the extractor isolated and that carries enough text to
+	 * be worth comparing. The default `page` helper produces neither, so every
+	 * case here states both — and the cases that mean "not comparable" say so by
+	 * leaving one of them out.
+	 */
+	const body = (digest: string, textLength = 800) => ({
+		isolated: true,
+		textDigest: digest,
+		textLength,
+	});
+
+	it("reports two URLs serving the same content, once, naming both", () => {
+		/**
+		 * The case rule 7 deliberately declines: two URLs, one language, one body.
+		 * Its comment calls this out in as many words — "two URLs serving one
+		 * language identically is duplicate content — a real problem, a different
+		 * one" — and this is that different problem, which is FR-020.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/en/article", { content: body("d1") }),
+				page("/en/article-copy", { content: body("d1") }),
+			],
+		}).filter(duplicatedContent);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBeNull();
+		expect(findings[0]?.detail).toMatchObject({
+			digest: "d1",
+			textLength: 800,
+			urls: [`${BASE}/en/article`, `${BASE}/en/article-copy`],
+		});
+	});
+
+	it("reports across languages too, where no family connects the pages", () => {
+		/**
+		 * Indifferent to language on purpose. Whether two URLs serve the same bytes
+		 * is not a question about what language those bytes are in — and with no
+		 * hreflang between them there is no family for rule 7 to have spoken about.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/article", { content: body("d1") }),
+					page("/de/artikel", { content: body("d1") }),
+				],
+			}).filter(duplicatedContent),
+		).toHaveLength(1);
+	});
+
+	it("says nothing about a set rule 7 already reported", () => {
+		/**
+		 * Two declared siblings serving one body. Rule 7 names the more specific
+		 * defect — a translation that was never made — so repeating the same URLs
+		 * here would be one problem under two headings.
+		 */
+		const alternates = { en: "/en/x", de: "/de/x" };
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/en/x", { hreflang: alternates, content: body("d1") }),
+				page("/de/x", { hreflang: alternates, content: body("d1") }),
+			],
+		});
+
+		expect(findings.filter(duplicatedContent)).toEqual([]);
+		expect(
+			findings.filter((f) => f.type === "content_untranslated"),
+		).toHaveLength(1);
+	});
+
+	it("still reports when a page outside the family shares the content", () => {
+		/**
+		 * A larger fact than rule 7 observed. Suppressing on the digest alone would
+		 * lose the third URL entirely, so the suppression is keyed on the exact set
+		 * rule 7 named.
+		 */
+		const alternates = { en: "/en/x", de: "/de/x" };
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/x", { hreflang: alternates, content: body("d1") }),
+					page("/de/x", { hreflang: alternates, content: body("d1") }),
+					page("/archive/x", { content: body("d1") }),
+				],
+			}).filter(duplicatedContent),
+		).toHaveLength(1);
+	});
+
+	it("says nothing when the site canonicalises the copies to one address", () => {
+		/**
+		 * The documented remedy for duplicate content, working. A site that names
+		 * one canonical for both URLs has already said which address counts, and
+		 * reporting it would blame the site for doing the thing this finding exists
+		 * to ask for.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/article", {
+						content: body("d1"),
+						metadata: { canonicals: [`${BASE}/en/article`] },
+					}),
+					page("/en/article-copy", {
+						content: body("d1"),
+						metadata: { canonicals: [`${BASE}/en/article`] },
+					}),
+				],
+			}).filter(duplicatedContent),
+		).toEqual([]);
+	});
+
+	it("says nothing about pages whose content was never isolated", () => {
+		/**
+		 * A fallback summary carries the navigation with it, and across arbitrary
+		 * URLs the two sides may not even describe the same region — a `<main>` on
+		 * one and a whole body on the other. Declining is the honest answer, and the
+		 * same one rule 8 gives.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/article", {
+						content: { isolated: false, textDigest: "d1", textLength: 800 },
+					}),
+					page("/en/article-copy", {
+						content: { isolated: false, textDigest: "d1", textLength: 800 },
+					}),
+				],
+			}).filter(duplicatedContent),
+		).toEqual([]);
+	});
+
+	it("says nothing about pages with too little text to compare", () => {
+		/**
+		 * The comparable-length floor, inherited rather than restated: the extractor
+		 * publishes no digest below it, so two nearly-empty pages cannot match.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/thin", { content: { isolated: true, textLength: 40 } }),
+					page("/en/thin-copy", {
+						content: { isolated: true, textLength: 40 },
+					}),
+				],
+			}).filter(duplicatedContent),
+		).toEqual([]);
+	});
+
+	it("says nothing about a response that was never HTML", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/brochure.pdf", {
+						content: { ...body("d1"), isHtml: false },
+					}),
+					page("/brochure-copy.pdf", {
+						content: { ...body("d1"), isHtml: false },
+					}),
+				],
+			}).filter(duplicatedContent),
+		).toEqual([]);
+	});
+
+	it("does not count a failed page towards a duplicate", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/article", { content: body("d1") }),
+					page("/en/article-copy", { status: 404, content: body("d1") }),
+				],
+			}).filter(duplicatedContent),
+		).toEqual([]);
+	});
+
+	it("says nothing about a duplicate on a truncated crawl", () => {
+		/**
+		 * The same guard rule 10 carries, for the same reason. The finding's
+		 * substance is the list of URLs serving the content, and a run that stopped
+		 * at its ceiling can hold one member of a pair and not the other.
+		 */
+		expect(
+			detailedFindingsFor({
+				crawlComplete: false,
+				pages: [
+					page("/en/article", { content: body("d1") }),
+					page("/en/article-copy", { content: body("d1") }),
+				],
+			}).filter(duplicatedContent),
+		).toEqual([]);
+	});
+
+	it("says nothing when every page serves its own content", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/en/article", { content: body("d1") }),
+					page("/en/other", { content: body("d2") }),
+				],
+			}).filter(duplicatedContent),
+		).toEqual([]);
 	});
 });

@@ -1018,20 +1018,20 @@ duration of a run, following the precedent S-05 set when it declined to persist 
 
 #### Automated
 
-- [ ] 1.1 Type checking passes: `npm run typecheck`
-- [ ] 1.2 Linting and formatting pass: `npm run check`
-- [ ] 1.3 Unit tests pass: `npm run test:unit`
-- [ ] 1.4 Integration tests pass: `npm run test:integration`
-- [ ] 1.5 A same-language duplicate content pair produces exactly one `content_duplicated` finding
-- [ ] 1.6 Two unlocalised pages sharing a title produce a `metadata_duplicated` finding
-- [ ] 1.7 Existing `metadata_duplicated` behaviour on localised pages is unchanged
-- [ ] 1.8 A family already reported by `content_untranslated` produces no `content_duplicated`
-- [ ] 1.9 Mutation check: inverting the `isolated` guard fails at least one test
+- [x] 1.1 Type checking passes: `npm run typecheck`
+- [x] 1.2 Linting and formatting pass: `npm run check`
+- [x] 1.3 Unit tests pass: `npm run test:unit`
+- [x] 1.4 Integration tests pass: `npm run test:integration`
+- [x] 1.5 A same-language duplicate content pair produces exactly one `content_duplicated` finding
+- [x] 1.6 Two unlocalised pages sharing a title produce a `metadata_duplicated` finding
+- [x] 1.7 Existing `metadata_duplicated` behaviour on localised pages is unchanged
+- [x] 1.8 A family already reported by `content_untranslated` produces no `content_duplicated`
+- [x] 1.9 Mutation check: inverting the `isolated` guard fails at least one test
 
 #### Manual
 
-- [ ] 1.10 Both findings render readably in the run panel with no raw JSON
-- [ ] 1.11 The unlocalised bucket reads as "no language established", not as a blank language
+- [x] 1.10 Both findings render readably in the run panel with no raw JSON
+- [x] 1.11 The unlocalised bucket reads as "no language established", not as a blank language
 
 ### Phase 2: Link graph and broken internal links
 

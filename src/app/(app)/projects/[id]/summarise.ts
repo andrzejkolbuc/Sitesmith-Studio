@@ -126,6 +126,14 @@ export function pagesInvolved(finding: {
 		case "noindex_present":
 			return one(detail.url);
 
+		/**
+		 * Every URL serving the shared content. Filed against none of them for the
+		 * same reason `metadata_duplicated` is — the problem is that there are
+		 * several — so counting one would understate the whole of it.
+		 */
+		case "content_duplicated":
+			return strings(detail.urls);
+
 		default:
 			// An unmapped type still counts the page it names, so a new finding
 			// never reports as affecting nothing.

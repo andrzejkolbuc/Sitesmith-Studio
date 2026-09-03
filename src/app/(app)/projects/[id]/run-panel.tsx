@@ -53,6 +53,7 @@ const FINDING_LABEL: Record<string, string> = {
 	canonical_conflicting: "Canonical tags that disagree",
 	canonical_target_broken: "Canonical pointing somewhere broken",
 	noindex_present: "Pages asking not to be indexed",
+	content_duplicated: "One page's content at several URLs",
 };
 
 /**
@@ -766,6 +767,13 @@ function Evidence({
 		case "metadata_duplicated": {
 			const urls = Array.isArray(detail.urls) ? (detail.urls as string[]) : [];
 			const field = str("field") ?? "";
+			/**
+			 * Null when nothing established a language for these pages — the bucket a
+			 * monolingual site falls into. Rendered as its own sentence rather than as
+			 * a tag reading "?", which looks like data we failed to load rather than a
+			 * fact about the site.
+			 */
+			const language = str("language");
 
 			/**
 			 * The shared string itself, quoted. Which pages and which field are only
@@ -776,9 +784,19 @@ function Evidence({
 			return (
 				<>
 					<span className="text-ink">
-						{urls.length} <Tag tone="flag">{str("language") ?? "?"}</Tag> pages
-						share one {FIELD_LABEL[field] ?? field}
+						{urls.length}{" "}
+						{language ? (
+							<>
+								<Tag tone="flag">{language}</Tag>{" "}
+							</>
+						) : null}
+						pages share one {FIELD_LABEL[field] ?? field}
 					</span>
+					{language ? null : (
+						<div className="mt-1.5 text-ink-faint text-xs">
+							No language established for these pages
+						</div>
+					)}
 					<div className="mt-1.5 max-w-prose text-ink-soft text-xs italic">
 						“{str("value")}”
 					</div>
@@ -919,6 +937,29 @@ function Evidence({
 					<div className="mt-1.5 break-all font-mono text-ink-soft text-xs">
 						{pathOf(str("url"))}
 					</div>
+				</>
+			);
+		}
+
+		case "content_duplicated": {
+			const urls = Array.isArray(detail.urls) ? (detail.urls as string[]) : [];
+			const length = Number(detail.textLength ?? 0);
+
+			/**
+			 * The length of the shared text, not the text itself — the crawl keeps a
+			 * digest and never the words. It is still the number that decides how
+			 * seriously to take the finding: three hundred identical characters is a
+			 * stub, three thousand is a page published twice.
+			 */
+			return (
+				<>
+					<span className="text-ink">
+						{urls.length} URLs serve the same content
+					</span>
+					<div className="mt-1.5 text-ink-soft text-xs">
+						{length.toLocaleString()} characters, identical on every one
+					</div>
+					<Listed items={urls.map(pathOf)} />
 				</>
 			);
 		}

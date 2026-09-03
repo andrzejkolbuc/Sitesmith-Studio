@@ -252,6 +252,45 @@ describe("pagesInvolved for metadata findings", () => {
 			}),
 		).toEqual([`${B}/en/bare`]);
 	});
+
+	it("counts every page a duplicate finding names when it has no language", () => {
+		/**
+		 * The unlocalised bucket. A null `language` changes how the finding reads,
+		 * not how much of the site it touches — so the count must be the same as for
+		 * a language-scoped duplicate rather than falling through to the default.
+		 */
+		expect(
+			pagesInvolved({
+				type: "metadata_duplicated",
+				url: null,
+				detail: {
+					field: "title",
+					language: null,
+					value: "Legal information",
+					urls: [`${B}/imprint`, `${B}/privacy`],
+				},
+			}),
+		).toHaveLength(2);
+	});
+
+	it("counts every URL serving duplicated content", () => {
+		/**
+		 * Filed against no page, like every duplicate finding. Without a case here
+		 * the default would read `finding.url`, find null, and report a problem
+		 * spanning three URLs as affecting nothing.
+		 */
+		expect(
+			pagesInvolved({
+				type: "content_duplicated",
+				url: null,
+				detail: {
+					digest: "abc123",
+					textLength: 800,
+					urls: [`${B}/guide`, `${B}/guide-copy`, `${B}/archive/guide`],
+				},
+			}),
+		).toHaveLength(3);
+	});
 });
 
 describe("pagesInvolved for canonical findings", () => {

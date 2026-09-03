@@ -86,6 +86,22 @@ const HANDBOOK_EN = `<h2>Configuring a project</h2>
     what any later run is able to say about the site.</p>
     <ul><li>Start URL</li><li>Included paths</li><li>Expected locales</li></ul>`;
 
+/**
+ * One body published at two addresses, in one language.
+ *
+ * Deliberately not `HANDBOOK_EN`: that body belongs to the untranslated-sibling
+ * family, and a third page carrying it would make the duplicate-content rule
+ * report a set larger than the one rule 7 named. That interaction is worth
+ * testing, but in `site-shapes.test.ts` where it can be stated in isolation —
+ * here it would blur two rules' fixtures into each other.
+ */
+const ARCHIVE_NOTE = `<h2>Retention and archiving</h2>
+    <p>Runs are kept for as long as the project exists, so that a comparison
+    against a previous run always has something to compare against. Deleting a
+    project deletes its runs, its pages and every finding recorded against
+    them, and that deletion is immediate rather than deferred to a batch.</p>
+    <ul><li>Runs</li><li>Pages</li><li>Findings</li></ul>`;
+
 const HANDBOOK_FR = `<h2>Configurer un projet</h2>
     <p>Un projet décrit un seul site : le point de départ d'une exploration, les
     chemins qu'elle peut suivre, et les langues que le site est censé publier.
@@ -123,6 +139,10 @@ const HANDBOOK_FR = `<h2>Configurer un projet</h2>
  * - `/final/page` — carries a **relative** link, so a redirected page proves
  *   which URL its hrefs resolve against. None of these paths is locale-shaped,
  *   so no detection rule speaks about them.
+ * - `/library/guide`, `/library/guide-archived` — one body at two addresses, one
+ *   language, no family between them. Fires rule 15 (duplicate content).
+ * - `/legal/imprint`, `/legal/privacy` — one title, and no established language
+ *   on either page. Fires rule 10 through its unlocalised bucket.
  * - `/private/secret` — only reachable if excludePaths is ignored.
  * - `/slow`, `/flaky` — timing and abort behaviour.
  */
@@ -158,6 +178,10 @@ const SITE: Record<string, Page> = {
 			"/meta/noindex-header",
 			"/meta/noindex-mixed",
 			"/meta/complete",
+			"/library/guide",
+			"/library/guide-archived",
+			"/legal/imprint",
+			"/legal/privacy",
 		],
 	},
 	"/de/": {
@@ -447,6 +471,28 @@ const SITE: Record<string, Page> = {
 		robots: "index, follow",
 		headers: { "x-robots-tag": "noindex" },
 	},
+
+	/**
+	 * One body at two addresses, in one language and with no family between them.
+	 *
+	 * The case rule 7 declines by design — it asks whether a translation was made,
+	 * and there is no second language here — and the one FR-020 asks about. Both
+	 * declare their own self-referential canonical, so the site has *not* said
+	 * which address counts, which is what leaves it a defect.
+	 */
+	"/library/guide": { body: ARCHIVE_NOTE, main: true },
+	"/library/guide-archived": { body: ARCHIVE_NOTE, main: true },
+
+	/**
+	 * Two pages sharing a title, in no established language: no hreflang, and no
+	 * locale segment in either path. Every page of a monolingual site looks like
+	 * this, and until S-04 the duplicate rule skipped them entirely.
+	 *
+	 * Descriptions are left to default, so exactly one field duplicates and the
+	 * finding count is unambiguous.
+	 */
+	"/legal/imprint": { title: "Company information" },
+	"/legal/privacy": { title: "Company information" },
 
 	/**
 	 * Complete, correct and unique on every axis. **This page must produce

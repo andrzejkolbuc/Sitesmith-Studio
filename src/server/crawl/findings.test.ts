@@ -354,7 +354,9 @@ describe("detectMissingVariants against the fixture site", () => {
 		 */
 		const { findings } = await detect();
 		const duplicated = findings.filter(
-			(f) => f.type === FINDING_TYPES.METADATA_DUPLICATED,
+			(f) =>
+				f.type === FINDING_TYPES.METADATA_DUPLICATED &&
+				f.detail.language === "en",
 		);
 
 		expect(duplicated).toHaveLength(1);
@@ -364,6 +366,52 @@ describe("detectMissingVariants against the fixture site", () => {
 			value: "Legal information",
 			urls: [`${site.baseUrl}/meta/twin-a`, `${site.baseUrl}/meta/twin-b`],
 		});
+	});
+
+	it("reports the two pages sharing a title in no established language", async () => {
+		/**
+		 * `/legal/imprint` and `/legal/privacy`: no hreflang, no locale segment,
+		 * one title between them. Every page of a monolingual site looks like this,
+		 * and the rule skipped them entirely until FR-020 asked about duplicates
+		 * across URLs rather than within a language.
+		 */
+		const { findings } = await detect();
+		const duplicated = findings.filter(
+			(f) =>
+				f.type === FINDING_TYPES.METADATA_DUPLICATED &&
+				f.detail.language === null,
+		);
+
+		expect(duplicated).toHaveLength(1);
+		expect(duplicated[0]?.detail).toMatchObject({
+			field: "title",
+			language: null,
+			value: "Company information",
+			urls: [`${site.baseUrl}/legal/imprint`, `${site.baseUrl}/legal/privacy`],
+		});
+	});
+
+	it("reports one body served at two addresses, and not the translated pair", async () => {
+		/**
+		 * `/library/guide` and `/library/guide-archived` serve one body in one
+		 * language — the case rule 7 declines by design.
+		 *
+		 * The second assertion is the one that matters most: `/handbook` and
+		 * `/de/handbuch` also serve identical bodies, and rule 7 already reports
+		 * them as untranslated. They must not appear here as well, or the fixture's
+		 * clearest defect arrives twice under two headings.
+		 */
+		const { findings } = await detect();
+		const duplicated = findings.filter(
+			(f) => f.type === FINDING_TYPES.CONTENT_DUPLICATED,
+		);
+
+		expect(duplicated).toHaveLength(1);
+		expect(duplicated[0]?.url).toBeNull();
+		expect(duplicated[0]?.detail.urls).toEqual([
+			`${site.baseUrl}/library/guide`,
+			`${site.baseUrl}/library/guide-archived`,
+		]);
 	});
 
 	it("says nothing about two languages sharing one title", async () => {
