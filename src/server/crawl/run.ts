@@ -230,6 +230,7 @@ async function execute(
 		entryUrl: result.entryUrl,
 		requested: result.requested,
 		external: result.external,
+		aliases: result.aliases,
 	});
 
 	if (detected.length > 0) {

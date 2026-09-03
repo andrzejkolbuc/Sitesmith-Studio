@@ -497,3 +497,91 @@ describe("metadata capture", () => {
 		expect(pages.get("/meta/bare")?.xRobotsTag).toBeNull();
 	});
 });
+
+describe("redirects, walked rather than followed", () => {
+	const path = (url: string) => new URL(url).pathname;
+
+	it("records every hop it walked", async () => {
+		/**
+		 * The capability the runtime hid. With `redirect: "follow"` the response
+		 * carried only the final status, so no page in any run could show a 3xx and
+		 * a chain left no trace at all.
+		 */
+		const result = await crawl({
+			...base(),
+			startUrl: `${site.baseUrl}/chain/start`,
+			maxPages: 1,
+		});
+
+		const page = result.pages[0];
+		expect(path(page?.url ?? "")).toBe("/final/page");
+		expect(page?.redirectChain.map((hop) => path(hop.url))).toEqual([
+			"/chain/start",
+			"/chain/middle",
+			"/chain/end",
+		]);
+		expect(page?.redirectChain.every((hop) => hop.status === 301)).toBe(true);
+	});
+
+	it("records no hops for a page reached directly", async () => {
+		const result = await crawl({ ...base(), maxPages: 1 });
+
+		expect(result.pages[0]?.redirectChain).toEqual([]);
+	});
+
+	it("stops a loop as a fetch error rather than as an abort", async () => {
+		/**
+		 * The runtime's own hop limit surfaced a loop as an opaque error, and being
+		 * an error it counted towards the failure burst that ends the whole run. A
+		 * site with a handful of circular redirects could stop its own crawl.
+		 */
+		const result = await crawl({
+			...base(),
+			startUrl: `${site.baseUrl}/circle/one`,
+			maxPages: 1,
+		});
+
+		expect(result.abortedReason).toBeNull();
+		expect(result.pages[0]?.fetchError).toContain("loop");
+		expect(result.pages[0]?.redirectChain.length).toBeGreaterThan(0);
+	});
+
+	it("paces every hop, not just the first request", async () => {
+		/**
+		 * Each hop is a real request. The runtime followed them itself, so a chain
+		 * of five was five requests the inter-request delay never saw — which is
+		 * exactly the guarantee this module exists to make.
+		 */
+		site.reset();
+		await crawl({
+			...base(),
+			startUrl: `${site.baseUrl}/chain/start`,
+			maxPages: 1,
+		});
+
+		expect(site.requests).toContain("/chain/start");
+		expect(site.requests).toContain("/chain/middle");
+		expect(site.requests).toContain("/chain/end");
+	});
+
+	it("records the alias a discarded route was asked for", async () => {
+		/**
+		 * `page-identity-under-redirects` dropped this on the grounds that it was "a
+		 * column nothing consumes until S-04". This is S-04, and the discard still
+		 * throws the whole page away — hop list included — so the alias has to be
+		 * kept where both names are still in hand.
+		 */
+		const result = await crawl({
+			...base(),
+			startUrl: `${site.baseUrl}/redirect-hub`,
+		});
+
+		expect(
+			result.aliases.some(
+				(alias) =>
+					path(alias.requested) === "/moved/page" &&
+					path(alias.served) === "/final/page",
+			),
+		).toBe(true);
+	});
+});

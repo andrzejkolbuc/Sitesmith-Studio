@@ -116,7 +116,38 @@ export type CrawledPage = {
 	 * publishing a header with nothing in it — and only the second is a defect.
 	 */
 	securityHeaders: Record<string, string>;
+	/**
+	 * The redirects walked to reach this page, in order. Empty for a direct hit.
+	 *
+	 * Each entry is a request that was actually made, so a chain is visible as
+	 * what it is rather than as a status nobody can see.
+	 */
+	redirectChain: Hop[];
 	fetchError: string | null;
+};
+
+/** A route that led somewhere other than where it was asked for. */
+export type Alias = {
+	requested: string;
+	served: string;
+	/**
+	 * The hops walked to get there.
+	 *
+	 * Carried on the alias rather than left on the page, because the page is
+	 * often thrown away: a route ending at a URL the crawl already recorded is
+	 * discarded whole. That is the *commonest* shape of a real redirect chain —
+	 * an old URL pointing at a new one that the navigation also links — so a rule
+	 * reading only surviving pages would miss most of them.
+	 */
+	chain: Hop[];
+};
+
+/** One redirect: where we asked, what it answered, and where it pointed. */
+export type Hop = {
+	url: string;
+	status: number;
+	/** Normalised, or null when the `Location` could not be made a URL. */
+	location: string | null;
 };
 
 /** One observation of a URL's outcome. */
@@ -194,6 +225,13 @@ export type CrawlResult = {
 	 * incomplete sweep: an unchecked link is not a broken one.
 	 */
 	external: ExternalSweep;
+	/**
+	 * Routes that led somewhere other than where they were asked for.
+	 *
+	 * The evidence a discarded alias would otherwise take with it: the crawl
+	 * records the served URL and drops a second route to a page it already has.
+	 */
+	aliases: Alias[];
 };
 
 /**
@@ -211,6 +249,15 @@ const SECURITY_HEADERS = [
 	"referrer-policy",
 	"permissions-policy",
 ] as const;
+
+/**
+ * How many hops a chain may have before it is called runaway.
+ *
+ * Below the runtime's own twenty, deliberately: more than ten redirects is not
+ * a chain anybody intended, and each hop is now a paced request the crawl pays
+ * for. The lower cap also halves the worst case of re-verifying a loop.
+ */
+const MAX_REDIRECT_HOPS = 10;
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_FAILURE_BURST = 5;
@@ -339,6 +386,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 			entryUrl: null,
 			requested: [],
 			external: { checked: [], complete: false },
+			aliases: [],
 		};
 	}
 
@@ -365,6 +413,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 
 	let abortedReason: string | null = null;
 	let reachedPageLimit = false;
+	const aliases: Alias[] = [];
 	let consecutiveFailures = 0;
 	let totalFailures = 0;
 	/** Serialises request *starts* so the delay applies across all workers. */
@@ -533,16 +582,83 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 	const sitemap = await readSitemap();
 
 	async function fetchOne(url: string): Promise<CrawledPage> {
-		await claimSlot();
-
 		const controller = new AbortController();
 		const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
 
+		/**
+		 * Redirects are followed by hand rather than by the runtime.
+		 *
+		 * `redirect: "follow"` was correct for everything before this slice and
+		 * hides the one thing FR-016 asks about: the runtime returns the final
+		 * response, so `status` is always the last hop's and no page in any run
+		 * could carry a 3xx. A redirect was simply not expressible.
+		 *
+		 * Walking the hops changes nothing about identity. The page is still the
+		 * URL the server finally served, relative hrefs still resolve against it,
+		 * and the two dedups still collapse aliases — the hop list is purely
+		 * additive. The tests that pin that behaviour were written against a live
+		 * client site and must keep passing untouched.
+		 *
+		 * Each hop is a real request and claims its own slot, which the runtime's
+		 * following never did: a chain of five was five unpaced requests before.
+		 */
+		const redirectChain: Hop[] = [];
+		let current = url;
+
 		try {
-			const response = await fetch(url, {
-				signal: controller.signal,
-				redirect: "follow",
-			});
+			let response: Response | null = null;
+
+			for (let hop = 0; ; hop += 1) {
+				if (hop > MAX_REDIRECT_HOPS) {
+					throw new Error(
+						`Too many redirects (more than ${MAX_REDIRECT_HOPS} hops).`,
+					);
+				}
+
+				await claimSlot();
+				const hopResponse = await fetch(current, {
+					signal: controller.signal,
+					redirect: "manual",
+				});
+
+				const location =
+					hopResponse.status >= 300 && hopResponse.status < 400
+						? hopResponse.headers.get("location")
+						: null;
+
+				if (location === null) {
+					response = hopResponse;
+					break;
+				}
+
+				const next = normaliseUrl(location, current);
+				redirectChain.push({
+					url: current,
+					status: hopResponse.status,
+					location: next,
+				});
+
+				/**
+				 * A `Location` we cannot make a URL of ends the walk. The status and
+				 * the hop are still recorded, so the chain says where it stopped.
+				 */
+				if (next === null) {
+					response = hopResponse;
+					break;
+				}
+
+				/**
+				 * A loop, detected as a structured outcome rather than left to the
+				 * runtime's own hop limit — which surfaced only as an opaque fetch
+				 * error and, being a fetch error, counted towards the abort that ends
+				 * the whole run.
+				 */
+				if (next === url || redirectChain.some((entry) => entry.url === next)) {
+					throw new Error("Redirect loop.");
+				}
+
+				current = next;
+			}
 
 			const contentType = response.headers.get("content-type") ?? "";
 			const isHtml = contentType.includes("html");
@@ -559,8 +675,12 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 			 * Falls back to the requested URL when the response carries nothing
 			 * usable, which keeps behaviour identical for the overwhelming majority
 			 * of pages that never redirect.
+			 *
+			 * With the hops walked here rather than by the runtime, this is simply
+			 * where the walk stopped — the same URL `redirect: "follow"` used to
+			 * report through `response.url`.
 			 */
-			const served = normaliseUrl(response.url) ?? url;
+			const served = normaliseUrl(current) ?? url;
 
 			const xRobotsTag = response.headers.get("x-robots-tag");
 
@@ -586,6 +706,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 				content: extractContent(html, isHtml),
 				metadata: extractMetadata(html, served),
 				xRobotsTag: xRobotsTag?.slice(0, MAX_METADATA_CHARS) ?? null,
+				redirectChain,
 				securityHeaders,
 				fetchError: null,
 			};
@@ -598,6 +719,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 				content: emptyContent(false),
 				metadata: emptyMetadata(),
 				xRobotsTag: null,
+				redirectChain,
 				securityHeaders: {},
 				fetchError: caught instanceof Error ? caught.message : String(caught),
 			};
@@ -618,6 +740,27 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 
 			const page = await fetchOne(next);
 			if (abortedReason !== null) return;
+
+			/**
+			 * A route that led somewhere other than where it was asked for.
+			 *
+			 * Recorded here, before the discard below, because that discard throws
+			 * the whole page away — hop list included — and this is the only place
+			 * both names are still in hand.
+			 *
+			 * `page-identity-under-redirects` dropped this deliberately, on the
+			 * grounds that recording it "means a column nothing consumes until
+			 * S-04". This is S-04: restoring it honours that decision rather than
+			 * reversing it. In memory, like the link graph, since no requirement yet
+			 * reads it back after a run.
+			 */
+			if (page.url !== next) {
+				aliases.push({
+					requested: next,
+					served: page.url,
+					chain: page.redirectChain,
+				});
+			}
 
 			/**
 			 * A second route to a page we already have.
@@ -815,5 +958,6 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 		entryUrl: pages[0]?.url ?? null,
 		requested: [...seen],
 		external,
+		aliases,
 	};
 }

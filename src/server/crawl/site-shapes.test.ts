@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { type ContentSummary, emptyContent } from "./content";
-import type { CrawledPage, Reverification } from "./crawler";
+import type { Alias, CrawledPage, Hop, Reverification } from "./crawler";
 import type { ExternalSweep } from "./external";
 import { detectMissingVariants } from "./findings";
 import { emptyMetadata, type PageMetadata } from "./metadata";
@@ -56,6 +56,8 @@ const page = (
 		metadata?: Partial<PageMetadata>;
 		/** Response headers this case is about, by lowercase name. */
 		securityHeaders?: Record<string, string>;
+		/** The redirects walked to reach this page. */
+		redirectChain?: Hop[];
 		/** The `X-Robots-Tag` header, verbatim as a site would serve it. */
 		xRobotsTag?: string | null;
 	} = {},
@@ -87,6 +89,7 @@ const page = (
 		...options.metadata,
 	},
 	xRobotsTag: options.xRobotsTag ?? null,
+	redirectChain: options.redirectChain ?? [],
 	securityHeaders: options.securityHeaders ?? {},
 	fetchError: null,
 });
@@ -130,6 +133,8 @@ function findingsFor(options: {
 		entryUrl: options.entryUrl ?? null,
 		requested: options.requested ?? options.pages.map((p) => p.url),
 		external: options.external ?? { checked: [], complete: false },
+		/** Not exposed here: the alias cases are all detail cases. */
+		aliases: [],
 	})
 		.map((finding) => ({ type: finding.type, url: finding.url }))
 		.sort(
@@ -169,6 +174,8 @@ function detailedFindingsFor(options: {
 	requested?: string[];
 	/** Defaults to an incomplete, empty sweep: most cases are not about it. */
 	external?: ExternalSweep;
+	/** Defaults to none: most cases describe routes that went where they were asked. */
+	aliases?: Alias[];
 }) {
 	return detectMissingVariants({
 		pages: options.pages,
@@ -182,6 +189,7 @@ function detailedFindingsFor(options: {
 		entryUrl: options.entryUrl ?? null,
 		requested: options.requested ?? options.pages.map((p) => p.url),
 		external: options.external ?? { checked: [], complete: false },
+		aliases: options.aliases ?? [],
 	});
 }
 
@@ -2579,10 +2587,18 @@ describe("a certificate that is not what it should be", () => {
 		issuer: "Test CA",
 		subject: "shop.test",
 		validFrom: new Date(Date.now() - 86_400_000 * 300).toISOString(),
+		/**
+		 * Half a day past the whole day asked for.
+		 *
+		 * The rule floors the remaining time, and it reads the clock a few
+		 * milliseconds after this does — so an exact ten days becomes nine whenever
+		 * the two readings straddle a millisecond, which is a coin toss rather than
+		 * a behaviour. The cushion makes the case say ten days and mean it.
+		 */
 		validTo:
 			days === null
 				? null
-				: new Date(Date.now() + 86_400_000 * days).toISOString(),
+				: new Date(Date.now() + 86_400_000 * days + 43_200_000).toISOString(),
 		subjectAltNames: ["shop.test"],
 		authorizationError: error,
 	});
@@ -3132,6 +3148,33 @@ describe("pages the sitemap lists that nothing links to", () => {
 		expect(findings[0]?.detail.urls).toEqual([`${BASE}/archive/unlinked`]);
 	});
 
+	it("says nothing when the crawl only saw a corner of the site", () => {
+		/**
+		 * A project pointed at a leaf — one blog post, one section page — finishes
+		 * in a single page and has visited nothing that could have linked anywhere.
+		 * Every other URL the sitemap submits then looks unlinked, and reporting
+		 * them would be dozens of defects invented by our own start URL.
+		 *
+		 * `crawlComplete` does not catch this: the run was not cut short, it simply
+		 * never had anywhere to go. The gate is coverage of the sitemap, and below
+		 * half of it the crawl's silence about inbound links is evidence of nothing.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [page("/blog/monolingual")],
+				requested: [`${BASE}/blog/monolingual`],
+				entryUrl: `${BASE}/blog/monolingual`,
+				sitemap: sitemapOf(
+					"/",
+					"/about",
+					"/careers",
+					"/support",
+					"/blog/monolingual",
+				),
+			}).filter(orphaned),
+		).toEqual([]);
+	});
+
 	it("reports a page reached only because a sibling declared it", () => {
 		/**
 		 * The rarer shape: the crawl found it through the hreflang graph, which is
@@ -3364,5 +3407,184 @@ describe("links that leave the site", () => {
 				),
 			}).filter(externalBroken),
 		).toEqual([]);
+	});
+});
+
+describe("redirects that go through several hops, or in circles", () => {
+	const chain = (f: { type: string }) => f.type === "redirect_chain";
+
+	const hop = (from: string, to: string | null, status = 301) => ({
+		url: `${BASE}${from}`,
+		status,
+		location: to === null ? null : `${BASE}${to}`,
+	});
+
+	it("reports a chain of two hops, drawn out", () => {
+		const findings = detailedFindingsFor({
+			pages: [
+				page("/final", {
+					redirectChain: [hop("/start", "/middle"), hop("/middle", "/final")],
+				}),
+			],
+		}).filter(chain);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBeNull();
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "chain",
+			from: `${BASE}/start`,
+			to: `${BASE}/final`,
+		});
+	});
+
+	it("says nothing about a single redirect", () => {
+		/**
+		 * One hop is ordinary site behaviour — canonicalising `www.`, forcing https,
+		 * tidying a moved page. Reporting it would fire on nearly every site, which
+		 * is the noise failure the PRD calls fatal.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [page("/final", { redirectChain: [hop("/moved", "/final")] })],
+			}).filter(chain),
+		).toEqual([]);
+	});
+
+	it("says nothing about a page reached directly", () => {
+		expect(
+			detailedFindingsFor({ pages: [page("/direct")] }).filter(chain),
+		).toEqual([]);
+	});
+
+	it("does not count a hop that only our normalisation created", () => {
+		/**
+		 * `normaliseUrl` drops the trailing slash, so `/path` and `/path/` are one
+		 * URL to this product. A hop between them is our identity definition meeting
+		 * the site's, not a redirect the site would recognise — and counting it
+		 * would report our own rules as the client's chain, which is the recorded
+		 * alias false positive under a third name.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/final", {
+						redirectChain: [hop("/start", "/start"), hop("/start", "/final")],
+					}),
+				],
+			}).filter(chain),
+		).toEqual([]);
+	});
+
+	it("reports a loop as a loop, naming no destination", () => {
+		/**
+		 * A loop ends nowhere, so `to` is null rather than a URL invented from
+		 * wherever the walk gave up.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				{
+					...page("/circle/one"),
+					fetchError: "Redirect loop.",
+					redirectChain: [
+						hop("/circle/one", "/circle/two"),
+						hop("/circle/two", "/circle/one"),
+					],
+				},
+			],
+		}).filter(chain);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "loop",
+			from: `${BASE}/circle/one`,
+			to: null,
+		});
+	});
+
+	it("reports a two-hop loop even though a two-hop chain is the threshold", () => {
+		/**
+		 * A loop is reported however short it is: going round is not a matter of
+		 * degree, and a single redirect pointing at itself never resolves.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				{
+					...page("/self"),
+					fetchError: "Redirect loop.",
+					redirectChain: [hop("/self", "/self")],
+				},
+			],
+		}).filter(chain);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail.kind).toBe("loop");
+	});
+
+	it("reports a chain carried only on a discarded route", () => {
+		/**
+		 * The commonest shape a real chain takes: an old URL redirecting to a new
+		 * one the navigation also links, so the route arrives at a page the crawl
+		 * already has and the whole page — hop list included — is thrown away. A
+		 * rule reading only surviving pages would report none of them.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [page("/final")],
+			aliases: [
+				{
+					requested: `${BASE}/start`,
+					served: `${BASE}/final`,
+					chain: [hop("/start", "/middle"), hop("/middle", "/final")],
+				},
+			],
+		}).filter(chain);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail).toMatchObject({
+			kind: "chain",
+			from: `${BASE}/start`,
+			to: `${BASE}/final`,
+		});
+	});
+
+	it("names the pages still linking at the stale URL", () => {
+		/**
+		 * The fix for a chain is rarely on any page in it: the redirects may not be
+		 * the reader's to delete, while their own links always are. So the finding
+		 * has to say who still points at the URL the chain starts from.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [{ ...page("/"), links: [`${BASE}/start`] }, page("/final")],
+			aliases: [
+				{
+					requested: `${BASE}/start`,
+					served: `${BASE}/final`,
+					chain: [hop("/start", "/middle"), hop("/middle", "/final")],
+				},
+			],
+		}).filter(chain);
+
+		expect(findings[0]?.detail.linkedFrom).toEqual([`${BASE}/`]);
+	});
+
+	it("reports one finding when a route survives as both a page and an alias", () => {
+		/**
+		 * A recorded page reached through redirects is also recorded as an alias of
+		 * the route that asked for it. They are two records of one walk, so keying
+		 * by where the walk was entered has to collapse them.
+		 */
+		const chainHops = [hop("/start", "/middle"), hop("/middle", "/final")];
+
+		expect(
+			detailedFindingsFor({
+				pages: [page("/final", { redirectChain: chainHops })],
+				aliases: [
+					{
+						requested: `${BASE}/start`,
+						served: `${BASE}/final`,
+						chain: chainHops,
+					},
+				],
+			}).filter(chain),
+		).toHaveLength(1);
 	});
 });

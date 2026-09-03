@@ -913,7 +913,38 @@ Negatives: a single hop; a trailing-slash-only hop; the existing identity tests 
 - A run against the fixture reports the same pages, statuses and existing findings as before
 - Chain findings read as the site's redirects, never as our normalisation
 
+### What this phase also had to fix
+
+This is the first phase whose gate includes `npm run test:e2e`, and the browser
+suite had been failing since the site-level rules landed. Four corrections, none
+of them in the phase's own spec, all of them required to get the gate green:
+
+- **Rule 22 gained a coverage gate.** A project whose start URL is a leaf
+  finishes in one page, and the orphan rule then reported all forty-four other
+  sitemap URLs as unlinked — our own entry point read back as the client's
+  defect. `crawlComplete` does not catch this: the run was not cut short, it
+  simply had nowhere to go. The rule is now silent unless the crawl requested at
+  least half the sitemap's comparable URLs, and says so in a comment with the
+  trade it accepts — a mostly-orphaned site is reported as nothing rather than
+  as a flood.
+- **The empty-state journey needed a site with no robots.txt and no sitemap.**
+  The shared fixture disallows a path its own sitemap submits, which is a true
+  finding on every crawl of it whichever page the run starts from, so "nothing
+  found" was unprovable there. `startFixtureSite({ publishesSiteFiles: false })`
+  serves both files as 404s; only that journey uses it.
+- **Playwright's per-test timeout was thirty seconds** while the crawl journeys
+  waited sixty for a run to finish — a cap that only became visible once the
+  fixture grew past thirty seconds of paced crawling. Raised to 120s. The pacing
+  itself is untouched: it is the guarantee the crawler exists to make.
+- **Two papercuts either side of the suite**: `tsconfig.json` now excludes
+  `playwright-report/` and `test-results/`, whose bundled JavaScript `checkJs`
+  typechecked the moment anybody ran the browser suite; and the certificate
+  fixture's `validTo` gained half a day, because the rule floors the remaining
+  time a few milliseconds after the case builds it and an exact ten days became
+  nine on a coin toss.
+
 **Implementation Note**: Pause for manual confirmation before Phase 10.
+
 
 ---
 
@@ -1158,16 +1189,16 @@ duration of a run, following the precedent S-05 set when it declined to persist 
 
 #### Automated
 
-- [x] 8.1 Type checking passes: `npm run typecheck`
-- [x] 8.2 Linting and formatting pass: `npm run check`
-- [x] 8.3 Unit tests pass: `npm run test:unit`
-- [x] 8.4 Integration tests pass: `npm run test:integration`
-- [x] 8.5 Each unique external URL is requested at most once per run
-- [x] 8.6 A 429 with `Retry-After` defers rather than retrying immediately
-- [x] 8.7 A host rejecting HEAD is retried with GET
-- [x] 8.8 A burst of dead external hosts does not abort the main crawl
-- [x] 8.9 An incomplete external sweep produces no `link_external_broken` findings
-- [x] 8.10 The limiter is not exported from `crawler.ts`
+- [x] 8.1 Type checking passes: `npm run typecheck` — 688e5a4
+- [x] 8.2 Linting and formatting pass: `npm run check` — 688e5a4
+- [x] 8.3 Unit tests pass: `npm run test:unit` — 688e5a4
+- [x] 8.4 Integration tests pass: `npm run test:integration` — 688e5a4
+- [x] 8.5 Each unique external URL is requested at most once per run — 688e5a4
+- [x] 8.6 A 429 with `Retry-After` defers rather than retrying immediately — 688e5a4
+- [x] 8.7 A host rejecting HEAD is retried with GET — 688e5a4
+- [x] 8.8 A burst of dead external hosts does not abort the main crawl — 688e5a4
+- [x] 8.9 An incomplete external sweep produces no `link_external_broken` findings — 688e5a4
+- [x] 8.10 The limiter is not exported from `crawler.ts` — 688e5a4
 
 #### Manual
 
@@ -1178,17 +1209,17 @@ duration of a run, following the precedent S-05 set when it declined to persist 
 
 #### Automated
 
-- [ ] 9.1 Type checking passes: `npm run typecheck`
-- [ ] 9.2 Linting and formatting pass: `npm run check`
-- [ ] 9.3 Unit tests pass: `npm run test:unit`
-- [ ] 9.4 Integration tests pass: `npm run test:integration`
-- [ ] 9.5 End-to-end tests pass: `npm run test:e2e`
-- [ ] 9.6 Every existing page-identity test in `crawler.test.ts` passes unchanged
-- [ ] 9.7 A two-hop chain produces one `redirect_chain` finding naming both hops
-- [ ] 9.8 A redirect loop is reported as `kind: "loop"`, not as a fetch error
-- [ ] 9.9 A single hop produces no finding
-- [ ] 9.10 A trailing-slash-only difference produces no finding
-- [ ] 9.11 A fixture crawl still records the same page count as before this phase
+- [x] 9.1 Type checking passes: `npm run typecheck`
+- [x] 9.2 Linting and formatting pass: `npm run check`
+- [x] 9.3 Unit tests pass: `npm run test:unit` — 459 passing
+- [x] 9.4 Integration tests pass: `npm run test:integration` — 35 passing
+- [x] 9.5 End-to-end tests pass: `npm run test:e2e` — 15 passing
+- [x] 9.6 Every existing page-identity test in `crawler.test.ts` passes unchanged
+- [x] 9.7 A two-hop chain produces one `redirect_chain` finding naming both hops
+- [x] 9.8 A redirect loop is reported as `kind: "loop"`, not as a fetch error
+- [x] 9.9 A single hop produces no finding
+- [x] 9.10 A trailing-slash-only difference produces no finding
+- [x] 9.11 A fixture crawl still records the same page count as before this phase — 47, measured on both sides of the change
 
 #### Manual
 

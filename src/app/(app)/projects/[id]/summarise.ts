@@ -158,6 +158,17 @@ export function pagesInvolved(finding: {
 		 * Listed explicitly so this reads as a decision rather than as a type
 		 * somebody forgot.
 		 */
+		/**
+		 * The pages still linking at the stale URL, which are the pages a reader
+		 * would edit. The hops in between are not pages of the site; they are
+		 * routes, and the entry URL stands in only when nothing links to it — a
+		 * chain reached from the sitemap, or from where the run started.
+		 */
+		case "redirect_chain": {
+			const linking = strings(detail.linkedFrom);
+			return linking.length > 0 ? linking : one(detail.from);
+		}
+
 		case "certificate_problem":
 			return [];
 

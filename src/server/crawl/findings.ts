@@ -1,5 +1,5 @@
 import { BLOCK_NAMES, type ContentSummary } from "./content";
-import type { CrawledPage, Reverification } from "./crawler";
+import type { Alias, CrawledPage, Hop, Reverification } from "./crawler";
 import { type ExternalSweep, isGone } from "./external";
 import { parseRobotsHeader } from "./metadata";
 import { evaluatePath, type RobotsFile, type RobotsRule } from "./robots";
@@ -70,6 +70,8 @@ export const FINDING_TYPES = {
 	PAGE_ORPHANED: "page_orphaned",
 	/** A link leaving the site whose target is gone. */
 	LINK_EXTERNAL_BROKEN: "link_external_broken",
+	/** A redirect chain of more than one hop, or one that goes round. */
+	REDIRECT_CHAIN: "redirect_chain",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -137,6 +139,16 @@ export type DetectOptions = {
 	requested: string[];
 	/** The links leaving the site, as checked after the crawl drained. */
 	external: ExternalSweep;
+	/**
+	 * Routes that led somewhere other than where they were asked for.
+	 *
+	 * Read beside `pages` rather than instead of it, because the two hold
+	 * different halves of the same fact: a route ending at a URL the crawl
+	 * already recorded is discarded whole — hop list included — and that is
+	 * the commonest shape a real chain takes: an old URL pointing at a new one
+	 * the navigation also links.
+	 */
+	aliases: Alias[];
 };
 
 /**
@@ -190,6 +202,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		entryUrl,
 		requested,
 		external,
+		aliases,
 	} = options;
 
 	const variants = groupVariants(pages);
@@ -1834,7 +1847,27 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 			// exists because a run stopping at its ceiling once reported the ceiling
 			// as eighteen defects on a live client site, naming URLs that all
 			// returned 200.
-			if (crawlComplete) {
+			//
+			// **And gated on the crawl having covered the sitemap.** `crawlComplete`
+			// says the run was not cut short; it does not say the run looked at the
+			// site. A project whose start URL is a leaf — a single blog post, a
+			// section landing page — finishes in one page and has still visited
+			// nothing that could have linked anywhere, so every other URL in the
+			// sitemap looks unlinked. That is a fact about where we started, and
+			// reporting it would be forty-four defects invented by our own entry
+			// point. Half the sitemap is the line: below it the crawl saw a corner
+			// of the site, and its silence about inbound links carries no evidence.
+			// Above it the rule may still be quiet about a site that is mostly
+			// orphaned — silence chosen over a flood, the same way every other rule
+			// here resolves the trade.
+			const covered = [...reconciled.comparable.keys()].filter((url) =>
+				new Set(requested).has(url),
+			).length;
+			const sawEnoughOfTheSitemap =
+				reconciled.comparable.size === 0 ||
+				covered * 2 >= reconciled.comparable.size;
+
+			if (crawlComplete && sawEnoughOfTheSitemap) {
 				const orphans: string[] = [];
 				const everRequested = new Set(requested);
 
@@ -1953,6 +1986,98 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 				},
 			});
 		}
+	}
+
+	// ── Rule 24: a redirect that goes round, or goes too far ──────────────────
+	//
+	// FR-016's remainder. Until this slice a redirect was not expressible at all:
+	// the runtime followed the hops and returned the last response, so no page in
+	// any run carried a 3xx and a chain left no trace.
+	//
+	// **One hop is not a finding.** A single redirect is ordinary site behaviour —
+	// canonicalising `www.`, forcing https, tidying a moved page — and reporting it
+	// would fire on nearly every site, which is the noise failure the PRD calls
+	// fatal. Two hops is where a reader has something to fix: each one costs a
+	// round trip, and search engines discount them.
+	//
+	// **A chain that exists only because of our own normalisation is not a
+	// finding.** `normaliseUrl` drops the query string and the trailing slash, so a
+	// `/path` → `/path/` hop is our identity definition meeting the site's rather
+	// than a defect of theirs. That is the trap which produced the recorded
+	// alias false positive, arriving here under a third name.
+	//
+	// No `crawlComplete` gate: every hop was observed, not inferred from absence.
+	/**
+	 * Every route walked, from both places a chain can end up.
+	 *
+	 * A route ending at a URL the crawl already recorded is discarded whole, hop
+	 * list included, and that is the commonest shape a real chain takes: an old
+	 * URL pointing at a new one the navigation also links. Reading `pages` alone
+	 * would miss most of them, and reading the aliases alone would miss every
+	 * loop — a loop lands nowhere, so it is never an alias of anything. Keyed by
+	 * where the route was entered, since a recorded page and its own alias are
+	 * two records of one walk.
+	 */
+	const routes = new Map<string, { chain: Hop[]; landed: string | null }>();
+	for (const page of pages) {
+		const entry = page.redirectChain[0]?.url;
+		if (entry === undefined) continue;
+		routes.set(entry, { chain: page.redirectChain, landed: page.url });
+	}
+	for (const alias of aliases) {
+		const entry = alias.chain[0]?.url;
+		if (entry === undefined || routes.has(entry)) continue;
+		routes.set(entry, { chain: alias.chain, landed: alias.served });
+	}
+
+	for (const [entry, route] of [...routes].sort(([a], [b]) =>
+		a.localeCompare(b),
+	)) {
+		/**
+		 * A loop is the last hop pointing back at somewhere the chain has already
+		 * been — not at the page we landed on, which is simply how a chain ends.
+		 * Conflating the two called every ordinary chain a loop.
+		 */
+		const visited = route.chain.map((hop) => hop.url);
+		const last = route.chain.at(-1);
+		const loops = last?.location != null && visited.includes(last.location);
+
+		/**
+		 * Hops that changed something the site controls.
+		 *
+		 * A hop whose destination differs from its source only in the parts
+		 * `normaliseUrl` already collapses is invisible to every other comparison in
+		 * this product, and counting it here would report our own rules as the
+		 * client's chain.
+		 */
+		const substantive = route.chain.filter(
+			(hop) => hop.location !== null && hop.location !== hop.url,
+		);
+
+		if (!loops && substantive.length < 2) continue;
+
+		findings.push({
+			type: FINDING_TYPES.REDIRECT_CHAIN,
+			url: null,
+			detail: {
+				kind: loops ? "loop" : "chain",
+				/** Where the chain was entered, which is the URL to correct. */
+				from: entry,
+				/** Where it ended up; null on a loop, which ends nowhere. */
+				to: loops ? null : route.landed,
+				hops: route.chain.map((hop) => ({
+					url: hop.url,
+					status: hop.status,
+					location: hop.location,
+				})),
+				/**
+				 * The pages still pointing at the stale URL, which is where the fix
+				 * is made. Deleting the redirect is the site owner's other option and
+				 * often not theirs to take; editing their own links always is.
+				 */
+				linkedFrom: [...(linkedFrom.get(entry) ?? [])].sort(),
+			},
+		});
 	}
 	return findings;
 }

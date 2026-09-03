@@ -477,4 +477,45 @@ describe("pagesInvolved for canonical findings", () => {
 			}),
 		).toEqual([`${B}/en/staging`]);
 	});
+
+	it("counts the pages still linking into a redirect chain", () => {
+		/**
+		 * The hops are routes, not pages, and the chain's own entry is a URL that
+		 * redirects rather than one that renders. What a reader edits is every page
+		 * still pointing at the stale URL.
+		 */
+		expect(
+			pagesInvolved({
+				type: "redirect_chain",
+				url: null,
+				detail: {
+					kind: "chain",
+					from: `${B}/old`,
+					to: `${B}/new`,
+					hops: [],
+					linkedFrom: [`${B}/`, `${B}/about`],
+				},
+			}),
+		).toEqual([`${B}/`, `${B}/about`]);
+	});
+
+	it("falls back to the chain's entry when nothing links to it", () => {
+		/**
+		 * A chain reached from the sitemap, or from where the run started. Reporting
+		 * zero pages would read as a problem affecting nothing.
+		 */
+		expect(
+			pagesInvolved({
+				type: "redirect_chain",
+				url: null,
+				detail: {
+					kind: "loop",
+					from: `${B}/circle`,
+					to: null,
+					hops: [],
+					linkedFrom: [],
+				},
+			}),
+		).toEqual([`${B}/circle`]);
+	});
 });

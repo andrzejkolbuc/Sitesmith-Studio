@@ -18,6 +18,14 @@ type Fixtures = {
 	signedIn: Page;
 	/** A crawlable site with known findings, stopped when the test ends. */
 	site: Fixture;
+	/**
+	 * The same site publishing neither robots.txt nor a sitemap.
+	 *
+	 * What an ordinary small site looks like, and the only shape on which a run
+	 * can honestly find nothing: the standard fixture's robots.txt disallows a
+	 * path its own sitemap submits, which is a true finding on every crawl of it.
+	 */
+	plainSite: Fixture;
 	/** Creates a project and lands on its detail page. Returns its name. */
 	createProject: (options: {
 		startUrl: string;
@@ -42,6 +50,13 @@ export const test = base.extend<Fixtures>({
 	// biome-ignore lint/correctness/noEmptyPattern: Playwright reads the destructuring pattern to work out which fixtures this one depends on; `{}` is how it spells "none", and `_` would change that meaning.
 	site: async ({}, use) => {
 		const fixture = await startFixtureSite();
+		await use(fixture);
+		await fixture.close();
+	},
+
+	// biome-ignore lint/correctness/noEmptyPattern: as above.
+	plainSite: async ({}, use) => {
+		const fixture = await startFixtureSite({ publishesSiteFiles: false });
 		await use(fixture);
 		await fixture.close();
 	},

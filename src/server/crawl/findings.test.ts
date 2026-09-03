@@ -36,6 +36,7 @@ const page = (
 	 */
 	metadata: { ...emptyMetadata(), title: url, description: `About ${url}` },
 	xRobotsTag: null,
+	redirectChain: [],
 	securityHeaders: {},
 	fetchError: null,
 });
@@ -142,6 +143,7 @@ describe("detectMissingVariants against the fixture site", () => {
 				entryUrl: result.entryUrl,
 				requested: result.requested,
 				external: result.external,
+				aliases: result.aliases,
 			}),
 		};
 	}
@@ -726,6 +728,7 @@ describe("detectMissingVariants edge cases", () => {
 			entryUrl: null,
 			requested: [],
 			external: { checked: [], complete: false },
+			aliases: [],
 			inScope: allInScope,
 		});
 
@@ -751,6 +754,7 @@ describe("detectMissingVariants edge cases", () => {
 			content: emptyContent(true),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
+			redirectChain: [],
 			securityHeaders: {},
 			fetchError: null,
 		};
@@ -764,6 +768,7 @@ describe("detectMissingVariants edge cases", () => {
 			content: emptyContent(true),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
+			redirectChain: [],
 			securityHeaders: {},
 			fetchError: null,
 		};
@@ -779,6 +784,7 @@ describe("detectMissingVariants edge cases", () => {
 			entryUrl: null,
 			requested: [],
 			external: { checked: [], complete: false },
+			aliases: [],
 			inScope: allInScope,
 		});
 
@@ -806,6 +812,7 @@ describe("detectMissingVariants edge cases", () => {
 			content: emptyContent(true),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
+			redirectChain: [],
 			securityHeaders: {},
 			fetchError: null,
 		};
@@ -820,6 +827,7 @@ describe("detectMissingVariants edge cases", () => {
 			content: emptyContent(true),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
+			redirectChain: [],
 			securityHeaders: {},
 			fetchError: null,
 		};
@@ -835,6 +843,7 @@ describe("detectMissingVariants edge cases", () => {
 			entryUrl: null,
 			requested: [],
 			external: { checked: [], complete: false },
+			aliases: [],
 			inScope: allInScope,
 		});
 
@@ -854,6 +863,7 @@ describe("detectMissingVariants edge cases", () => {
 			content: emptyContent(true),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
+			redirectChain: [],
 			securityHeaders: {},
 			fetchError: null,
 		};
@@ -869,6 +879,7 @@ describe("detectMissingVariants edge cases", () => {
 			entryUrl: null,
 			requested: [],
 			external: { checked: [], complete: false },
+			aliases: [],
 			inScope: allInScope,
 		});
 

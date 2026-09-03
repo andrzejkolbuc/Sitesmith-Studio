@@ -672,6 +672,30 @@ ${paths.map((path) => `  <url><loc>${base}${path}</loc></url>`).join("\n")}
 
 const REDIRECTS: Record<string, string> = {
 	"/moved/page": "/final/page",
+
+	/**
+	 * A two-hop chain, and one hop of it is deliberately trailing-slash-only.
+	 *
+	 * `/chain/start` → `/chain/middle/` → `/final/page`. The middle hop's target
+	 * differs from its source only by a trailing slash, which `normaliseUrl`
+	 * collapses — so a rule counting raw hops would call this three, and a rule
+	 * counting substantive ones calls it two. That distinction is the whole
+	 * defence against reporting our own normalisation as the client's chain.
+	 *
+	 * Reachable only as a start URL, so ordinary crawls stay small and no other
+	 * rule has to account for it.
+	 */
+	"/chain/start": "/chain/middle",
+	"/chain/middle": "/chain/end/",
+	"/chain/end": "/final/page",
+
+	/**
+	 * Two routes that point at each other. Before this slice a loop surfaced only
+	 * as an opaque fetch error from the runtime's own hop limit — and being a
+	 * fetch error, it counted towards the abort that ends the whole run.
+	 */
+	"/circle/one": "/circle/two",
+	"/circle/two": "/circle/one",
 };
 
 /**
@@ -775,8 +799,26 @@ function render(path: string, page: Page): string {
  * `flakyFrom` makes `/flaky` return 500 after that many successful hits, so a
  * test can drive the abort-on-failure-burst path deterministically.
  */
-export async function startFixtureSite(): Promise<Fixture> {
+export type FixtureOptions = {
+	/**
+	 * Whether the site publishes a robots.txt and a sitemap.
+	 *
+	 * On by default, because almost every case wants the whole site. Turning it
+	 * off is what a plainly ordinary site looks like: the pages are the same, and
+	 * the rules that read a site's own declarations have nothing to read. The
+	 * empty-state journey needs exactly that — the fixture's robots.txt disallows
+	 * a path its sitemap submits, which is a true finding on every run and would
+	 * otherwise make "nothing found" unprovable.
+	 */
+	publishesSiteFiles?: boolean;
+};
+
+export async function startFixtureSite(
+	options: FixtureOptions = {},
+): Promise<Fixture> {
+	const publishesSiteFiles = options.publishesSiteFiles ?? true;
 	const requests: string[] = [];
+
 	let inFlight = 0;
 	let peakConcurrency = 0;
 
@@ -814,6 +856,20 @@ export async function startFixtureSite(): Promise<Fixture> {
 			 * is fetched and parsed over real HTTP; what the directives *mean* is
 			 * `robots.test.ts`'s job, where a case can state one shape at a time.
 			 */
+			/**
+			 * A site that publishes neither file answers for both the way any site
+			 * without them does: with a 404. Silence has to arrive through the same
+			 * door a real absence would.
+			 */
+			if (
+				!publishesSiteFiles &&
+				(pathname === "/robots.txt" || pathname?.startsWith("/sitemap"))
+			) {
+				res.writeHead(404, { "content-type": "text/plain" });
+				res.end("not found");
+				return;
+			}
+
 			if (pathname === "/robots.txt") {
 				res.writeHead(200, { "content-type": "text/plain" });
 				/**

@@ -39,6 +39,22 @@ export default defineConfig({
 	globalSetup: "./e2e/global-setup.ts",
 
 	/**
+	 * Long enough for a journey to sit through a real crawl.
+	 *
+	 * Every crawl journey runs the product's own pacing — two requests at a time,
+	 * five hundred milliseconds apart — over the shared fixture site, and that
+	 * fixture grows by a few pages with each rule slice. The waits inside the
+	 * journeys already allow sixty seconds; the default per-test cap of thirty cut
+	 * them off before their own timeout could be reached, so the suite began
+	 * failing on duration rather than on behaviour.
+	 *
+	 * The pacing is not shortened for tests: it is the guarantee the crawler
+	 * exists to make, and a suite that ran without it would prove nothing about
+	 * the load a client's site actually sees.
+	 */
+	timeout: 120_000,
+
+	/**
 	 * Serial by default. The journeys share one database and one seeded owner;
 	 * running them in parallel would make them race on the project list. Speed is
 	 * not the constraint at this suite size — a flaky suite that nobody trusts is.

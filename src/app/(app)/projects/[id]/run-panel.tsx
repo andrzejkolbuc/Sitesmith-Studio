@@ -63,6 +63,7 @@ const FINDING_LABEL: Record<string, string> = {
 	robots_blocks_indexable: "robots.txt blocks a page the sitemap submits",
 	page_orphaned: "Pages the sitemap lists that nothing links to",
 	link_external_broken: "Links to other sites that are gone",
+	redirect_chain: "Redirects that go through several hops, or in circles",
 };
 
 /** Security headers in the reader's words, the same split `FIELD_LABEL` makes. */
@@ -1129,6 +1130,56 @@ function Evidence({
 						from a sitemap of {Number(detail.sitemapEntryCount ?? 0)}
 					</span>
 					<Listed items={urls.map(pathOf)} />
+				</>
+			);
+		}
+
+		case "redirect_chain": {
+			const hops = Array.isArray(detail.hops)
+				? (detail.hops as Array<Record<string, unknown>>)
+				: [];
+			const linkedFrom = Array.isArray(detail.linkedFrom)
+				? (detail.linkedFrom as string[])
+				: [];
+			const loop = detail.kind === "loop";
+
+			/**
+			 * The route drawn out, hop by hop with its status. A chain is a sequence,
+			 * and naming only its ends would leave the reader to walk it themselves
+			 * to find which redirect to delete.
+			 */
+			return (
+				<>
+					<span className="text-ink">
+						{loop ? (
+							<>
+								<Tag tone="mark">loop</Tag> {pathOf(str("from"))} redirects back
+								to itself
+							</>
+						) : (
+							<>
+								{hops.length} redirects from {pathOf(str("from"))} to{" "}
+								{pathOf(str("to"))}
+							</>
+						)}
+					</span>
+					<Listed
+						items={hops.map(
+							(hop) =>
+								`${pathOf(hop.url)} → ${pathOf(hop.location)} (${
+									typeof hop.status === "number" ? hop.status : "?"
+								})`,
+						)}
+					/>
+					{linkedFrom.length > 0 ? (
+						<>
+							<div className="mt-1.5 text-ink-soft text-xs">
+								Still linked from {linkedFrom.length}{" "}
+								{linkedFrom.length === 1 ? "page" : "pages"}
+							</div>
+							<Listed items={linkedFrom.map(pathOf)} />
+						</>
+					) : null}
 				</>
 			);
 		}

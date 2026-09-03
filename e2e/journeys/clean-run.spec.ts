@@ -11,16 +11,21 @@ import { expect, test } from "../fixtures";
 
 test("a site with nothing wrong says so, rather than showing an empty list", async ({
 	signedIn,
-	site,
+	plainSite,
 	createProject,
 }) => {
 	/**
 	 * A single monolingual page with no declared alternates and no locale in its
-	 * URL. Every rule is designed to stay silent here — which makes it the right
-	 * shape for proving the empty state, and a second guard on the narrowing.
+	 * URL, on a site publishing neither robots.txt nor a sitemap. Every rule is
+	 * designed to stay silent here — which makes it the right shape for proving
+	 * the empty state, and a second guard on the narrowing.
+	 *
+	 * The site files are what the plain fixture drops: the standard one disallows
+	 * a path its own sitemap submits, and that contradiction is a true finding on
+	 * every crawl of it, whichever page the run starts from.
 	 */
 	await createProject({
-		startUrl: `${site.baseUrl}${EXPECTED.silentPath}`,
+		startUrl: `${plainSite.baseUrl}${EXPECTED.silentPath}`,
 		locales: "",
 	});
 
