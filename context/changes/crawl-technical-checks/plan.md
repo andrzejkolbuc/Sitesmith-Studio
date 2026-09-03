@@ -1142,13 +1142,13 @@ duration of a run, following the precedent S-05 set when it declined to persist 
 
 #### Automated
 
-- [x] 7.1 Type checking passes: `npm run typecheck`
-- [x] 7.2 Linting and formatting pass: `npm run check`
-- [x] 7.3 Unit tests pass: `npm run test:unit`
-- [x] 7.4 A sitemap-listed page with no inbound link is reported
-- [x] 7.5 A page linked once is not reported
-- [x] 7.6 The start URL is never reported
-- [x] 7.7 No orphan findings are produced on a truncated crawl
+- [x] 7.1 Type checking passes: `npm run typecheck` — 0066f04
+- [x] 7.2 Linting and formatting pass: `npm run check` — 0066f04
+- [x] 7.3 Unit tests pass: `npm run test:unit` — 0066f04
+- [x] 7.4 A sitemap-listed page with no inbound link is reported — 0066f04
+- [x] 7.5 A page linked once is not reported — 0066f04
+- [x] 7.6 The start URL is never reported — 0066f04
+- [x] 7.7 No orphan findings are produced on a truncated crawl — 0066f04
 
 #### Manual
 
@@ -1158,16 +1158,16 @@ duration of a run, following the precedent S-05 set when it declined to persist 
 
 #### Automated
 
-- [ ] 8.1 Type checking passes: `npm run typecheck`
-- [ ] 8.2 Linting and formatting pass: `npm run check`
-- [ ] 8.3 Unit tests pass: `npm run test:unit`
-- [ ] 8.4 Integration tests pass: `npm run test:integration`
-- [ ] 8.5 Each unique external URL is requested at most once per run
-- [ ] 8.6 A 429 with `Retry-After` defers rather than retrying immediately
-- [ ] 8.7 A host rejecting HEAD is retried with GET
-- [ ] 8.8 A burst of dead external hosts does not abort the main crawl
-- [ ] 8.9 An incomplete external sweep produces no `link_external_broken` findings
-- [ ] 8.10 The limiter is not exported from `crawler.ts`
+- [x] 8.1 Type checking passes: `npm run typecheck`
+- [x] 8.2 Linting and formatting pass: `npm run check`
+- [x] 8.3 Unit tests pass: `npm run test:unit`
+- [x] 8.4 Integration tests pass: `npm run test:integration`
+- [x] 8.5 Each unique external URL is requested at most once per run
+- [x] 8.6 A 429 with `Retry-After` defers rather than retrying immediately
+- [x] 8.7 A host rejecting HEAD is retried with GET
+- [x] 8.8 A burst of dead external hosts does not abort the main crawl
+- [x] 8.9 An incomplete external sweep produces no `link_external_broken` findings
+- [x] 8.10 The limiter is not exported from `crawler.ts`
 
 #### Manual
 

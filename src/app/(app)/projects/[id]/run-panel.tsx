@@ -62,6 +62,7 @@ const FINDING_LABEL: Record<string, string> = {
 	page_missing_from_sitemap: "Live pages the sitemap does not list",
 	robots_blocks_indexable: "robots.txt blocks a page the sitemap submits",
 	page_orphaned: "Pages the sitemap lists that nothing links to",
+	link_external_broken: "Links to other sites that are gone",
 };
 
 /** Security headers in the reader's words, the same split `FIELD_LABEL` makes. */
@@ -991,7 +992,8 @@ function Evidence({
 			);
 		}
 
-		case "link_broken": {
+		case "link_broken":
+		case "link_external_broken": {
 			const linkedFrom = Array.isArray(detail.linkedFrom)
 				? (detail.linkedFrom as string[])
 				: [];

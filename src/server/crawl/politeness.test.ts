@@ -376,3 +376,50 @@ describe("a site that publishes no sitemap", () => {
 		expect(result.abortedReason).toBeNull();
 	});
 });
+
+describe("links that leave the site", () => {
+	it("does not sweep at all when the crawl aborted", async () => {
+		/**
+		 * The isolation that matters most, from the other direction.
+		 *
+		 * A run that stopped because a site was struggling has no business making
+		 * further requests, least of all to strangers. And because the sweep is
+		 * skipped, the rule that reads it must stay silent — an unchecked link is
+		 * not a broken one.
+		 */
+		site = await startHostileSite({ fanOut: 30, failEvery: 2 });
+
+		const result = await crawl({
+			...baseOptions,
+			startUrl: `${site.baseUrl}/flapping-hub`,
+			maxConcurrency: 1,
+		});
+
+		expect(result.abortedReason).not.toBeNull();
+		expect(result.external.complete).toBe(false);
+		expect(result.external.checked).toEqual([]);
+	});
+});
+
+describe("a page full of dead external links", () => {
+	it("stops the sweep without touching the crawl of the client's site", async () => {
+		/**
+		 * The isolation this phase exists for. The crawl's abort counters are global
+		 * — today a run of failures ends the whole run — so without a budget of its
+		 * own the sweep would spend the client's abort allowance on somebody else's
+		 * outage, and a page of dead outbound links would look like the client's
+		 * site struggling.
+		 */
+		site = await startHostileSite({ fanOut: 0, failEvery: 0 });
+
+		const result = await crawl({
+			...baseOptions,
+			startUrl: `${site.baseUrl}/external-hub`,
+			maxConcurrency: 1,
+		});
+
+		expect(result.abortedReason).toBeNull();
+		expect(result.pages).toHaveLength(1);
+		expect(result.pages[0]?.httpStatus).toBe(200);
+	});
+});

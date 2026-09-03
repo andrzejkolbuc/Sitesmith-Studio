@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { type ContentSummary, emptyContent } from "./content";
 import type { CrawledPage, Reverification } from "./crawler";
+import type { ExternalSweep } from "./external";
 import { detectMissingVariants } from "./findings";
 import { emptyMetadata, type PageMetadata } from "./metadata";
 import { parseRobots, type RobotsFile } from "./robots";
@@ -114,6 +115,8 @@ function findingsFor(options: {
 	 * states the crawl it wants, so nothing in it was silently unreachable.
 	 */
 	requested?: string[];
+	/** Defaults to an incomplete, empty sweep: most cases are not about it. */
+	external?: ExternalSweep;
 }): Summary[] {
 	return detectMissingVariants({
 		pages: options.pages,
@@ -126,6 +129,7 @@ function findingsFor(options: {
 		sitemap: options.sitemap ?? null,
 		entryUrl: options.entryUrl ?? null,
 		requested: options.requested ?? options.pages.map((p) => p.url),
+		external: options.external ?? { checked: [], complete: false },
 	})
 		.map((finding) => ({ type: finding.type, url: finding.url }))
 		.sort(
@@ -163,6 +167,8 @@ function detailedFindingsFor(options: {
 	 * states the crawl it wants, so nothing in it was silently unreachable.
 	 */
 	requested?: string[];
+	/** Defaults to an incomplete, empty sweep: most cases are not about it. */
+	external?: ExternalSweep;
 }) {
 	return detectMissingVariants({
 		pages: options.pages,
@@ -175,6 +181,7 @@ function detailedFindingsFor(options: {
 		sitemap: options.sitemap ?? null,
 		entryUrl: options.entryUrl ?? null,
 		requested: options.requested ?? options.pages.map((p) => p.url),
+		external: options.external ?? { checked: [], complete: false },
 	});
 }
 
@@ -3232,6 +3239,130 @@ describe("pages the sitemap lists that nothing links to", () => {
 				entryUrl: `${BASE}/`,
 				sitemap: null,
 			}).filter(orphaned),
+		).toEqual([]);
+	});
+});
+
+describe("links that leave the site", () => {
+	const externalBroken = (f: { type: string }) =>
+		f.type === "link_external_broken";
+
+	const linking = (path: string, links: string[]): CrawledPage => ({
+		...page(path),
+		links,
+	});
+
+	const sweep = (
+		checked: Array<{
+			url: string;
+			httpStatus: number | null;
+			fetchError?: string | null;
+			confirmed?: boolean;
+		}>,
+		complete = true,
+	) => ({
+		complete,
+		checked: checked.map((check) => ({
+			url: check.url,
+			httpStatus: check.httpStatus,
+			fetchError: check.fetchError ?? null,
+			confirmed: check.confirmed ?? false,
+		})),
+	});
+
+	it("reports a link to a page another site says is gone", () => {
+		const findings = detailedFindingsFor({
+			pages: [linking("/", ["https://elsewhere.test/gone"])],
+			external: sweep([
+				{ url: "https://elsewhere.test/gone", httpStatus: 404 },
+			]),
+		}).filter(externalBroken);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBeNull();
+		expect(findings[0]?.detail).toMatchObject({
+			target: "https://elsewhere.test/gone",
+			httpStatus: 404,
+			linkedFrom: [`${BASE}/`],
+		});
+	});
+
+	it("says nothing about a host that merely refused us", () => {
+		/**
+		 * The narrowing that matters most here. A `403` is the host saying *we* may
+		 * not have it — a fact about being an automated client — and reporting it
+		 * would file someone else's access policy as the client's broken link.
+		 * Bot-hostile hosts are common, and with no suppression mechanism yet such a
+		 * finding would repeat in every future run forever.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [linking("/", ["https://elsewhere.test/closed"])],
+				external: sweep([
+					{ url: "https://elsewhere.test/closed", httpStatus: 403 },
+				]),
+			}).filter(externalBroken),
+		).toEqual([]);
+	});
+
+	it("says nothing about a host that was briefly down", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [linking("/", ["https://elsewhere.test/down"])],
+				external: sweep([
+					{ url: "https://elsewhere.test/down", httpStatus: 503 },
+				]),
+			}).filter(externalBroken),
+		).toEqual([]);
+	});
+
+	it("reports a network failure only once it has been confirmed", () => {
+		const pages = [linking("/", ["https://gone.test/x"])];
+
+		expect(
+			detailedFindingsFor({
+				pages,
+				external: sweep([
+					{
+						url: "https://gone.test/x",
+						httpStatus: null,
+						fetchError: "ENOTFOUND",
+						confirmed: true,
+					},
+				]),
+			}).filter(externalBroken),
+		).toHaveLength(1);
+
+		expect(
+			detailedFindingsFor({
+				pages,
+				external: sweep([
+					{
+						url: "https://gone.test/x",
+						httpStatus: null,
+						fetchError: "ENOTFOUND",
+						confirmed: false,
+					},
+				]),
+			}).filter(externalBroken),
+		).toEqual([]);
+	});
+
+	it("says nothing at all when the sweep did not finish", () => {
+		/**
+		 * An unchecked link is not a broken one. The sweep stops when its request
+		 * budget runs out, when too much fails at the transport layer, or when the
+		 * crawl aborted — and in none of those cases does what it managed to check
+		 * describe the site.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [linking("/", ["https://elsewhere.test/gone"])],
+				external: sweep(
+					[{ url: "https://elsewhere.test/gone", httpStatus: 404 }],
+					false,
+				),
+			}).filter(externalBroken),
 		).toEqual([]);
 	});
 });

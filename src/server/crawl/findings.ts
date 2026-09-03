@@ -1,5 +1,6 @@
 import { BLOCK_NAMES, type ContentSummary } from "./content";
 import type { CrawledPage, Reverification } from "./crawler";
+import { type ExternalSweep, isGone } from "./external";
 import { parseRobotsHeader } from "./metadata";
 import { evaluatePath, type RobotsFile, type RobotsRule } from "./robots";
 import { reconcile, type SitemapDocument } from "./sitemap";
@@ -67,6 +68,8 @@ export const FINDING_TYPES = {
 	ROBOTS_BLOCKS_INDEXABLE: "robots_blocks_indexable",
 	/** A page the sitemap submits that nothing on the site links to. */
 	PAGE_ORPHANED: "page_orphaned",
+	/** A link leaving the site whose target is gone. */
+	LINK_EXTERNAL_BROKEN: "link_external_broken",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -132,6 +135,8 @@ export type DetectOptions = {
 	 * and redirected somewhere already known.
 	 */
 	requested: string[];
+	/** The links leaving the site, as checked after the crawl drained. */
+	external: ExternalSweep;
 };
 
 /**
@@ -184,6 +189,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		sitemap,
 		entryUrl,
 		requested,
+		external,
 	} = options;
 
 	const variants = groupVariants(pages);
@@ -1882,6 +1888,70 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 					});
 				}
 			}
+		}
+	}
+
+	// ── Rule 23: a link leaving the site whose target is gone ─────────────────
+	//
+	// FR-016's external half, and it reports far less than the sweep observed —
+	// deliberately.
+	//
+	// **Only `404` and `410`, or a network error confirmed twice.** Those are the
+	// host saying the resource does not exist, which is a fact about the link. A
+	// `401`, `403` or `429` is the host saying *we* may not have it, which is a
+	// fact about being an automated client — and filing that as a defect on the
+	// client's site would report someone else's access policy as their broken
+	// link. A `5xx` is excluded for a third reason: a link to a site that is
+	// briefly down is not a broken link.
+	//
+	// That narrowing matters more here than anywhere else in this file, because
+	// bot-hostile hosts are common and there is still no way to suppress a finding
+	// once it is reported. A rule that called every `403` a dead link would put
+	// permanent noise in every future run.
+	//
+	// One finding per dead target, listing the pages that link to it, matching
+	// rule 16's shape for rule 16's reason.
+	if (external.complete) {
+		/**
+		 * Which pages link to each URL the sweep checked.
+		 *
+		 * Keyed off the sweep's own list rather than recomputed from `inScope`,
+		 * which here is the run's path-prefix closure and knows nothing about
+		 * origins — asking it whether a link is external would get the wrong answer
+		 * for every off-origin URL whose path happens not to be excluded. The sweep
+		 * already decided what was external; this only needs to say who pointed at
+		 * it.
+		 */
+		const swept = new Set(external.checked.map((check) => check.url));
+		const linkedFromExternal = new Map<string, string[]>();
+		for (const page of pages) {
+			for (const link of page.links) {
+				if (!swept.has(link)) continue;
+				linkedFromExternal.set(link, [
+					...(linkedFromExternal.get(link) ?? []),
+					page.url,
+				]);
+			}
+		}
+
+		for (const check of [...external.checked].sort((a, b) =>
+			a.url.localeCompare(b.url),
+		)) {
+			if (!isGone(check)) continue;
+
+			findings.push({
+				type: FINDING_TYPES.LINK_EXTERNAL_BROKEN,
+				url: null,
+				detail: {
+					target: check.url,
+					httpStatus: check.httpStatus,
+					fetchError: check.fetchError,
+					confirmed: check.confirmed,
+					linkedFrom: [
+						...new Set(linkedFromExternal.get(check.url) ?? []),
+					].sort(),
+				},
+			});
 		}
 	}
 	return findings;

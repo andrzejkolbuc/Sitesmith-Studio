@@ -12,13 +12,13 @@
  */
 
 import { type ContentSummary, emptyContent, extractContent } from "./content";
+import { checkExternalLinks, type ExternalSweep } from "./external";
 import {
 	emptyMetadata,
 	extractMetadata,
 	MAX_METADATA_CHARS,
 	type PageMetadata,
 } from "./metadata";
-
 import { parseRobots, type RobotsFile } from "./robots";
 import {
 	decodeSitemapBody,
@@ -187,6 +187,13 @@ export type CrawlResult = {
 	 * reached and led somewhere already known.
 	 */
 	requested: string[];
+	/**
+	 * The links leaving the site, checked once each after the crawl drained.
+	 *
+	 * Empty and incomplete on an aborted crawl. A rule must stay silent about an
+	 * incomplete sweep: an unchecked link is not a broken one.
+	 */
+	external: ExternalSweep;
 };
 
 /**
@@ -331,6 +338,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 			sitemap: null,
 			entryUrl: null,
 			requested: [],
+			external: { checked: [], complete: false },
 		};
 	}
 
@@ -720,6 +728,53 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 	 * Skipped entirely on an aborted crawl. The abort exists because the site is
 	 * struggling, and a site that made us stop is the last one to ask again.
 	 */
+	/**
+	 * The links that leave the site, checked once each.
+	 *
+	 * After the crawl drains, because the full external set is only known once
+	 * every page has been read — and skipped entirely on an aborted crawl, for the
+	 * same reason re-verification is: a run that stopped because a site was
+	 * struggling has no business making more requests, least of all to strangers.
+	 *
+	 * The sweep borrows the pacer rather than keeping one, so the total request
+	 * rate against the whole world stays what the operator configured. It is lent
+	 * as a closure, not exported: `crawler.ts`'s guarantee is that a caller cannot
+	 * opt out of the ceiling, and handing the limiter out of the module would end
+	 * that.
+	 */
+	const external =
+		abortedReason === null
+			? await checkExternalLinks({
+					/**
+					 * Off-origin, not merely out of scope — and the difference is load
+					 * bearing.
+					 *
+					 * `inScope` is false for two quite different things: a link to
+					 * another site, and a same-origin path the operator excluded.
+					 * Sweeping on `!inScope` sent requests into the excluded prefix,
+					 * which is the one instruction the operator gave us about their own
+					 * site. Caught by the test that exists to protect exactly that.
+					 */
+					urls: [
+						...new Set(
+							pages.flatMap((page) =>
+								page.links.filter((link) => {
+									try {
+										return new URL(link).origin !== origin;
+									} catch {
+										return false;
+									}
+								}),
+							),
+						),
+					].sort(),
+					pacer: { claim: claimSlot },
+					requestTimeoutMs,
+					perHostDelayMs: requestDelayMs,
+					maxRequests: pages.length,
+				})
+			: { checked: [], complete: false };
+
 	const reverified: Reverification[] = [];
 
 	if (abortedReason === null) {
@@ -759,5 +814,6 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 		sitemap,
 		entryUrl: pages[0]?.url ?? null,
 		requested: [...seen],
+		external,
 	};
 }

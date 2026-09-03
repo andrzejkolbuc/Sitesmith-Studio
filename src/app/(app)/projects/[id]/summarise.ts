@@ -140,6 +140,7 @@ export function pagesInvolved(finding: {
 		 * how much of the site has to be edited.
 		 */
 		case "link_broken":
+		case "link_external_broken":
 			return [...one(detail.target), ...strings(detail.linkedFrom)];
 
 		/**

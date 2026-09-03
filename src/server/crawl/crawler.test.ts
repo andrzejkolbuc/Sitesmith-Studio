@@ -286,6 +286,25 @@ describe("page identity under redirects", () => {
 	});
 });
 
+describe("the politeness guarantee this module exists for", () => {
+	it("does not export its request pacer", async () => {
+		/**
+		 * This module's opening promise is that a caller cannot opt out of the
+		 * concurrency ceiling, the inter-request delay, or the abort behaviour by
+		 * forgetting to wrap something.
+		 *
+		 * The external sweep needed the pacer, and the tempting way to share it was
+		 * to export it. That would have ended the guarantee: anything importing
+		 * `crawler.ts` could then make paced-looking requests outside every abort
+		 * counter. It is lent as a closure instead, and this asserts the door stayed
+		 * shut — a structural claim no other test would catch.
+		 */
+		const exported = Object.keys(await import("./crawler")).sort();
+
+		expect(exported).toEqual(["crawl", "normaliseUrl"]);
+	});
+});
+
 describe("metadata capture", () => {
 	const pathOf = (url: string) => new URL(url).pathname;
 

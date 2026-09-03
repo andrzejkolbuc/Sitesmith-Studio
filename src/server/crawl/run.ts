@@ -229,6 +229,7 @@ async function execute(
 		sitemap: result.sitemap,
 		entryUrl: result.entryUrl,
 		requested: result.requested,
+		external: result.external,
 	});
 
 	if (detected.length > 0) {

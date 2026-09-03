@@ -146,6 +146,27 @@ export async function startHostileSite(
 				return;
 			}
 
+			/**
+			 * Links to hosts that are not there at all, on a port nothing listens
+			 * on so the failure is instant. The point is the isolation: a wall of
+			 * dead third parties must stop the sweep, never the crawl of the
+			 * client's site, whose abort counters are global and would otherwise
+			 * be spent on somebody else's outage.
+			 */
+			if (path === "/external-hub") {
+				res.writeHead(200, { "content-type": "text/html" });
+				res.end(
+					html(
+						"external hub",
+						Array.from(
+							{ length: 8 },
+							(_, index) => `http://127.0.0.1:1/dead-${index}`,
+						),
+					),
+				);
+				return;
+			}
+
 			if (path === "/slow-hub") {
 				res.writeHead(200, { "content-type": "text/html" });
 				res.end(html("slow hub", children("/slow")));

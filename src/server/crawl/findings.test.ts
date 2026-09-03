@@ -141,6 +141,7 @@ describe("detectMissingVariants against the fixture site", () => {
 				sitemap: result.sitemap,
 				entryUrl: result.entryUrl,
 				requested: result.requested,
+				external: result.external,
 			}),
 		};
 	}
@@ -724,6 +725,7 @@ describe("detectMissingVariants edge cases", () => {
 			sitemap: null,
 			entryUrl: null,
 			requested: [],
+			external: { checked: [], complete: false },
 			inScope: allInScope,
 		});
 
@@ -776,6 +778,7 @@ describe("detectMissingVariants edge cases", () => {
 			sitemap: null,
 			entryUrl: null,
 			requested: [],
+			external: { checked: [], complete: false },
 			inScope: allInScope,
 		});
 
@@ -831,6 +834,7 @@ describe("detectMissingVariants edge cases", () => {
 			sitemap: null,
 			entryUrl: null,
 			requested: [],
+			external: { checked: [], complete: false },
 			inScope: allInScope,
 		});
 
@@ -864,6 +868,7 @@ describe("detectMissingVariants edge cases", () => {
 			sitemap: null,
 			entryUrl: null,
 			requested: [],
+			external: { checked: [], complete: false },
 			inScope: allInScope,
 		});
 
