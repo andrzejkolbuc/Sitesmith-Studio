@@ -329,3 +329,29 @@ describe("a failure that might not be one", () => {
 		expect(result.reverified).toEqual([]);
 	});
 });
+
+describe("a site that publishes no robots.txt", () => {
+	it("records no robots file and does not treat its absence as a failure", async () => {
+		/**
+		 * Absence of the file is not a defect, and not evidence of anything. A site
+		 * without a robots.txt has said nothing about crawling — which the
+		 * specification reads as permission — so the honest record is null and no
+		 * rule may read null as an assertion.
+		 *
+		 * The request also must not count towards the failure budget. A 404 for a
+		 * file most sites do not publish is not a site struggling, and letting it
+		 * count would spend part of the abort budget before the crawl began.
+		 */
+		site = await startHostileSite({ fanOut: 0, failEvery: 0 });
+
+		const result = await crawl({
+			...baseOptions,
+			startUrl: `${site.baseUrl}/loop/a`,
+			maxConcurrency: 1,
+		});
+
+		expect(result.robots).toBeNull();
+		expect(result.abortedReason).toBeNull();
+		expect(result.pages.length).toBeGreaterThan(0);
+	});
+});

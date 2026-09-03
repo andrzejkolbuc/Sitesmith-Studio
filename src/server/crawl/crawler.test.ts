@@ -350,6 +350,48 @@ describe("metadata capture", () => {
 		]);
 	});
 
+	it("fetches and parses the site's robots.txt", async () => {
+		/**
+		 * The channel, over real HTTP. What the directives *mean* is
+		 * `robots.test.ts`'s job — this asserts only that the file arrives and
+		 * comes back with its structure intact.
+		 */
+		const result = await crawl(base());
+
+		expect(result.robots).not.toBeNull();
+		expect(result.robots?.groups.map((g) => g.userAgents)).toEqual([
+			["*"],
+			["googlebot"],
+		]);
+		expect(result.robots?.sitemaps).toHaveLength(1);
+		expect(site.requests.filter((path) => path === "/robots.txt")).toHaveLength(
+			1,
+		);
+	});
+
+	it("crawls exactly the same pages whether or not robots.txt disallows them", async () => {
+		/**
+		 * The dependency FR-018 rests on, asserted rather than assumed.
+		 *
+		 * robots.txt is read for findings and deliberately not obeyed — a decision
+		 * recorded twice in S-01 and left standing. The rule that reports a blocked
+		 * page can only see it because the crawl went and looked, so if obedience
+		 * ever arrives this test is where it will surface.
+		 *
+		 * `/private` is both `Disallow`ed by the fixture's robots.txt and excluded
+		 * by configuration here, so the comparison is between a crawl that consults
+		 * the file and one whose scope was widened to include the blocked prefix.
+		 */
+		const respectingScope = await crawl(base());
+		const ignoringScope = await crawl({ ...base(), excludePaths: [] });
+
+		const blocked = `${site.baseUrl}/private/secret`;
+
+		expect(respectingScope.pages.some((p) => p.url === blocked)).toBe(false);
+		// Widening our own scope reaches it, which robots.txt did nothing to stop.
+		expect(ignoringScope.pages.some((p) => p.url === blocked)).toBe(true);
+	});
+
 	it("records a page that published no title and no description", async () => {
 		const pages = await crawled();
 		const bare = pages.get("/meta/bare");

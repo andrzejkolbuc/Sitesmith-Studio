@@ -131,6 +131,7 @@ describe("detectMissingVariants against the fixture site", () => {
 				crawlComplete: true,
 				reverified: [],
 				certificate: null,
+				robots: null,
 			}),
 		};
 	}
@@ -596,6 +597,7 @@ describe("detectMissingVariants edge cases", () => {
 			crawlComplete: true,
 			reverified: [],
 			certificate: null,
+			robots: null,
 			inScope: allInScope,
 		});
 
@@ -644,6 +646,7 @@ describe("detectMissingVariants edge cases", () => {
 			crawlComplete: true,
 			reverified: [],
 			certificate: null,
+			robots: null,
 			inScope: allInScope,
 		});
 
@@ -695,6 +698,7 @@ describe("detectMissingVariants edge cases", () => {
 			crawlComplete: true,
 			reverified: [],
 			certificate: null,
+			robots: null,
 			inScope: allInScope,
 		});
 
@@ -724,6 +728,7 @@ describe("detectMissingVariants edge cases", () => {
 			crawlComplete: true,
 			reverified: [],
 			certificate: null,
+			robots: null,
 			inScope: allInScope,
 		});
 

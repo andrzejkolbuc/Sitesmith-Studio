@@ -225,6 +225,7 @@ async function execute(
 		inScope,
 		reverified: result.reverified,
 		certificate: result.certificate,
+		robots: result.robots,
 	});
 
 	if (detected.length > 0) {

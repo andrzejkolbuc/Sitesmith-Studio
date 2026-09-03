@@ -553,6 +553,31 @@ const SITE: Record<string, Page> = {
  * The fixture had none until now, which is exactly why a whole class of defect
  * went unseen: every crawl the suite performed landed on the URL it asked for.
  */
+/**
+ * The site's robots.txt.
+ *
+ * `/private` is disallowed, which is also the prefix every detection crawl
+ * excludes by configuration — so the two agree, and the crawl's behaviour is
+ * unchanged by the file existing. That agreement is the point: the crawler
+ * reads robots.txt for findings and does not obey it, and a fixture where
+ * obeying and not obeying produced different page counts would make that
+ * impossible to assert.
+ *
+ * The `googlebot` group and the query-bearing pattern are here so an
+ * end-to-end parse has something with structure to have got right.
+ */
+const ROBOTS = `# Fixture robots.txt
+User-agent: *
+Disallow: /private
+Disallow: /*?sessionid=
+
+User-agent: googlebot
+Disallow: /private
+Allow: /private/public-after-all
+
+Sitemap: SITEMAP_URL
+`;
+
 const REDIRECTS: Record<string, string> = {
 	"/moved/page": "/final/page",
 };
@@ -685,6 +710,31 @@ export async function startFixtureSite(): Promise<Fixture> {
 			if (pathname?.startsWith("/flaky/")) {
 				res.writeHead(500, { "content-type": "text/html" });
 				res.end("<html><body>boom</body></html>");
+				return;
+			}
+
+			/**
+			 * Served as `text/plain`, which is what a real site sends and what the
+			 * crawler's soft-404 guard depends on: a body announcing itself as HTML
+			 * is treated as no robots.txt at all.
+			 *
+			 * The rules here are deliberately ordinary. This fixture proves the file
+			 * is fetched and parsed over real HTTP; what the directives *mean* is
+			 * `robots.test.ts`'s job, where a case can state one shape at a time.
+			 */
+			if (pathname === "/robots.txt") {
+				res.writeHead(200, { "content-type": "text/plain" });
+				/**
+				 * The sitemap URL is absolute, as the protocol requires, so it has to
+				 * be built from the port the server actually got — which is not known
+				 * until it is listening.
+				 */
+				res.end(
+					ROBOTS.replace(
+						"SITEMAP_URL",
+						`http://${req.headers.host ?? "127.0.0.1"}/sitemap.xml`,
+					),
+				);
 				return;
 			}
 

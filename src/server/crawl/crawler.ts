@@ -18,6 +18,7 @@ import {
 	MAX_METADATA_CHARS,
 	type PageMetadata,
 } from "./metadata";
+import { parseRobots, type RobotsFile } from "./robots";
 import { type CertificateObservation, probeCertificate } from "./tls";
 import { normaliseUrl } from "./url";
 
@@ -146,6 +147,12 @@ export type CrawlResult = {
 	 * a plain-http origin, or a probe that could not connect.
 	 */
 	certificate: CertificateObservation | null;
+	/**
+	 * The site's robots.txt, parsed, or null when there was none to read.
+	 *
+	 * Read for findings and not obeyed — see the fetch site for why.
+	 */
+	robots: RobotsFile | null;
 };
 
 /**
@@ -286,6 +293,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 			reachedPageLimit: false,
 			reverified: [],
 			certificate: null,
+			robots: null,
 		};
 	}
 
@@ -323,6 +331,61 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 		nextSlotAt = slot + requestDelayMs;
 		if (slot > now) await sleep(slot - now);
 	}
+
+	/**
+	 * Fetches a site-control file, through the same pacer as everything else.
+	 *
+	 * Separate from `fetchOne` because the result is not a page: it is never
+	 * recorded, never counted towards the ceiling, and never counted as a failure.
+	 * A site without a robots.txt is not a struggling site.
+	 */
+	async function fetchText(url: string): Promise<string | null> {
+		await claimSlot();
+
+		const controller = new AbortController();
+		const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
+
+		try {
+			const response = await fetch(url, {
+				signal: controller.signal,
+				redirect: "follow",
+			});
+
+			if (!response.ok) return null;
+
+			/**
+			 * A soft 404 — an HTML "not found" page served with a 200 — is the
+			 * commonest way a site answers a request for a file it does not have.
+			 * Parsing it would invent groups out of prose, so a response that
+			 * announces itself as HTML is treated as absent.
+			 */
+			const contentType = response.headers.get("content-type") ?? "";
+			if (contentType.includes("html")) return null;
+
+			return await response.text();
+		} catch {
+			return null;
+		} finally {
+			clearTimeout(timer);
+		}
+	}
+
+	/**
+	 * One request, before the crawl proper.
+	 *
+	 * Read for findings, not obeyed. Honouring robots.txt as a crawl constraint
+	 * was declined deliberately in S-01 and stays declined — the operator pointed
+	 * this crawl at a site they are authorised to check, and robots.txt addresses
+	 * search crawlers rather than an invited audit. FR-018's formulation depends
+	 * on that: it compares what the site tells search engines against what the
+	 * site's own sitemap submits to them, and it can only see a blocked page
+	 * because we went and looked.
+	 *
+	 * A missing or unreadable robots.txt is null, and null is silence. Absence of
+	 * the file is not a defect.
+	 */
+	const robotsBody = await fetchText(`${origin}/robots.txt`);
+	const robots = robotsBody === null ? null : parseRobots(robotsBody);
 
 	async function fetchOne(url: string): Promise<CrawledPage> {
 		await claimSlot();
@@ -549,5 +612,12 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 		}
 	}
 
-	return { pages, abortedReason, reachedPageLimit, reverified, certificate };
+	return {
+		pages,
+		abortedReason,
+		reachedPageLimit,
+		reverified,
+		certificate,
+		robots,
+	};
 }

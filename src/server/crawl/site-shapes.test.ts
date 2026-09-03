@@ -4,6 +4,7 @@ import { type ContentSummary, emptyContent } from "./content";
 import type { CrawledPage, Reverification } from "./crawler";
 import { detectMissingVariants } from "./findings";
 import { emptyMetadata, type PageMetadata } from "./metadata";
+import type { RobotsFile } from "./robots";
 import type { CertificateObservation } from "./tls";
 import { localeFromUrl } from "./variants";
 
@@ -101,6 +102,8 @@ function findingsFor(options: {
 	reverified?: Reverification[];
 	/** Defaults to none: most cases are not about the transport layer. */
 	certificate?: CertificateObservation | null;
+	/** Defaults to none: most cases describe a site with no robots.txt. */
+	robots?: RobotsFile | null;
 }): Summary[] {
 	return detectMissingVariants({
 		pages: options.pages,
@@ -109,6 +112,7 @@ function findingsFor(options: {
 		crawlComplete: options.crawlComplete ?? true,
 		reverified: options.reverified ?? [],
 		certificate: options.certificate ?? null,
+		robots: options.robots ?? null,
 	})
 		.map((finding) => ({ type: finding.type, url: finding.url }))
 		.sort(
@@ -135,6 +139,8 @@ function detailedFindingsFor(options: {
 	reverified?: Reverification[];
 	/** Defaults to none: most cases are not about the transport layer. */
 	certificate?: CertificateObservation | null;
+	/** Defaults to none: most cases describe a site with no robots.txt. */
+	robots?: RobotsFile | null;
 }) {
 	return detectMissingVariants({
 		pages: options.pages,
@@ -143,6 +149,7 @@ function detailedFindingsFor(options: {
 		crawlComplete: options.crawlComplete ?? true,
 		reverified: options.reverified ?? [],
 		certificate: options.certificate ?? null,
+		robots: options.robots ?? null,
 	});
 }
 

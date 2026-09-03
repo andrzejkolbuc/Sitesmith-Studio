@@ -1,6 +1,7 @@
 import { BLOCK_NAMES, type ContentSummary } from "./content";
 import type { CrawledPage, Reverification } from "./crawler";
 import { parseRobotsHeader } from "./metadata";
+import type { RobotsFile } from "./robots";
 import type { CertificateObservation } from "./tls";
 import { normaliseUrl } from "./url";
 import {
@@ -100,6 +101,13 @@ export type DetectOptions = {
 	 * Null is silence: a probe that could not run is a fact about us.
 	 */
 	certificate: CertificateObservation | null;
+	/**
+	 * The site's robots.txt, parsed, or null when it published none.
+	 *
+	 * Null is silence rather than permission: no rule here reads an absent
+	 * robots.txt as the site asserting anything.
+	 */
+	robots: RobotsFile | null;
 };
 
 /**

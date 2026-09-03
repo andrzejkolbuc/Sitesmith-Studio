@@ -1070,37 +1070,37 @@ duration of a run, following the precedent S-05 set when it declined to persist 
 
 #### Automated
 
-- [x] 3.1 Type checking passes: `npm run typecheck`
-- [x] 3.2 Linting and formatting pass: `npm run check`
-- [x] 3.3 Unit tests pass: `npm run test:unit`
-- [x] 3.4 Integration tests pass: `npm run test:integration`
-- [x] 3.5 A malformed HSTS value produces one `security_header_contradiction`
-- [x] 3.6 A site with no CSP and no other contradiction produces no finding
-- [x] 3.7 A header the site sends on some pages and omits on others produces `kind: "inconsistent"`
-- [x] 3.8 `probeCertificate` returns null on a plain-http origin and on a connection error
-- [x] 3.9 An expired certificate produces `kind: "expired"`
+- [x] 3.1 Type checking passes: `npm run typecheck` — af83602
+- [x] 3.2 Linting and formatting pass: `npm run check` — af83602
+- [x] 3.3 Unit tests pass: `npm run test:unit` — af83602
+- [x] 3.4 Integration tests pass: `npm run test:integration` — af83602
+- [x] 3.5 A malformed HSTS value produces one `security_header_contradiction` — af83602
+- [x] 3.6 A site with no CSP and no other contradiction produces no finding — af83602
+- [x] 3.7 A header the site sends on some pages and omits on others produces `kind: "inconsistent"` — af83602
+- [x] 3.8 `probeCertificate` returns null on a plain-http origin and on a connection error — af83602
+- [x] 3.9 An expired certificate produces `kind: "expired"` — af83602
 
 #### Manual
 
-- [x] 3.10 The certificate finding reads as a fact about the site, not as a security opinion
-- [x] 3.11 A well-configured real site produces no security-header findings
+- [x] 3.10 The certificate finding reads as a fact about the site, not as a security opinion — af83602
+- [x] 3.11 A well-configured real site produces no security-header findings — af83602
 
 ### Phase 4: robots.txt fetch and parser
 
 #### Automated
 
-- [ ] 4.1 Type checking passes: `npm run typecheck`
-- [ ] 4.2 Linting and formatting pass: `npm run check`
-- [ ] 4.3 Unit tests pass: `npm run test:unit`
-- [ ] 4.4 `googlebot` group wins over `*` when both match
-- [ ] 4.5 `Allow` wins a same-specificity tie against `Disallow`
-- [ ] 4.6 A query-bearing pattern reports as not-evaluated rather than not-matching
-- [ ] 4.7 A missing robots.txt yields `robots: null` and no finding
-- [ ] 4.8 Crawl behaviour is unchanged: the same fixture crawl visits the same pages as before
+- [x] 4.1 Type checking passes: `npm run typecheck`
+- [x] 4.2 Linting and formatting pass: `npm run check`
+- [x] 4.3 Unit tests pass: `npm run test:unit`
+- [x] 4.4 `googlebot` group wins over `*` when both match
+- [x] 4.5 `Allow` wins a same-specificity tie against `Disallow`
+- [x] 4.6 A query-bearing pattern reports as not-evaluated rather than not-matching
+- [x] 4.7 A missing robots.txt yields `robots: null` and no finding
+- [x] 4.8 Crawl behaviour is unchanged: the same fixture crawl visits the same pages as before
 
 #### Manual
 
-- [ ] 4.9 The parser's output on yazaki-emea.com's real robots.txt matches a hand reading of it
+- [x] 4.9 The parser's output on yazaki-emea.com's real robots.txt matches a hand reading of it
 
 ### Phase 5: Sitemap fetch and parser
 
