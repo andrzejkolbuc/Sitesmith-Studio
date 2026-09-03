@@ -1018,38 +1018,38 @@ duration of a run, following the precedent S-05 set when it declined to persist 
 
 #### Automated
 
-- [x] 1.1 Type checking passes: `npm run typecheck`
-- [x] 1.2 Linting and formatting pass: `npm run check`
-- [x] 1.3 Unit tests pass: `npm run test:unit`
-- [x] 1.4 Integration tests pass: `npm run test:integration`
-- [x] 1.5 A same-language duplicate content pair produces exactly one `content_duplicated` finding
-- [x] 1.6 Two unlocalised pages sharing a title produce a `metadata_duplicated` finding
-- [x] 1.7 Existing `metadata_duplicated` behaviour on localised pages is unchanged
-- [x] 1.8 A family already reported by `content_untranslated` produces no `content_duplicated`
-- [x] 1.9 Mutation check: inverting the `isolated` guard fails at least one test
+- [x] 1.1 Type checking passes: `npm run typecheck` — 9942838
+- [x] 1.2 Linting and formatting pass: `npm run check` — 9942838
+- [x] 1.3 Unit tests pass: `npm run test:unit` — 9942838
+- [x] 1.4 Integration tests pass: `npm run test:integration` — 9942838
+- [x] 1.5 A same-language duplicate content pair produces exactly one `content_duplicated` finding — 9942838
+- [x] 1.6 Two unlocalised pages sharing a title produce a `metadata_duplicated` finding — 9942838
+- [x] 1.7 Existing `metadata_duplicated` behaviour on localised pages is unchanged — 9942838
+- [x] 1.8 A family already reported by `content_untranslated` produces no `content_duplicated` — 9942838
+- [x] 1.9 Mutation check: inverting the `isolated` guard fails at least one test — 9942838
 
 #### Manual
 
-- [x] 1.10 Both findings render readably in the run panel with no raw JSON
-- [x] 1.11 The unlocalised bucket reads as "no language established", not as a blank language
+- [x] 1.10 Both findings render readably in the run panel with no raw JSON — 9942838
+- [x] 1.11 The unlocalised bucket reads as "no language established", not as a blank language — 9942838
 
 ### Phase 2: Link graph and broken internal links
 
 #### Automated
 
-- [ ] 2.1 Type checking passes: `npm run typecheck`
-- [ ] 2.2 Linting and formatting pass: `npm run check`
-- [ ] 2.3 Unit tests pass: `npm run test:unit`
-- [ ] 2.4 Integration tests pass: `npm run test:integration`
-- [ ] 2.5 A 404 linked from three fixture pages yields one finding naming all three
-- [ ] 2.6 A flapping 5xx that recovers on re-verification yields no finding
-- [ ] 2.7 A target already reported by `canonical_target_broken` yields no `link_broken`
-- [ ] 2.8 The re-verification pass issues no requests on an aborted crawl
+- [x] 2.1 Type checking passes: `npm run typecheck`
+- [x] 2.2 Linting and formatting pass: `npm run check`
+- [x] 2.3 Unit tests pass: `npm run test:unit`
+- [x] 2.4 Integration tests pass: `npm run test:integration`
+- [x] 2.5 A 404 linked from three fixture pages yields one finding naming all three
+- [x] 2.6 A flapping 5xx that recovers on re-verification yields no finding
+- [x] 2.7 A target already reported by `canonical_target_broken` yields no `link_broken`
+- [x] 2.8 The re-verification pass issues no requests on an aborted crawl
 
 #### Manual
 
-- [ ] 2.9 A long linker list truncates readably rather than flooding the panel
-- [ ] 2.10 Re-verification does not noticeably lengthen a run on a healthy site
+- [x] 2.9 A long linker list truncates readably rather than flooding the panel
+- [x] 2.10 Re-verification does not noticeably lengthen a run on a healthy site
 
 ### Phase 3: Security headers and certificate
 

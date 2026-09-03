@@ -273,6 +273,26 @@ describe("pagesInvolved for metadata findings", () => {
 		).toHaveLength(2);
 	});
 
+	it("counts the dead target and every page linking to it", () => {
+		/**
+		 * The linking pages are where the fix happens — the dead URL may be gone on
+		 * purpose — so a count naming only the target would understate how much of
+		 * the site has to be edited.
+		 */
+		expect(
+			pagesInvolved({
+				type: "link_broken",
+				url: null,
+				detail: {
+					target: `${B}/gone`,
+					httpStatus: 404,
+					confirmed: false,
+					linkedFrom: [`${B}/`, `${B}/about`],
+				},
+			}),
+		).toHaveLength(3);
+	});
+
 	it("counts every URL serving duplicated content", () => {
 		/**
 		 * Filed against no page, like every duplicate finding. Without a case here

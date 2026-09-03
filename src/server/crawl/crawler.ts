@@ -53,7 +53,14 @@ export type CrawledPage = {
 	httpStatus: number | null;
 	/** locale → absolute URL, as declared by this page. */
 	hreflangTargets: Record<string, string>;
-	/** Absolute, in-scope URLs linked from this page. */
+	/**
+	 * Every absolute http(s) URL this page links to, in scope or not.
+	 *
+	 * Deliberately unfiltered, and the comment here used to say otherwise. Scope
+	 * is applied at enqueue time instead, so a link off the origin is captured and
+	 * simply never followed — which is what makes it possible to check external
+	 * links at all without a second pass over the markup.
+	 */
 	links: string[];
 	/**
 	 * What the page's content is, in fixed-size form.
@@ -88,11 +95,39 @@ export type CrawledPage = {
 	fetchError: string | null;
 };
 
+/** One observation of a URL's outcome. */
+export type Observation = {
+	httpStatus: number | null;
+	fetchError: string | null;
+};
+
+/**
+ * A failure that was asked a second time, and what it said.
+ *
+ * Recorded rather than merely acted on, because "this URL failed twice, minutes
+ * apart" is a materially stronger claim than "this URL failed" and a rule that
+ * makes the stronger claim should be able to show its working.
+ */
+export type Reverification = {
+	url: string;
+	first: Observation;
+	second: Observation;
+	/** Whether the failure survived the second request. */
+	confirmed: boolean;
+};
+
 export type CrawlResult = {
 	pages: CrawledPage[];
 	/** Set when the crawl stopped early; null when it finished normally. */
 	abortedReason: string | null;
 	reachedPageLimit: boolean;
+	/**
+	 * Transient-looking failures, re-requested once after the crawl drained.
+	 *
+	 * Empty when the crawl aborted: a site that made us stop is the last one to
+	 * ask again.
+	 */
+	reverified: Reverification[];
 };
 
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -172,6 +207,19 @@ function extractLinks(html: string, pageUrl: string): string[] {
 	return [...found];
 }
 
+/**
+ * A failure that might not be one.
+ *
+ * The same line the abort counters draw, and drawn once so the two cannot drift:
+ * 5xx and network errors are a site having a bad moment, while a 404 is a
+ * finding and the thing this product exists to report. Only the first kind is
+ * worth asking about twice.
+ */
+const isTransientFailure = (page: {
+	httpStatus: number | null;
+	fetchError: string | null;
+}): boolean => page.fetchError !== null || (page.httpStatus ?? 0) >= 500;
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
@@ -202,6 +250,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 			pages: [],
 			abortedReason: `Start URL is not a valid http(s) URL: ${options.startUrl}`,
 			reachedPageLimit: false,
+			reverified: [],
 		};
 	}
 
@@ -322,7 +371,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 			 * A run of failures means the site is struggling. Continuing would turn
 			 * observing a problem into causing one, so the crawl stops and says why.
 			 */
-			const failed = page.fetchError !== null || (page.httpStatus ?? 0) >= 500;
+			const failed = isTransientFailure(page);
 			consecutiveFailures = failed ? consecutiveFailures + 1 : 0;
 			if (failed) totalFailures += 1;
 
@@ -388,5 +437,55 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 		await Promise.all(Array.from({ length: size }, () => worker()));
 	}
 
-	return { pages, abortedReason, reachedPageLimit };
+	/**
+	 * Failures, asked once more.
+	 *
+	 * A page on a real client site answered 200 on five consecutive re-fetches
+	 * while the crawl had recorded it 502 — a true observation at the moment we
+	 * looked, and a false statement about the site. Every rule that reads a status
+	 * inherited that, and the rules this slice adds rest on it almost entirely.
+	 *
+	 * One extra request per transient failure, through the same pacer as
+	 * everything else, and only for 5xx and network errors: a 404 does not flap,
+	 * and re-asking every dead link would double the requests made against exactly
+	 * the sites with the most dead links.
+	 *
+	 * The second observation replaces the first, because it is the later and
+	 * better-evidenced one — and a page that recovered brings its content and
+	 * metadata with it, so the rules see the page rather than the bad moment. The
+	 * first observation is kept in `reverified` so nothing is lost.
+	 *
+	 * Skipped entirely on an aborted crawl. The abort exists because the site is
+	 * struggling, and a site that made us stop is the last one to ask again.
+	 */
+	const reverified: Reverification[] = [];
+
+	if (abortedReason === null) {
+		for (const [index, page] of pages.entries()) {
+			if (!isTransientFailure(page)) continue;
+
+			const second = await fetchOne(page.url);
+			const confirmed = isTransientFailure(second);
+
+			reverified.push({
+				url: page.url,
+				first: { httpStatus: page.httpStatus, fetchError: page.fetchError },
+				second: {
+					httpStatus: second.httpStatus,
+					fetchError: second.fetchError,
+				},
+				confirmed,
+			});
+
+			/**
+			 * Keyed on the URL already recorded, not on wherever the retry landed.
+			 * The page has a row under this URL and a unique index behind it; a
+			 * second request that redirects elsewhere is a different observation than
+			 * this pass is equipped to make.
+			 */
+			pages[index] = { ...second, url: page.url };
+		}
+	}
+
+	return { pages, abortedReason, reachedPageLimit, reverified };
 }

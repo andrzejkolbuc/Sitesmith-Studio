@@ -134,6 +134,14 @@ export function pagesInvolved(finding: {
 		case "content_duplicated":
 			return strings(detail.urls);
 
+		/**
+		 * The dead URL and every page pointing at it. The linking pages are where
+		 * the fix happens, so a count that named only the target would understate
+		 * how much of the site has to be edited.
+		 */
+		case "link_broken":
+			return [...one(detail.target), ...strings(detail.linkedFrom)];
+
 		default:
 			// An unmapped type still counts the page it names, so a new finding
 			// never reports as affecting nothing.

@@ -221,3 +221,111 @@ describe("a site whose links go in circles", () => {
 		expect(result.pages.length).toBeLessThanOrEqual(5 + 2);
 	});
 });
+
+describe("a failure that might not be one", () => {
+	/**
+	 * The scar this pass exists to close: a page on a real client site answered
+	 * 200 on five consecutive re-fetches while the crawl had recorded it 502 — "a
+	 * true observation at crawl time and a false statement about the site".
+	 *
+	 * Every rule that reads a status inherited that, so the fix belongs in the
+	 * crawl rather than in any one of them.
+	 */
+	it("keeps the second answer when a failure turns out to be transient", async () => {
+		site = await startHostileSite({ fanOut: 0, failEvery: 0 });
+
+		const result = await crawl({
+			...baseOptions,
+			startUrl: `${site.baseUrl}/transient-hub`,
+			maxConcurrency: 1,
+		});
+
+		const recovered = result.pages.find((page) =>
+			page.url.endsWith("/transient/recovers"),
+		);
+
+		expect(recovered?.httpStatus).toBe(200);
+
+		const entry = result.reverified.find((r) =>
+			r.url.endsWith("/transient/recovers"),
+		);
+		expect(entry?.first.httpStatus).toBe(503);
+		expect(entry?.second.httpStatus).toBe(200);
+		expect(entry?.confirmed).toBe(false);
+	});
+
+	it("confirms a failure that survives being asked again", async () => {
+		site = await startHostileSite({ fanOut: 0, failEvery: 0 });
+
+		const result = await crawl({
+			...baseOptions,
+			startUrl: `${site.baseUrl}/transient-hub`,
+			maxConcurrency: 1,
+		});
+
+		const entry = result.reverified.find((r) =>
+			r.url.endsWith("/transient/stays-broken"),
+		);
+
+		expect(entry?.confirmed).toBe(true);
+		expect(entry?.second.httpStatus).toBe(500);
+	});
+
+	it("never asks a second time about a 404", async () => {
+		/**
+		 * A 404 is a stable answer and the thing this product exists to report.
+		 * Re-requesting every dead link would double the load on exactly the sites
+		 * with the most of them — the opposite of what the pass is for.
+		 */
+		site = await startHostileSite({ fanOut: 0, failEvery: 0 });
+
+		const result = await crawl({
+			...baseOptions,
+			startUrl: `${site.baseUrl}/transient-hub`,
+			maxConcurrency: 1,
+		});
+
+		expect(
+			result.reverified.some((r) => r.url.endsWith("/transient/gone")),
+		).toBe(false);
+		expect(
+			site.requests.filter((path) => path === "/transient/gone"),
+		).toHaveLength(1);
+	});
+
+	it("asks again exactly once per transient failure", async () => {
+		site = await startHostileSite({ fanOut: 0, failEvery: 0 });
+
+		await crawl({
+			...baseOptions,
+			startUrl: `${site.baseUrl}/transient-hub`,
+			maxConcurrency: 1,
+		});
+
+		expect(
+			site.requests.filter((path) => path === "/transient/recovers"),
+		).toHaveLength(2);
+		expect(
+			site.requests.filter((path) => path === "/transient/stays-broken"),
+		).toHaveLength(2);
+	});
+
+	it("asks nothing again on a crawl that aborted", async () => {
+		/**
+		 * The abort exists because the site is struggling. A site that made us stop
+		 * is the last one to go back to with a second round of requests — and the
+		 * pass would be aimed squarely at the pages that failed, which on an
+		 * aborting site is most of them.
+		 */
+		site = await startHostileSite({ fanOut: 30, failEvery: 2 });
+
+		const result = await crawl({
+			...baseOptions,
+			startUrl: `${site.baseUrl}/flapping-hub`,
+			maxConcurrency: 1,
+		});
+
+		expect(result.abortedReason).not.toBeNull();
+		expect(result.reverified).toEqual([]);
+	});
+});

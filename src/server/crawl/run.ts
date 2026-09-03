@@ -187,6 +187,25 @@ async function execute(
 		},
 	});
 
+	/**
+	 * Statuses the crawl revised after asking again.
+	 *
+	 * Rows are written as pages arrive, which is what keeps memory flat and the
+	 * progress count honest — but it means a page re-requested after the crawl
+	 * drained has a row holding the first observation. Correcting them here rather
+	 * than deferring the insert keeps both properties: the row appeared while the
+	 * run was live, and it ends up saying what the crawl concluded.
+	 */
+	for (const entry of result.reverified) {
+		await db
+			.update(pages)
+			.set({
+				httpStatus: entry.second.httpStatus,
+				fetchError: entry.second.fetchError,
+			})
+			.where(and(eq(pages.runId, runId), eq(pages.url, entry.url)));
+	}
+
 	const variants = groupVariants(result.pages);
 	for (const variant of variants.values()) {
 		await db
@@ -204,6 +223,7 @@ async function execute(
 		crawlComplete: result.abortedReason === null && !result.reachedPageLimit,
 		expectedLocales: project.locales,
 		inScope,
+		reverified: result.reverified,
 	});
 
 	if (detected.length > 0) {

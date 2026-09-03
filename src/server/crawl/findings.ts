@@ -1,5 +1,5 @@
 import { BLOCK_NAMES, type ContentSummary } from "./content";
-import type { CrawledPage } from "./crawler";
+import type { CrawledPage, Reverification } from "./crawler";
 import { parseRobotsHeader } from "./metadata";
 import { normaliseUrl } from "./url";
 import {
@@ -50,6 +50,8 @@ export const FINDING_TYPES = {
 	NOINDEX_PRESENT: "noindex_present",
 	/** Several URLs serving byte-identical content, in any language. */
 	CONTENT_DUPLICATED: "content_duplicated",
+	/** A page linked from somewhere on the site that does not load. */
+	LINK_BROKEN: "link_broken",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -79,6 +81,15 @@ export type DetectOptions = {
 	 * behaviour rather than the safe one.
 	 */
 	crawlComplete: boolean;
+	/**
+	 * Failures the crawl asked about a second time.
+	 *
+	 * Required for the same reason `crawlComplete` is, though it fails safe in the
+	 * opposite direction: a caller that forgets hands the broken-link rule no
+	 * confirmed failures, and the rule goes quiet about every 5xx rather than
+	 * reporting one on a single observation.
+	 */
+	reverified: Reverification[];
 };
 
 /**
@@ -120,7 +131,8 @@ const NOINDEX_DIRECTIVES = new Set(["noindex", "none"]);
  * which matters because a later slice diffs runs against each other.
  */
 export function detectMissingVariants(options: DetectOptions): Finding[] {
-	const { pages, expectedLocales, inScope, crawlComplete } = options;
+	const { pages, expectedLocales, inScope, crawlComplete, reverified } =
+		options;
 
 	const variants = groupVariants(pages);
 
@@ -135,6 +147,36 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 	const variantFamilies = groupFamilies(pages);
 	const byUrl = new Map(pages.map((page) => [page.url, page]));
 	const expected = expectedLocales.map((locale) => locale.toLowerCase());
+
+	/**
+	 * Which pages link to a given URL.
+	 *
+	 * Derived here rather than passed in, for the reason `byUrl` and
+	 * `variantFamilies` are: it is a pure reading of `pages`, and a caller handing
+	 * us an index built from a different set of pages than the one it also handed
+	 * us is a failure mode worth not having.
+	 *
+	 * In-scope targets only. An external link is captured by the extractor and
+	 * belongs to a rule that can actually go and check it.
+	 */
+	const linkedFrom = new Map<string, string[]>();
+	for (const page of pages) {
+		for (const link of page.links) {
+			if (!inScope(link)) continue;
+			if (link === page.url) continue;
+			linkedFrom.set(link, [...(linkedFrom.get(link) ?? []), page.url]);
+		}
+	}
+
+	/**
+	 * URLs an earlier rule has already called broken.
+	 *
+	 * Read by rule 16, which would otherwise report a third time what rules 2, 6
+	 * and 13 have each said more specifically — a declared sibling, a diverged
+	 * variant, a nominated canonical. "It is also linked from four pages" is not
+	 * worth a second heading in the list.
+	 */
+	const reportedBrokenTargets = new Set<string>();
 
 	const findings: Finding[] = [];
 
@@ -270,9 +312,10 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		}
 	}
 
-	for (const [, detail] of [...collapsed.entries()].sort(([a], [b]) =>
+	for (const [brokenUrl, detail] of [...collapsed.entries()].sort(([a], [b]) =>
 		a.localeCompare(b),
 	)) {
+		reportedBrokenTargets.add(brokenUrl);
 		findings.push({
 			type: FINDING_TYPES.VARIANT_DIVERGED,
 			url: null,
@@ -297,6 +340,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 				 */
 				if (collapsed.has(target)) continue;
 
+				reportedBrokenTargets.add(target);
 				findings.push({
 					type: FINDING_TYPES.HREFLANG_TARGET_FAILED,
 					url: page.url,
@@ -1014,6 +1058,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		const target = byUrl.get(canonical);
 
 		if (target && isError(target)) {
+			reportedBrokenTargets.add(canonical);
 			findings.push({
 				type: FINDING_TYPES.CANONICAL_TARGET_BROKEN,
 				url: page.url,
@@ -1223,6 +1268,71 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 				},
 			});
 		}
+	}
+
+	// ── Rule 16: a link to a page that does not load ──────────────────────────
+	//
+	// FR-016's internal half. The crawl already fetched every in-scope link it
+	// found, so the status is in hand; what was missing is the attribution — which
+	// pages point at it, which is the whole of the fix.
+	//
+	// **One finding per broken target, never per linking page.** A dead URL in
+	// site-wide navigation is linked from every page on the site, so per-page
+	// reporting would turn one defect into five hundred findings and make the
+	// worst sites the least readable — rule 5's argument, in the setting where it
+	// bites hardest.
+	//
+	// No `crawlComplete` gate. This reasons from a status we observed rather than
+	// from absence, so a truncated run reports less but never wrongly.
+	const brokenTargets = [...linkedFrom.keys()].sort();
+
+	for (const target of brokenTargets) {
+		const page = byUrl.get(target);
+		/**
+		 * A link to a URL the crawl never recorded is not a broken link. It may sit
+		 * beyond the page ceiling, or behind a redirect to a page already recorded
+		 * under another name — and calling either one dead would report where we
+		 * stopped, or our own identity rules, as the client's defect.
+		 */
+		if (!page || !isError(page)) continue;
+
+		/**
+		 * Already said, and said better. Rules 2, 6 and 13 each name this URL as
+		 * broken with the relationship that makes it matter — a declared sibling, a
+		 * diverged variant, a nominated canonical.
+		 */
+		if (reportedBrokenTargets.has(target)) continue;
+
+		/**
+		 * A 5xx or a network error is reported only once it has failed twice.
+		 *
+		 * The crawl re-requests transient failures after it drains and keeps the
+		 * later observation, so a page that recovered is no longer failing here at
+		 * all. What this guard covers is the case where no second look happened —
+		 * an aborted crawl — where the honest reading is that the site was having a
+		 * bad moment, not that it has a dead link. A 4xx needs no such treatment:
+		 * it is a stable answer, and reporting it is what this product is for.
+		 */
+		const confirmation = reverified.find((entry) => entry.url === target);
+		const transient = page.fetchError !== null || (page.httpStatus ?? 0) >= 500;
+		if (transient && !confirmation?.confirmed) continue;
+
+		findings.push({
+			type: FINDING_TYPES.LINK_BROKEN,
+			url: null,
+			detail: {
+				target,
+				httpStatus: page.httpStatus,
+				fetchError: page.fetchError,
+				/**
+				 * Whether the failure survived a second request. False for a 4xx, which
+				 * was never asked twice — the flag says how the evidence was obtained,
+				 * not how bad the defect is.
+				 */
+				confirmed: confirmation?.confirmed ?? false,
+				linkedFrom: [...new Set(linkedFrom.get(target) ?? [])].sort(),
+			},
+		});
 	}
 
 	return findings;

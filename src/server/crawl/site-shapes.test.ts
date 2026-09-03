@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { type ContentSummary, emptyContent } from "./content";
-import type { CrawledPage } from "./crawler";
+import type { CrawledPage, Reverification } from "./crawler";
 import { detectMissingVariants } from "./findings";
 import { emptyMetadata, type PageMetadata } from "./metadata";
 import { localeFromUrl } from "./variants";
@@ -93,12 +93,15 @@ function findingsFor(options: {
 	inScope?: (url: string) => boolean;
 	/** Defaults to a finished crawl: every existing case describes one. */
 	crawlComplete?: boolean;
+	/** Defaults to none: most cases describe a crawl with no transient failure. */
+	reverified?: Reverification[];
 }): Summary[] {
 	return detectMissingVariants({
 		pages: options.pages,
 		expectedLocales: options.expectedLocales ?? [],
 		inScope: options.inScope ?? ((url) => url.startsWith(BASE)),
 		crawlComplete: options.crawlComplete ?? true,
+		reverified: options.reverified ?? [],
 	})
 		.map((finding) => ({ type: finding.type, url: finding.url }))
 		.sort(
@@ -121,12 +124,15 @@ function detailedFindingsFor(options: {
 	inScope?: (url: string) => boolean;
 	/** Defaults to a finished crawl: every existing case describes one. */
 	crawlComplete?: boolean;
+	/** Defaults to none: most cases describe a crawl with no transient failure. */
+	reverified?: Reverification[];
 }) {
 	return detectMissingVariants({
 		pages: options.pages,
 		expectedLocales: options.expectedLocales ?? [],
 		inScope: options.inScope ?? ((url) => url.startsWith(BASE)),
 		crawlComplete: options.crawlComplete ?? true,
+		reverified: options.reverified ?? [],
 	});
 }
 
@@ -2296,5 +2302,214 @@ describe("one page's content at several URLs", () => {
 				],
 			}).filter(duplicatedContent),
 		).toEqual([]);
+	});
+});
+
+describe("links to a page that does not load", () => {
+	const broken = (f: { type: string }) => f.type === "link_broken";
+
+	/** A page that links somewhere, written the way the crawler records it. */
+	const linking = (path: string, links: string[]): CrawledPage => ({
+		...page(path),
+		links: links.map((href) => `${BASE}${href}`),
+	});
+
+	it("reports one finding per dead target, naming every page that links to it", () => {
+		/**
+		 * The shape this rule exists for. A dead URL in site-wide navigation is
+		 * linked from every page on the site, and per-page reporting would turn one
+		 * defect into a finding for each — the failure rule 5's family-level shape
+		 * was written to prevent, in the setting where it bites hardest.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				linking("/", ["/gone"]),
+				linking("/about", ["/gone"]),
+				linking("/contact", ["/gone"]),
+				page("/gone", { status: 404 }),
+			],
+		}).filter(broken);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBeNull();
+		expect(findings[0]?.detail).toMatchObject({
+			target: `${BASE}/gone`,
+			httpStatus: 404,
+			linkedFrom: [`${BASE}/`, `${BASE}/about`, `${BASE}/contact`],
+		});
+	});
+
+	it("says nothing about a link to a page that loads", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [linking("/", ["/about"]), page("/about")],
+			}).filter(broken),
+		).toEqual([]);
+	});
+
+	it("says nothing about a link the crawl never recorded", () => {
+		/**
+		 * The URL may sit beyond the page ceiling, or behind a redirect to a page
+		 * already recorded under another name. Calling either one dead would report
+		 * where we stopped, or our own identity rules, as the client's defect —
+		 * which is the failure `lessons.md` was written after.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [linking("/", ["/never-crawled"])],
+			}).filter(broken),
+		).toEqual([]);
+	});
+
+	it("says nothing about a link that leaves the configured scope", () => {
+		/**
+		 * The crawl was told not to go there, so its absence is the configuration
+		 * working. The same guard rules 3 and 13 carry.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [linking("/", ["/private/secret"])],
+				inScope: (url) => !url.startsWith(`${BASE}/private`),
+			}).filter(broken),
+		).toEqual([]);
+	});
+
+	it("defers to the rule that already named the target as a broken sibling", () => {
+		/**
+		 * Rule 2 says the same URL is broken *and* that a page declared it as a
+		 * language variant, which is the fact worth acting on. "It is also linked
+		 * from one page" does not earn a second heading in the list.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [
+				{
+					...linking("/en/contact", ["/de/kontakt"]),
+					hreflangTargets: {
+						en: `${BASE}/en/contact`,
+						de: `${BASE}/de/kontakt`,
+					},
+				},
+				page("/de/kontakt", { status: 404 }),
+			],
+		});
+
+		expect(findings.filter(broken)).toEqual([]);
+		expect(
+			findings.filter((f) => f.type === "hreflang_target_failed"),
+		).toHaveLength(1);
+	});
+
+	it("defers to the rule that already named the target as a broken canonical", () => {
+		const findings = detailedFindingsFor({
+			pages: [
+				{
+					...linking("/article", ["/canonical-target"]),
+					metadata: {
+						...page("/article").metadata,
+						canonicals: [`${BASE}/canonical-target`],
+					},
+				},
+				page("/canonical-target", { status: 404 }),
+			],
+		});
+
+		expect(findings.filter(broken)).toEqual([]);
+		expect(
+			findings.filter((f) => f.type === "canonical_target_broken"),
+		).toHaveLength(1);
+	});
+
+	it("reports a 5xx only once a second request has confirmed it", () => {
+		const pages = [linking("/", ["/down"]), page("/down", { status: 503 })];
+
+		expect(
+			detailedFindingsFor({
+				pages,
+				reverified: [
+					{
+						url: `${BASE}/down`,
+						first: { httpStatus: 503, fetchError: null },
+						second: { httpStatus: 503, fetchError: null },
+						confirmed: true,
+					},
+				],
+			}).filter(broken),
+		).toHaveLength(1);
+	});
+
+	it("says nothing about a 5xx that recovered when asked again", () => {
+		/**
+		 * The transient-502 scar, end to end at the rule's own level.
+		 *
+		 * The crawl keeps the later observation, so the page arrives here answering
+		 * 200 and the `reverified` entry records what it looked like before.
+		 * Asserted as one case rather than trusting the two halves to compose,
+		 * because "the crawl fixes it" and "the rule respects the fix" are exactly
+		 * the pair that can drift apart later.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [linking("/", ["/recovered"]), page("/recovered")],
+				reverified: [
+					{
+						url: `${BASE}/recovered`,
+						first: { httpStatus: 502, fetchError: null },
+						second: { httpStatus: 200, fetchError: null },
+						confirmed: false,
+					},
+				],
+			}).filter(broken),
+		).toEqual([]);
+	});
+
+	it("says nothing about a 5xx that was never asked about twice", () => {
+		/**
+		 * No second look happened, which on this codebase means the crawl aborted —
+		 * and an aborting crawl is one where the site is struggling. The honest
+		 * reading is a bad moment, not a dead link.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [linking("/", ["/down"]), page("/down", { status: 503 })],
+				reverified: [],
+			}).filter(broken),
+		).toEqual([]);
+	});
+
+	it("reports a 404 without requiring confirmation", () => {
+		/**
+		 * A 404 is a stable answer, and reporting it is what this product is for.
+		 * Requiring a second observation would make the commonest true finding the
+		 * hardest one to earn.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [linking("/", ["/gone"]), page("/gone", { status: 404 })],
+			reverified: [],
+		}).filter(broken);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail.confirmed).toBe(false);
+	});
+
+	it("does not report a page for linking to itself", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [{ ...page("/gone", { status: 404 }), links: [`${BASE}/gone`] }],
+			}).filter(broken),
+		).toEqual([]);
+	});
+
+	it("names each linking page once, however many times it links", () => {
+		const findings = detailedFindingsFor({
+			pages: [
+				{
+					...page("/"),
+					links: [`${BASE}/gone`, `${BASE}/gone`],
+				},
+				page("/gone", { status: 404 }),
+			],
+		}).filter(broken);
+
+		expect(findings[0]?.detail.linkedFrom).toEqual([`${BASE}/`]);
 	});
 });

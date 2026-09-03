@@ -54,6 +54,8 @@ export async function startHostileSite(
 	let peakConcurrency = 0;
 	let failuresServed = 0;
 	let served = 0;
+	/** Paths that have already failed once, for the recover-on-retry shape. */
+	const recovered = new Set<string>();
 
 	const children = (prefix: string) =>
 		Array.from({ length: fanOut }, (_, index) => `${prefix}/${index}`);
@@ -87,6 +89,60 @@ export async function startHostileSite(
 				}
 				res.writeHead(200, { "content-type": "text/html" });
 				res.end(html(path));
+				return;
+			}
+
+			/**
+			 * A page that fails once and then recovers, counted per path rather than
+			 * per response so the outcome does not depend on request ordering.
+			 *
+			 * This is the shape behind the transient-502 scar: a real client page
+			 * answered 200 on five consecutive re-fetches while the crawl had
+			 * recorded it 502. A crawl that reports on one observation calls this
+			 * page broken; one that asks again does not.
+			 */
+			if (path === "/transient-hub") {
+				res.writeHead(200, { "content-type": "text/html" });
+				res.end(
+					html("transient hub", [
+						"/transient/recovers",
+						"/transient/stays-broken",
+						"/transient/gone",
+					]),
+				);
+				return;
+			}
+
+			if (path === "/transient/recovers") {
+				const first = !recovered.has(path);
+				recovered.add(path);
+				if (first) {
+					failuresServed += 1;
+					res.writeHead(503, { "content-type": "text/html" });
+					res.end(html("temporarily unavailable"));
+					return;
+				}
+				res.writeHead(200, { "content-type": "text/html" });
+				res.end(html(path));
+				return;
+			}
+
+			/** Fails every time, so a second look confirms rather than clears it. */
+			if (path === "/transient/stays-broken") {
+				failuresServed += 1;
+				res.writeHead(500, { "content-type": "text/html" });
+				res.end(html("boom"));
+				return;
+			}
+
+			/**
+			 * A stable 404. Must never be requested twice: re-asking every dead link
+			 * would double the requests made against exactly the sites with the most
+			 * of them.
+			 */
+			if (path === "/transient/gone") {
+				res.writeHead(404, { "content-type": "text/html" });
+				res.end(html("not found"));
 				return;
 			}
 

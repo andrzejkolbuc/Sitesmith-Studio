@@ -54,6 +54,7 @@ const FINDING_LABEL: Record<string, string> = {
 	canonical_target_broken: "Canonical pointing somewhere broken",
 	noindex_present: "Pages asking not to be indexed",
 	content_duplicated: "One page's content at several URLs",
+	link_broken: "Links to a page that does not load",
 };
 
 /**
@@ -960,6 +961,39 @@ function Evidence({
 						{length.toLocaleString()} characters, identical on every one
 					</div>
 					<Listed items={urls.map(pathOf)} />
+				</>
+			);
+		}
+
+		case "link_broken": {
+			const linkedFrom = Array.isArray(detail.linkedFrom)
+				? (detail.linkedFrom as string[])
+				: [];
+			const status = detail.httpStatus;
+
+			/**
+			 * The target first, then the pages to edit. A broken link is the one
+			 * finding here whose fix is not on the page it names — the dead URL may be
+			 * gone on purpose, and what has to change is every page still pointing at
+			 * it.
+			 */
+			return (
+				<>
+					<span className="text-ink">
+						<Tag tone="mark">
+							{typeof status === "number" ? status : "no response"}
+						</Tag>{" "}
+						{pathOf(str("target"))}
+					</span>
+					<div className="mt-1.5 text-ink-soft text-xs">
+						{detail.confirmed === true
+							? "Failed twice, asked again after the crawl"
+							: null}
+						{detail.confirmed === true ? " · " : null}
+						Linked from {linkedFrom.length}{" "}
+						{linkedFrom.length === 1 ? "page" : "pages"}
+					</div>
+					<Listed items={linkedFrom.map(pathOf)} />
 				</>
 			);
 		}

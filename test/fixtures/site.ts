@@ -141,6 +141,8 @@ const HANDBOOK_FR = `<h2>Configurer un projet</h2>
  *   so no detection rule speaks about them.
  * - `/library/guide`, `/library/guide-archived` — one body at two addresses, one
  *   language, no family between them. Fires rule 15 (duplicate content).
+ * - `/library/removed` — linked from `/library/guide` and never served. The one
+ *   dead link here no other rule speaks for. Fires rule 16 (broken link).
  * - `/legal/imprint`, `/legal/privacy` — one title, and no established language
  *   on either page. Fires rule 10 through its unlocalised bucket.
  * - `/private/secret` — only reachable if excludePaths is ignored.
@@ -480,7 +482,19 @@ const SITE: Record<string, Page> = {
 	 * declare their own self-referential canonical, so the site has *not* said
 	 * which address counts, which is what leaves it a defect.
 	 */
-	"/library/guide": { body: ARCHIVE_NOTE, main: true },
+	"/library/guide": {
+		body: ARCHIVE_NOTE,
+		main: true,
+		/**
+		 * A dead link, and the only one in this fixture that no other rule speaks
+		 * for. `/meta/nowhere` is also dead and also linked, but it is a canonical
+		 * target — so it proves the deferral rather than the rule.
+		 *
+		 * Links render outside `<main>`, so this does not change the digest the
+		 * duplicate-content pair is built on.
+		 */
+		links: ["/library/removed"],
+	},
 	"/library/guide-archived": { body: ARCHIVE_NOTE, main: true },
 
 	/**

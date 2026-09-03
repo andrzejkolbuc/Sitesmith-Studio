@@ -128,6 +128,7 @@ describe("detectMissingVariants against the fixture site", () => {
 				inScope,
 				// The fixture is small enough that every crawl here reaches the end.
 				crawlComplete: true,
+				reverified: [],
 			}),
 		};
 	}
@@ -414,6 +415,29 @@ describe("detectMissingVariants against the fixture site", () => {
 		]);
 	});
 
+	it("reports the one dead link no other rule speaks for", async () => {
+		/**
+		 * `/library/removed` is linked from `/library/guide` and never served.
+		 *
+		 * The count is the assertion that matters. `/de/kontakt`, the French careers
+		 * variant and `/meta/nowhere` are all dead too, and all three are already
+		 * named by rules 2, 6 and 13 respectively — so exactly one finding here is
+		 * what proves the deferral works over real HTTP rather than only against
+		 * hand-built page records.
+		 */
+		const { findings } = await detect();
+		const broken = findings.filter((f) => f.type === FINDING_TYPES.LINK_BROKEN);
+
+		expect(broken).toHaveLength(1);
+		expect(broken[0]?.url).toBeNull();
+		expect(broken[0]?.detail).toMatchObject({
+			target: `${site.baseUrl}/library/removed`,
+			httpStatus: 404,
+			confirmed: false,
+			linkedFrom: [`${site.baseUrl}/library/guide`],
+		});
+	});
+
 	it("says nothing about two languages sharing one title", async () => {
 		/**
 		 * `/meta/cross-en` and `/meta/cross-de` both publish "Yazaki". A brand name
@@ -568,6 +592,7 @@ describe("detectMissingVariants edge cases", () => {
 			pages: [page("https://x.test/a"), page("https://x.test/b")],
 			expectedLocales: ["en", "de", "fr"],
 			crawlComplete: true,
+			reverified: [],
 			inScope: allInScope,
 		});
 
@@ -612,6 +637,7 @@ describe("detectMissingVariants edge cases", () => {
 			pages: [healthy, broken],
 			expectedLocales: ["en", "de"],
 			crawlComplete: true,
+			reverified: [],
 			inScope: allInScope,
 		});
 
@@ -659,6 +685,7 @@ describe("detectMissingVariants edge cases", () => {
 			pages: [en, de],
 			expectedLocales: ["en", "de", "fr"],
 			crawlComplete: true,
+			reverified: [],
 			inScope: allInScope,
 		});
 
@@ -685,6 +712,7 @@ describe("detectMissingVariants edge cases", () => {
 			pages: [broken],
 			expectedLocales: ["en", "de"],
 			crawlComplete: true,
+			reverified: [],
 			inScope: allInScope,
 		});
 
