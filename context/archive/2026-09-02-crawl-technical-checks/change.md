@@ -1,10 +1,10 @@
 ---
 change_id: crawl-technical-checks
 title: "Broken links, sitemap and robots reconciliation, orphans, duplicates and TLS checks"
-status: implementing
+status: archived
 created: 2026-09-02
 updated: 2026-09-03
-archived_at: null
+archived_at: 2026-09-03T17:25:07Z
 ---
 
 ## Notes

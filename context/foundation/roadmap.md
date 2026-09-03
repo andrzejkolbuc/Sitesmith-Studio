@@ -3,7 +3,7 @@ project: "Sitesmith-Studio"
 version: 1
 status: draft
 created: 2026-08-21
-updated: 2026-09-02
+updated: 2026-09-03
 prd_version: 1
 main_goal: market-feedback
 top_blocker: capacity
@@ -55,7 +55,7 @@ works.
 | S-01 | first-multilingual-crawl        | define a project, crawl it, and see pages missing a language variant           | F-01             | US-01, FR-006, FR-007, FR-008, FR-011, FR-012, FR-013, FR-014, FR-024, FR-036, NFR-1 | built    |
 | S-02 | hreflang-and-variant-parity     | see hreflang graph problems and variants that regressed while siblings did not | S-01             | US-01, FR-025, FR-026                                                                | done     |
 | S-03 | cross-variant-content-drift     | see content drift between language variants                                    | S-02             | FR-027                                                                               | done     |
-| S-04 | crawl-technical-checks          | see broken links, sitemap and robots problems, orphans, duplicates, TLS issues | S-01             | FR-016, FR-017, FR-018, FR-019, FR-020, FR-030                                       | proposed |
+| S-04 | crawl-technical-checks          | see broken links, sitemap and robots problems, orphans, duplicates, TLS issues | S-01             | FR-016, FR-017, FR-018, FR-019, FR-020, FR-030                                       | done     |
 | S-05 | seo-metadata-checks             | see title, meta, canonical and noindex problems                                | S-01             | FR-021, FR-022, FR-023                                                               | done |
 | S-06 | browser-observed-checks         | see console errors, sampled performance scores, and image weight problems      | S-01             | FR-015, FR-028, FR-029                                                               | proposed |
 | S-07 | run-history-and-comparison      | compare a run against the previous one and see only what changed               | S-01             | US-02, FR-037, FR-038                                                                | proposed |
@@ -172,7 +172,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Blockers:** —
 - **Unknowns:** —
 - **Risk:** These checks are the part the PRD's own Socratic record admits is a rebuild of a mature existing tool, and they were kept as must-have with that objection acknowledged and overruled. Sequenced after the differentiator for exactly that reason. They read from data S-01 already collects, so they are cheap once the crawl exists - and they are the most parallelisable work on the roadmap, which matters when capacity is the constraint.
-- **Status:** proposed
+- **Status:** done
 
 ### S-05: SEO metadata checks
 
@@ -351,6 +351,8 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Observability tooling.** Why parked: no PRD requirement demands it, so no foundation opens for it. Revisit if operating scheduled runs proves opaque.
 
 ## Done
+
+- **S-04: User can see broken internal and external links, redirect chains, sitemap and robots problems, orphan pages, duplicate content, and certificate or security-header issues.** — Archived 2026-09-03 → `context/archive/2026-09-02-crawl-technical-checks/`. Lesson: a threshold that scales with the defect it hunts goes quiet exactly when it matters.
 
 - **S-05: User can see missing, duplicated or out-of-range titles and meta descriptions, canonical tag problems, and pages carrying a noindex directive in production.** — Archived 2026-09-02 → `context/archive/2026-09-01-seo-metadata-checks/`. Lesson: —.
 
