@@ -2,6 +2,7 @@ import { BLOCK_NAMES, type ContentSummary } from "./content";
 import type { CrawledPage, Reverification } from "./crawler";
 import { parseRobotsHeader } from "./metadata";
 import type { RobotsFile } from "./robots";
+import type { SitemapDocument } from "./sitemap";
 import type { CertificateObservation } from "./tls";
 import { normaliseUrl } from "./url";
 import {
@@ -108,6 +109,11 @@ export type DetectOptions = {
 	 * robots.txt as the site asserting anything.
 	 */
 	robots: RobotsFile | null;
+	/**
+	 * The site's sitemap, or null when it published none we could find.
+	 * Null is silence, never permission to infer anything.
+	 */
+	sitemap: SitemapDocument | null;
 };
 
 /**

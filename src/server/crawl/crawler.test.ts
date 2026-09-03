@@ -369,6 +369,55 @@ describe("metadata capture", () => {
 		);
 	});
 
+	it("follows a sitemap index into its children, plain and gzipped alike", async () => {
+		/**
+		 * Three things at once, because they only exist together: an index is
+		 * followed rather than read as pages, a `.gz` child is inflated, and the
+		 * entries from every document land in one set.
+		 *
+		 * The gzip child is served as a gzip *file* rather than with
+		 * `Content-Encoding: gzip` — `fetch` would decompress the latter itself, and
+		 * the crawler's own inflation path would never run.
+		 */
+		const result = await crawl(base());
+
+		expect(result.sitemap).not.toBeNull();
+		expect(result.sitemap?.sources).toHaveLength(3);
+		expect(result.sitemap?.truncated).toBe(false);
+
+		const listed = (result.sitemap?.entries ?? []).map((entry) => entry.url);
+		expect(listed).toContain(`${site.baseUrl}/about`);
+		// From the gzipped child, which proves inflation happened.
+		expect(listed).toContain(`${site.baseUrl}/blog/monolingual`);
+	});
+
+	it("prefers the sitemap robots.txt declares over the conventional path", async () => {
+		/**
+		 * A provenance decision rather than a technical one. The `Sitemap:` line is
+		 * the site telling us where its sitemap is; `/sitemap.xml` is a guess we
+		 * make. Both happen to be the same URL in this fixture, so what is asserted
+		 * is which channel the crawl recorded having used.
+		 */
+		const result = await crawl(base());
+
+		expect(result.sitemap?.discovery).toBe("robots");
+	});
+
+	it("refuses a corrupt gzipped sitemap without throwing", async () => {
+		/**
+		 * Gzip magic bytes over a body that is not gzip. A malformed sitemap is the
+		 * site's problem to fix, not a reason for the whole run to fail — so the
+		 * read returns nothing and the crawl carries on.
+		 */
+		const result = await crawl({
+			...base(),
+			startUrl: `${site.baseUrl}/sitemap-corrupt.xml.gz`,
+			maxPages: 1,
+		});
+
+		expect(result.abortedReason).toBeNull();
+	});
+
 	it("crawls exactly the same pages whether or not robots.txt disallows them", async () => {
 		/**
 		 * The dependency FR-018 rests on, asserted rather than assumed.

@@ -226,6 +226,7 @@ async function execute(
 		reverified: result.reverified,
 		certificate: result.certificate,
 		robots: result.robots,
+		sitemap: result.sitemap,
 	});
 
 	if (detected.length > 0) {

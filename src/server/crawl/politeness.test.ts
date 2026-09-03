@@ -355,3 +355,24 @@ describe("a site that publishes no robots.txt", () => {
 		expect(result.pages.length).toBeGreaterThan(0);
 	});
 });
+
+describe("a site that publishes no sitemap", () => {
+	it("records no sitemap and does not treat the guess as a failure", async () => {
+		/**
+		 * `/sitemap.xml` is a convention we guess at, not something the site
+		 * declared. A 404 there is evidence about our guess and nothing about the
+		 * site — so it must produce null rather than a finding, and must not spend
+		 * any of the abort budget on the way.
+		 */
+		site = await startHostileSite({ fanOut: 0, failEvery: 0 });
+
+		const result = await crawl({
+			...baseOptions,
+			startUrl: `${site.baseUrl}/loop/a`,
+			maxConcurrency: 1,
+		});
+
+		expect(result.sitemap).toBeNull();
+		expect(result.abortedReason).toBeNull();
+	});
+});

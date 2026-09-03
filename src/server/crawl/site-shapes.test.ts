@@ -5,6 +5,7 @@ import type { CrawledPage, Reverification } from "./crawler";
 import { detectMissingVariants } from "./findings";
 import { emptyMetadata, type PageMetadata } from "./metadata";
 import type { RobotsFile } from "./robots";
+import type { SitemapDocument } from "./sitemap";
 import type { CertificateObservation } from "./tls";
 import { localeFromUrl } from "./variants";
 
@@ -104,6 +105,8 @@ function findingsFor(options: {
 	certificate?: CertificateObservation | null;
 	/** Defaults to none: most cases describe a site with no robots.txt. */
 	robots?: RobotsFile | null;
+	/** Defaults to none: most cases describe a site with no sitemap. */
+	sitemap?: SitemapDocument | null;
 }): Summary[] {
 	return detectMissingVariants({
 		pages: options.pages,
@@ -113,6 +116,7 @@ function findingsFor(options: {
 		reverified: options.reverified ?? [],
 		certificate: options.certificate ?? null,
 		robots: options.robots ?? null,
+		sitemap: options.sitemap ?? null,
 	})
 		.map((finding) => ({ type: finding.type, url: finding.url }))
 		.sort(
@@ -141,6 +145,8 @@ function detailedFindingsFor(options: {
 	certificate?: CertificateObservation | null;
 	/** Defaults to none: most cases describe a site with no robots.txt. */
 	robots?: RobotsFile | null;
+	/** Defaults to none: most cases describe a site with no sitemap. */
+	sitemap?: SitemapDocument | null;
 }) {
 	return detectMissingVariants({
 		pages: options.pages,
@@ -150,6 +156,7 @@ function detailedFindingsFor(options: {
 		reverified: options.reverified ?? [],
 		certificate: options.certificate ?? null,
 		robots: options.robots ?? null,
+		sitemap: options.sitemap ?? null,
 	});
 }
 

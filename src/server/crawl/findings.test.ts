@@ -132,6 +132,7 @@ describe("detectMissingVariants against the fixture site", () => {
 				reverified: [],
 				certificate: null,
 				robots: null,
+				sitemap: null,
 			}),
 		};
 	}
@@ -598,6 +599,7 @@ describe("detectMissingVariants edge cases", () => {
 			reverified: [],
 			certificate: null,
 			robots: null,
+			sitemap: null,
 			inScope: allInScope,
 		});
 
@@ -647,6 +649,7 @@ describe("detectMissingVariants edge cases", () => {
 			reverified: [],
 			certificate: null,
 			robots: null,
+			sitemap: null,
 			inScope: allInScope,
 		});
 
@@ -699,6 +702,7 @@ describe("detectMissingVariants edge cases", () => {
 			reverified: [],
 			certificate: null,
 			robots: null,
+			sitemap: null,
 			inScope: allInScope,
 		});
 
@@ -729,6 +733,7 @@ describe("detectMissingVariants edge cases", () => {
 			reverified: [],
 			certificate: null,
 			robots: null,
+			sitemap: null,
 			inScope: allInScope,
 		});
 

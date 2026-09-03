@@ -1,5 +1,6 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { gzipSync } from "node:zlib";
 
 /**
  * A deliberately imperfect multilingual site, served from the test process.
@@ -145,6 +146,15 @@ const HANDBOOK_FR = `<h2>Configurer un projet</h2>
  *   dead link here no other rule speaks for. Fires rule 16 (broken link).
  * - `/legal/imprint`, `/legal/privacy` — one title, and no established language
  *   on either page. Fires rule 10 through its unlocalised bucket.
+ * - `/robots.txt` — served as text/plain. Disallows `/private`, which is also
+ *   what every detection crawl excludes by configuration, so the file existing
+ *   changes no page count. Carries a `googlebot` group and a query-bearing
+ *   pattern so an end-to-end parse has structure to have got right.
+ * - `/sitemap.xml` — an index over `/sitemap-pages.xml` and a gzipped
+ *   `/sitemap-posts.xml.gz`. Following the index and inflating the `.gz` are
+ *   the crawler's job rather than the parser's, so they need a server.
+ * - `/sitemap-corrupt.xml.gz` — gzip magic bytes over a body that is not gzip.
+ *   Must be refused without throwing; only reachable as a start URL.
  * - `/private/secret` — only reachable if excludePaths is ignored.
  * - `/slow`, `/flaky` — timing and abort behaviour.
  */
@@ -578,6 +588,13 @@ Allow: /private/public-after-all
 Sitemap: SITEMAP_URL
 `;
 
+/** A urlset over the given paths, absolute as the protocol requires. */
+const sitemapFor = (base: string, paths: string[]): string =>
+	`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${paths.map((path) => `  <url><loc>${base}${path}</loc></url>`).join("\n")}
+</urlset>`;
+
 const REDIRECTS: Record<string, string> = {
 	"/moved/page": "/final/page",
 };
@@ -735,6 +752,59 @@ export async function startFixtureSite(): Promise<Fixture> {
 						`http://${req.headers.host ?? "127.0.0.1"}/sitemap.xml`,
 					),
 				);
+				return;
+			}
+
+			/**
+			 * The sitemap, published as an index over two children — one plain, one
+			 * gzipped. Both shapes are ordinary in the wild and neither is reachable
+			 * by the parser alone: following an index and inflating a `.gz` are the
+			 * crawler's job, so they need a server to be tested against.
+			 */
+			if (pathname === "/sitemap.xml") {
+				const base = `http://${req.headers.host ?? "127.0.0.1"}`;
+				res.writeHead(200, { "content-type": "application/xml" });
+				res.end(
+					`<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap><loc>${base}/sitemap-pages.xml</loc></sitemap>
+  <sitemap><loc>${base}/sitemap-posts.xml.gz</loc></sitemap>
+</sitemapindex>`,
+				);
+				return;
+			}
+
+			if (pathname === "/sitemap-pages.xml") {
+				const base = `http://${req.headers.host ?? "127.0.0.1"}`;
+				res.writeHead(200, { "content-type": "application/xml" });
+				res.end(sitemapFor(base, ["/", "/about", "/pricing"]));
+				return;
+			}
+
+			if (pathname === "/sitemap-posts.xml.gz") {
+				const base = `http://${req.headers.host ?? "127.0.0.1"}`;
+				/**
+				 * A gzip *file*, not `Content-Encoding: gzip` — `fetch` would have
+				 * decompressed the latter transparently and the crawler would never
+				 * exercise its own inflation path.
+				 */
+				res.writeHead(200, { "content-type": "application/gzip" });
+				res.end(gzipSync(Buffer.from(sitemapFor(base, ["/blog/monolingual"]))));
+				return;
+			}
+
+			/**
+			 * Gzip magic bytes over a body that is not gzip. The read must refuse it
+			 * and return nothing rather than throwing — a malformed sitemap is the
+			 * site's problem to fix, not a reason for the run to fail.
+			 *
+			 * The size cap has no route here on purpose: a gzip bomb is tested
+			 * against `decodeSitemapBody` directly, where the assertion can be that
+			 * the cap refused it rather than merely that the crawl survived.
+			 */
+			if (pathname === "/sitemap-corrupt.xml.gz") {
+				res.writeHead(200, { "content-type": "application/gzip" });
+				res.end(Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0x99, 0x99, 0x99]));
 				return;
 			}
 

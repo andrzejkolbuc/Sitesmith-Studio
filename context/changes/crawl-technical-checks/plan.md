@@ -1089,35 +1089,35 @@ duration of a run, following the precedent S-05 set when it declined to persist 
 
 #### Automated
 
-- [x] 4.1 Type checking passes: `npm run typecheck`
-- [x] 4.2 Linting and formatting pass: `npm run check`
-- [x] 4.3 Unit tests pass: `npm run test:unit`
-- [x] 4.4 `googlebot` group wins over `*` when both match
-- [x] 4.5 `Allow` wins a same-specificity tie against `Disallow`
-- [x] 4.6 A query-bearing pattern reports as not-evaluated rather than not-matching
-- [x] 4.7 A missing robots.txt yields `robots: null` and no finding
-- [x] 4.8 Crawl behaviour is unchanged: the same fixture crawl visits the same pages as before
+- [x] 4.1 Type checking passes: `npm run typecheck` — 0fcd5aa
+- [x] 4.2 Linting and formatting pass: `npm run check` — 0fcd5aa
+- [x] 4.3 Unit tests pass: `npm run test:unit` — 0fcd5aa
+- [x] 4.4 `googlebot` group wins over `*` when both match — 0fcd5aa
+- [x] 4.5 `Allow` wins a same-specificity tie against `Disallow` — 0fcd5aa
+- [x] 4.6 A query-bearing pattern reports as not-evaluated rather than not-matching — 0fcd5aa
+- [x] 4.7 A missing robots.txt yields `robots: null` and no finding — 0fcd5aa
+- [x] 4.8 Crawl behaviour is unchanged: the same fixture crawl visits the same pages as before — 0fcd5aa
 
 #### Manual
 
-- [x] 4.9 The parser's output on yazaki-emea.com's real robots.txt matches a hand reading of it
+- [x] 4.9 The parser's output on yazaki-emea.com's real robots.txt matches a hand reading of it — 0fcd5aa
 
 ### Phase 5: Sitemap fetch and parser
 
 #### Automated
 
-- [ ] 5.1 Type checking passes: `npm run typecheck`
-- [ ] 5.2 Linting and formatting pass: `npm run check`
-- [ ] 5.3 Unit tests pass: `npm run test:unit`
-- [ ] 5.4 A sitemap index resolves both children into one entry set
-- [ ] 5.5 A gzipped sitemap parses; one exceeding the size cap is refused without throwing
-- [ ] 5.6 Locs differing only by query string collapse to a single entry
-- [ ] 5.7 A cross-origin sitemap produces an observation, not per-page defects
-- [ ] 5.8 A missing sitemap yields `sitemap: null` and no finding
+- [x] 5.1 Type checking passes: `npm run typecheck`
+- [x] 5.2 Linting and formatting pass: `npm run check`
+- [x] 5.3 Unit tests pass: `npm run test:unit`
+- [x] 5.4 A sitemap index resolves both children into one entry set
+- [x] 5.5 A gzipped sitemap parses; one exceeding the size cap is refused without throwing
+- [x] 5.6 Locs differing only by query string collapse to a single entry
+- [x] 5.7 A cross-origin sitemap produces an observation, not per-page defects
+- [x] 5.8 A missing sitemap yields `sitemap: null` and no finding
 
 #### Manual
 
-- [ ] 5.9 The parser's entry count on yazaki-emea.com's real sitemap matches its declared contents
+- [x] 5.9 The parser's entry count on yazaki-emea.com's real sitemap matches its declared contents
 
 ### Phase 6: Sitemap reconciliation and robots-blocked pages
 

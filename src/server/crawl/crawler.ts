@@ -18,7 +18,17 @@ import {
 	MAX_METADATA_CHARS,
 	type PageMetadata,
 } from "./metadata";
+
 import { parseRobots, type RobotsFile } from "./robots";
+import {
+	decodeSitemapBody,
+	MAX_SITEMAP_DOCUMENTS,
+	MAX_SITEMAP_URLS,
+	parseSitemap,
+	type SitemapDiscovery,
+	type SitemapDocument,
+	type SitemapEntry,
+} from "./sitemap";
 import { type CertificateObservation, probeCertificate } from "./tls";
 import { normaliseUrl } from "./url";
 
@@ -153,6 +163,11 @@ export type CrawlResult = {
 	 * Read for findings and not obeyed — see the fetch site for why.
 	 */
 	robots: RobotsFile | null;
+	/**
+	 * The site's sitemap, followed through any index, or null when none was
+	 * found. Null is silence: a guessed path returning 404 says nothing.
+	 */
+	sitemap: SitemapDocument | null;
 };
 
 /**
@@ -294,6 +309,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 			reverified: [],
 			certificate: null,
 			robots: null,
+			sitemap: null,
 		};
 	}
 
@@ -386,6 +402,106 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 	 */
 	const robotsBody = await fetchText(`${origin}/robots.txt`);
 	const robots = robotsBody === null ? null : parseRobots(robotsBody);
+
+	/**
+	 * A sitemap document, decompressed if it arrived compressed.
+	 *
+	 * Gzip is detected by the body's own magic bytes rather than by a `.gz`
+	 * extension, because the extension is a convention and the bytes are a fact —
+	 * and `fetch` transparently handles `Content-Encoding: gzip`, so what arrives
+	 * here compressed is a gzip *file* served as an opaque body, whatever it is
+	 * called.
+	 *
+	 * The size cap applies after decompression, where it needs to: a small
+	 * compressed body can expand without bound, and this is the first code in the
+	 * product to read a file whose decompressed size the server chooses.
+	 */
+	async function fetchSitemapBody(url: string): Promise<string | null> {
+		await claimSlot();
+
+		const controller = new AbortController();
+		const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
+
+		try {
+			const response = await fetch(url, {
+				signal: controller.signal,
+				redirect: "follow",
+			});
+			if (!response.ok) return null;
+
+			return decodeSitemapBody(Buffer.from(await response.arrayBuffer()));
+		} catch {
+			return null;
+		} finally {
+			clearTimeout(timer);
+		}
+	}
+
+	/**
+	 * The site's sitemap, followed through any index it declares.
+	 *
+	 * Discovery order is a provenance decision, not a convenience one. The site's
+	 * own `Sitemap:` directive is an assertion about where its sitemap lives;
+	 * `/sitemap.xml` is a convention we guess at. So the declaration is preferred,
+	 * the guess is the fallback, and which one answered travels with every
+	 * finding — because **a 404 at the guessed path is not evidence the site has
+	 * no sitemap**, and must never become one.
+	 */
+	async function readSitemap(): Promise<SitemapDocument | null> {
+		const declared = robots?.sitemaps ?? [];
+		const discovery: SitemapDiscovery =
+			declared.length > 0 ? "robots" : "conventional";
+
+		const queue = (declared.length > 0 ? declared : [`${origin}/sitemap.xml`])
+			.map((href) => normaliseUrl(href))
+			.filter((href): href is string => href !== null);
+
+		const seenSitemaps = new Set<string>(queue);
+		const sources: string[] = [];
+		const entries: SitemapEntry[] = [];
+		let truncated = false;
+
+		while (queue.length > 0) {
+			if (sources.length >= MAX_SITEMAP_DOCUMENTS) {
+				truncated = true;
+				break;
+			}
+
+			const next = queue.shift();
+			if (next === undefined) break;
+
+			const body = await fetchSitemapBody(next);
+			if (body === null) continue;
+
+			sources.push(next);
+			const parsed = parseSitemap(body, next);
+
+			if (parsed.kind === "index") {
+				for (const child of parsed.children) {
+					if (seenSitemaps.has(child)) continue;
+					seenSitemaps.add(child);
+					queue.push(child);
+				}
+				continue;
+			}
+
+			for (const entry of parsed.entries) {
+				if (entries.length >= MAX_SITEMAP_URLS) {
+					truncated = true;
+					break;
+				}
+				entries.push(entry);
+			}
+		}
+
+		// Nothing answered. The site publishes no sitemap we could find, and that
+		// is silence rather than a finding.
+		if (sources.length === 0) return null;
+
+		return { discovery, sources, entries, truncated };
+	}
+
+	const sitemap = await readSitemap();
 
 	async function fetchOne(url: string): Promise<CrawledPage> {
 		await claimSlot();
@@ -619,5 +735,6 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 		reverified,
 		certificate,
 		robots,
+		sitemap,
 	};
 }
