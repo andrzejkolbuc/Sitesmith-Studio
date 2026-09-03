@@ -58,6 +58,9 @@ const FINDING_LABEL: Record<string, string> = {
 	certificate_problem: "Certificate problems",
 	security_header_contradiction:
 		"Security headers the site disagrees with itself about",
+	sitemap_url_failed: "Sitemap URLs that do not load",
+	page_missing_from_sitemap: "Live pages the sitemap does not list",
+	robots_blocks_indexable: "robots.txt blocks a page the sitemap submits",
 };
 
 /** Security headers in the reader's words, the same split `FIELD_LABEL` makes. */
@@ -1079,6 +1082,73 @@ function Evidence({
 						</div>
 					)}
 					<Listed items={affected.map(pathOf)} />
+				</>
+			);
+		}
+
+		case "sitemap_url_failed": {
+			const entries = Array.isArray(detail.entries)
+				? (detail.entries as Array<Record<string, unknown>>)
+				: [];
+
+			return (
+				<>
+					<span className="text-ink">
+						{entries.length} {entries.length === 1 ? "URL" : "URLs"} in the
+						sitemap did not load
+					</span>
+					<Listed
+						items={entries.map(
+							(entry) =>
+								`${pathOf(entry.normalised)} — ${
+									typeof entry.httpStatus === "number"
+										? entry.httpStatus
+										: "no response"
+								}`,
+						)}
+					/>
+				</>
+			);
+		}
+
+		case "page_missing_from_sitemap": {
+			const urls = Array.isArray(detail.urls) ? (detail.urls as string[]) : [];
+
+			/**
+			 * The sitemap's length beside the count, because "twelve pages are
+			 * missing" reads very differently against a sitemap of fifteen than
+			 * against one of five hundred.
+			 */
+			return (
+				<>
+					<span className="text-ink">
+						{urls.length} live {urls.length === 1 ? "page" : "pages"} are absent
+						from a sitemap of {Number(detail.sitemapEntryCount ?? 0)}
+					</span>
+					<Listed items={urls.map(pathOf)} />
+				</>
+			);
+		}
+
+		case "robots_blocks_indexable": {
+			const urls = Array.isArray(detail.urls) ? (detail.urls as string[]) : [];
+
+			/**
+			 * The verbatim rule and the group it addresses. The whole finding is a
+			 * quotation — the site said both of these things — so the line it said
+			 * one of them on is the substance, not decoration.
+			 */
+			return (
+				<>
+					<span className="text-ink">
+						<Tag tone="mark">{str("ruleLine")}</Tag> blocks {urls.length}{" "}
+						{urls.length === 1 ? "URL" : "URLs"} the sitemap submits
+					</span>
+					<div className="mt-1.5 text-ink-soft text-xs">
+						robots.txt line {Number(detail.ruleLineNumber ?? 0)}, in the{" "}
+						<code className="font-mono">{str("userAgentGroup")}</code> group
+					</div>
+					<Listed items={urls.map(pathOf)} />
 				</>
 			);
 		}

@@ -588,6 +588,39 @@ Allow: /private/public-after-all
 Sitemap: SITEMAP_URL
 `;
 
+/**
+ * The one page the sitemap deliberately leaves out.
+ *
+ * Rule 20 reports live pages absent from the sitemap, so the fixture's sitemap
+ * has to be *nearly* complete — the way a real one is. A sitemap listing four of
+ * forty pages makes that rule name almost the whole site in one finding, which
+ * swamps every "this page must fire nothing" assertion here. That is the exact
+ * failure this fixture's header warns about, and it happened on the first try.
+ *
+ * `/library/guide-archived` is a safe choice: it already fires the
+ * duplicate-content rule, and no negative assertion depends on its silence.
+ */
+const OMITTED_FROM_SITEMAP = "/library/guide-archived";
+
+/**
+ * What the sitemap lists, derived from the site rather than written out.
+ *
+ * A hand-maintained list would drift the moment somebody adds a page, and the
+ * drift would surface as a rule-20 finding on an unrelated test.
+ *
+ * `/private/*` is excluded wholesale and `/private/secret` added back by hand,
+ * so that exactly one URL is both submitted by the sitemap and `Disallow`ed by
+ * the robots.txt — one rule-21 finding rather than one per private page.
+ * `/library/removed` is added because it 404s, which is rule 19's case.
+ */
+const sitemapPaths = (): string[] => [
+	...Object.keys(SITE).filter(
+		(path) => !path.startsWith("/private") && path !== OMITTED_FROM_SITEMAP,
+	),
+	"/library/removed",
+	"/private/secret",
+];
+
 /** A urlset over the given paths, absolute as the protocol requires. */
 const sitemapFor = (base: string, paths: string[]): string =>
 	`<?xml version="1.0" encoding="UTF-8"?>
@@ -777,7 +810,7 @@ export async function startFixtureSite(): Promise<Fixture> {
 			if (pathname === "/sitemap-pages.xml") {
 				const base = `http://${req.headers.host ?? "127.0.0.1"}`;
 				res.writeHead(200, { "content-type": "application/xml" });
-				res.end(sitemapFor(base, ["/", "/about", "/pricing"]));
+				res.end(sitemapFor(base, sitemapPaths()));
 				return;
 			}
 

@@ -160,6 +160,25 @@ export function pagesInvolved(finding: {
 		case "certificate_problem":
 			return [];
 
+		/**
+		 * Live pages the sitemap omits, and the URLs a robots.txt rule blocks.
+		 * Both are about a set of URLs and neither is filed against one.
+		 */
+		case "page_missing_from_sitemap":
+		case "robots_blocks_indexable":
+			return strings(detail.urls);
+
+		/**
+		 * The normalised URL of each failing entry. The raw loc travels beside it
+		 * as evidence, but it is the normalised form that names a page.
+		 */
+		case "sitemap_url_failed":
+			return Array.isArray(detail.entries)
+				? (detail.entries as Array<Record<string, unknown>>).flatMap((entry) =>
+						typeof entry.normalised === "string" ? [entry.normalised] : [],
+					)
+				: [];
+
 		default:
 			// An unmapped type still counts the page it names, so a new finding
 			// never reports as affecting nothing.

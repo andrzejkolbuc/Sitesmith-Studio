@@ -1,8 +1,8 @@
 import { BLOCK_NAMES, type ContentSummary } from "./content";
 import type { CrawledPage, Reverification } from "./crawler";
 import { parseRobotsHeader } from "./metadata";
-import type { RobotsFile } from "./robots";
-import type { SitemapDocument } from "./sitemap";
+import { evaluatePath, type RobotsFile, type RobotsRule } from "./robots";
+import { reconcile, type SitemapDocument } from "./sitemap";
 import type { CertificateObservation } from "./tls";
 import { normaliseUrl } from "./url";
 import {
@@ -59,6 +59,12 @@ export const FINDING_TYPES = {
 	CERTIFICATE_PROBLEM: "certificate_problem",
 	/** A security header the site contradicts itself about. */
 	SECURITY_HEADER_CONTRADICTION: "security_header_contradiction",
+	/** A URL the sitemap submits that does not load. */
+	SITEMAP_URL_FAILED: "sitemap_url_failed",
+	/** A live page the site did not submit in its own sitemap. */
+	PAGE_MISSING_FROM_SITEMAP: "page_missing_from_sitemap",
+	/** A robots.txt rule blocking a URL the site's own sitemap submits. */
+	ROBOTS_BLOCKS_INDEXABLE: "robots_blocks_indexable",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -162,6 +168,8 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		crawlComplete,
 		reverified,
 		certificate,
+		robots,
+		sitemap,
 	} = options;
 
 	const variants = groupVariants(pages);
@@ -207,6 +215,16 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 	 * worth a second heading in the list.
 	 */
 	const reportedBrokenTargets = new Set<string>();
+
+	/**
+	 * Pages that asked not to be indexed, on either channel.
+	 *
+	 * Populated by rule 14 and read by rule 20, which must not report a `noindex`
+	 * page as missing from the sitemap: a site that told search engines to skip a
+	 * page is *consistent* in leaving it out of its index submission, and saying
+	 * otherwise would report the site for doing two things that agree.
+	 */
+	const noindexed = new Set<string>();
 
 	const findings: Finding[] = [];
 
@@ -1186,6 +1204,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 			.filter((channel) => !carrying.has(channel))
 			.sort();
 
+		noindexed.add(page.url);
 		findings.push({
 			type: FINDING_TYPES.NOINDEX_PRESENT,
 			url: page.url,
@@ -1536,5 +1555,251 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		}
 	}
 
+	// ── Rules 19, 20 and 21: what the site submitted, and what it blocks ──────
+	//
+	// FR-017 and FR-018, sharing one input. All three read the sitemap, and the
+	// third reads robots.txt beside it.
+	//
+	// The comparison itself lives in `sitemap.ts` rather than here, because every
+	// trap in it is a URL-identity trap and doing it once, where it can be tested
+	// on its own, is worth more than doing it three times inline.
+	if (sitemap) {
+		/**
+		 * The crawl's origin, taken from the pages themselves.
+		 *
+		 * A sitemap may legitimately live on another host — a CDN, commonly — so
+		 * the origin that matters is the one the crawl walked, not the one the
+		 * sitemap was served from.
+		 */
+		const crawlOrigin = (() => {
+			const first = pages[0]?.url;
+			if (first === undefined) return null;
+			try {
+				return new URL(first).origin;
+			} catch {
+				return null;
+			}
+		})();
+
+		if (crawlOrigin !== null) {
+			const reconciled = reconcile(sitemap.entries, crawlOrigin, inScope);
+			const source = sitemap.sources[0] ?? null;
+
+			// ── Rule 19: a sitemap entry that does not load ───────────────────────
+			//
+			// FR-017's first direction, and narrower than it looks. It reports only
+			// entries the crawl **recorded with a failure**, never entries merely
+			// absent from the crawl — and that distinction is the whole rule.
+			//
+			// The crawl records the URL the server *served* and discards a response
+			// that redirects to a page already recorded. So a sitemap URL that 301s
+			// to its canonical address was fetched successfully, is perfectly
+			// healthy, and never appears under its own name. Deriving failure from
+			// absence would report the site's own tidy redirects as broken sitemap
+			// entries — the redirect-alias false positive re-emerging in a third
+			// setting, which is exactly what `context/foundation/lessons.md` was
+			// written after.
+			//
+			// One finding for the whole sitemap rather than one per entry: a
+			// sitemap generated from a stale index breaks in bulk, and per-entry
+			// reporting would make the worst case the least readable.
+			if (crawlComplete) {
+				const failed: Array<Record<string, unknown>> = [];
+
+				for (const [url, entries] of [...reconciled.comparable].sort(
+					([a], [b]) => a.localeCompare(b),
+				)) {
+					const page = byUrl.get(url);
+					if (!page || !isError(page)) continue;
+
+					failed.push({
+						raw: entries[0]?.raw ?? url,
+						normalised: url,
+						httpStatus: page.httpStatus,
+						fetchError: page.fetchError,
+					});
+				}
+
+				if (failed.length > 0) {
+					findings.push({
+						type: FINDING_TYPES.SITEMAP_URL_FAILED,
+						url: null,
+						detail: {
+							sitemapSource: source,
+							discovery: sitemap.discovery,
+							entries: failed,
+						},
+					});
+				}
+			}
+
+			// ── Rule 20: a live page the sitemap does not list ────────────────────
+			//
+			// FR-017's second direction, and it rests on firmer ground than almost
+			// anything else in this file: the sitemap's completeness is the site's
+			// own assertion, and the other half is a *positive* observation — we
+			// fetched this page and it returned 200.
+			//
+			// **No `crawlComplete` gate**, and that is deliberate rather than an
+			// oversight. Truncating the crawl can only make this rule quieter, never
+			// wrong: a page we never fetched is simply not among the pages we are
+			// asking about. Every other absence-reasoning rule here needs the gate
+			// because absence is its evidence; here presence is.
+			//
+			// The exclusions are what keep it honest. A sitemap is *correct* to omit
+			// a page that errored, a page that asked not to be indexed, and a page
+			// whose canonical names a different address — in each case the site has
+			// already said this URL is not the one it wants indexed.
+			const omitted: string[] = [];
+
+			for (const page of [...pages].sort((a, b) =>
+				a.url.localeCompare(b.url),
+			)) {
+				if (isError(page)) continue;
+				if (!page.content.isHtml) continue;
+				if (!inScope(page.url)) continue;
+				if (reconciled.comparable.has(page.url)) continue;
+
+				// The site said not to index it; leaving it out is consistent.
+				if (noindexed.has(page.url)) continue;
+
+				/**
+				 * The site nominated a different address for this content, so the
+				 * sitemap listing that address instead is the site agreeing with
+				 * itself. A self-referential canonical is not this case.
+				 */
+				const canonicals = canonicalsOf(page);
+				const canonical = canonicals.length === 1 ? canonicals[0] : undefined;
+				if (canonical !== undefined && canonical !== selfUrl(page)) continue;
+
+				omitted.push(page.url);
+			}
+
+			if (omitted.length > 0) {
+				findings.push({
+					type: FINDING_TYPES.PAGE_MISSING_FROM_SITEMAP,
+					url: null,
+					detail: {
+						sitemapSource: source,
+						discovery: sitemap.discovery,
+						/**
+						 * The corpus-level fact carried into the finding, the way rule 11
+						 * carries `pagesDeclaringCanonical`. Without it the reader is told
+						 * some pages are absent from a list and cannot see how long the
+						 * list was.
+						 */
+						sitemapEntryCount: reconciled.comparable.size,
+						urls: omitted,
+					},
+				});
+			}
+
+			// ── Rule 21: robots.txt blocks a page the sitemap submits ─────────────
+			//
+			// FR-018, formulated as a contradiction rather than as an intent.
+			//
+			// "Pages intended to be indexable" is a claim about a human's mental
+			// state, and nothing observable is intent. What *is* observable is the
+			// site asserting two opposing things on the same host: its sitemap
+			// submits this URL for indexing, and its robots.txt tells crawlers not
+			// to fetch it. The finding can be stated entirely in quotation — the
+			// loc, the verbatim `Disallow` line, its line number, and the group it
+			// sits in.
+			//
+			// **Not internal links.** "Blocked but linked from N pages" would fire
+			// on `/search`, `/cart`, `/login`, faceted navigation and print views —
+			// the canonical *correct* uses of `Disallow` — and `page.links` is
+			// already in hand, which makes it the tempting formulation. It is
+			// rejected in writing rather than by omission.
+			//
+			// **Evaluated as googlebot, falling back to `*`.** This reads backwards
+			// at first: we send no distinct user-agent, so on paper our group is the
+			// wildcard. But the finding is a claim about the site's instruction to
+			// *search engines*, and Googlebot ignores `*` entirely once a
+			// `googlebot` group exists — so a site with a permissive wildcard and a
+			// blocking googlebot group is catastrophically blocked in the way that
+			// matters, and evaluating the wildcard would report nothing. The group
+			// travels in the detail so the reader sees which audience was addressed.
+			//
+			// **No `crawlComplete` gate.** This rule reads sitemap ⋈ robots.txt and
+			// does not consult the crawl at all, so it survives a truncated or
+			// aborted run intact. It also depends on the crawler continuing not to
+			// obey robots.txt — not for its own evidence, which is documentary, but
+			// because a crawl that skipped blocked pages would make the rest of this
+			// slice blind to them.
+			if (robots) {
+				const byRule = new Map<
+					string,
+					{ rule: RobotsRule; group: string; urls: string[] }
+				>();
+
+				/**
+				 * Every same-origin entry, in scope or not — the one rule here that
+				 * ignores the crawl's configured scope, deliberately.
+				 *
+				 * Elsewhere `inScope` suppresses a finding because the evidence would
+				 * be an *absence* the configuration caused. Nothing is absent here:
+				 * both facts are published, in two files, by the same site. An
+				 * operator excluding `/private` from a crawl has said where to spend
+				 * requests, not that the site may contradict itself there unwatched —
+				 * and a section excluded from crawling is exactly where a
+				 * sitemap/robots contradiction is least likely to be noticed by hand.
+				 */
+				const published = [
+					...reconciled.comparable.keys(),
+					...reconciled.outOfScope.flatMap((entry) =>
+						entry.url === null ? [] : [entry.url],
+					),
+				];
+
+				for (const url of [...new Set(published)].sort()) {
+					let path: string;
+					try {
+						path = new URL(url).pathname;
+					} catch {
+						continue;
+					}
+
+					const verdict = evaluatePath(robots, path, "googlebot");
+					if (verdict.allowed || verdict.rule === null) continue;
+
+					const key = `${verdict.group ?? "*"} ${verdict.rule.lineNumber}`;
+					const entry = byRule.get(key) ?? {
+						rule: verdict.rule,
+						group: verdict.group ?? "*",
+						urls: [],
+					};
+					entry.urls.push(url);
+					byRule.set(key, entry);
+				}
+
+				/**
+				 * One finding per blocking rule, not per URL.
+				 *
+				 * FR-018 asks which robots.txt *rules* block pages — the rule is the
+				 * subject and the pages are the evidence — and the shape matters
+				 * practically as well: a single `Disallow: /` matching four hundred
+				 * sitemap URLs is one line to fix, not four hundred findings.
+				 */
+				for (const [, entry] of [...byRule].sort(([a], [b]) =>
+					a.localeCompare(b),
+				)) {
+					findings.push({
+						type: FINDING_TYPES.ROBOTS_BLOCKS_INDEXABLE,
+						url: null,
+						detail: {
+							rule: entry.rule.pattern,
+							ruleLine: entry.rule.line,
+							ruleLineNumber: entry.rule.lineNumber,
+							userAgentGroup: entry.group,
+							sitemapSource: source,
+							discovery: sitemap.discovery,
+							urls: [...entry.urls].sort(),
+						},
+					});
+				}
+			}
+		}
+	}
 	return findings;
 }

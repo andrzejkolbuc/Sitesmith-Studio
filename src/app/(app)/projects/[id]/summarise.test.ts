@@ -308,6 +308,55 @@ describe("pagesInvolved for metadata findings", () => {
 		).toHaveLength(2);
 	});
 
+	it("counts the pages a sitemap reconciliation names", () => {
+		expect(
+			pagesInvolved({
+				type: "page_missing_from_sitemap",
+				url: null,
+				detail: {
+					sitemapSource: `${B}/sitemap.xml`,
+					sitemapEntryCount: 40,
+					urls: [`${B}/a`, `${B}/b`],
+				},
+			}),
+		).toHaveLength(2);
+	});
+
+	it("counts the normalised URL of each failing sitemap entry", () => {
+		/**
+		 * The raw loc travels beside it as evidence, but it is the normalised form
+		 * that names a page — and reading the wrong one would count a URL the crawl
+		 * never had under that spelling.
+		 */
+		expect(
+			pagesInvolved({
+				type: "sitemap_url_failed",
+				url: null,
+				detail: {
+					sitemapSource: `${B}/sitemap.xml`,
+					entries: [
+						{ raw: `${B}/gone?x=1`, normalised: `${B}/gone`, httpStatus: 404 },
+					],
+				},
+			}),
+		).toEqual([`${B}/gone`]);
+	});
+
+	it("counts the URLs a robots.txt rule blocks", () => {
+		expect(
+			pagesInvolved({
+				type: "robots_blocks_indexable",
+				url: null,
+				detail: {
+					rule: "/admin",
+					ruleLine: "Disallow: /admin",
+					userAgentGroup: "googlebot",
+					urls: [`${B}/admin/a`, `${B}/admin/b`, `${B}/admin/c`],
+				},
+			}),
+		).toHaveLength(3);
+	});
+
 	it("counts no pages for a certificate problem", () => {
 		/**
 		 * Deliberately zero, and pinned so it cannot be mistaken for a type somebody

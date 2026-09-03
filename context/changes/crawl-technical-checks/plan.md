@@ -1106,37 +1106,37 @@ duration of a run, following the precedent S-05 set when it declined to persist 
 
 #### Automated
 
-- [x] 5.1 Type checking passes: `npm run typecheck`
-- [x] 5.2 Linting and formatting pass: `npm run check`
-- [x] 5.3 Unit tests pass: `npm run test:unit`
-- [x] 5.4 A sitemap index resolves both children into one entry set
-- [x] 5.5 A gzipped sitemap parses; one exceeding the size cap is refused without throwing
-- [x] 5.6 Locs differing only by query string collapse to a single entry
-- [x] 5.7 A cross-origin sitemap produces an observation, not per-page defects
-- [x] 5.8 A missing sitemap yields `sitemap: null` and no finding
+- [x] 5.1 Type checking passes: `npm run typecheck` — 86c86f3
+- [x] 5.2 Linting and formatting pass: `npm run check` — 86c86f3
+- [x] 5.3 Unit tests pass: `npm run test:unit` — 86c86f3
+- [x] 5.4 A sitemap index resolves both children into one entry set — 86c86f3
+- [x] 5.5 A gzipped sitemap parses; one exceeding the size cap is refused without throwing — 86c86f3
+- [x] 5.6 Locs differing only by query string collapse to a single entry — 86c86f3
+- [x] 5.7 A cross-origin sitemap produces an observation, not per-page defects — 86c86f3
+- [x] 5.8 A missing sitemap yields `sitemap: null` and no finding — 86c86f3
 
 #### Manual
 
-- [x] 5.9 The parser's entry count on yazaki-emea.com's real sitemap matches its declared contents
+- [x] 5.9 The parser's entry count on yazaki-emea.com's real sitemap matches its declared contents — 86c86f3
 
 ### Phase 6: Sitemap reconciliation and robots-blocked pages
 
 #### Automated
 
-- [ ] 6.1 Type checking passes: `npm run typecheck`
-- [ ] 6.2 Linting and formatting pass: `npm run check`
-- [ ] 6.3 Unit tests pass: `npm run test:unit`
-- [ ] 6.4 Integration tests pass: `npm run test:integration`
-- [ ] 6.5 A `Disallow` matching four sitemap URLs produces one finding listing four
-- [ ] 6.6 A `googlebot` group is preferred over a permissive `*`
-- [ ] 6.7 A noindex page absent from the sitemap produces no finding
-- [ ] 6.8 `page_missing_from_sitemap` still reports on a truncated crawl
-- [ ] 6.9 `sitemap_url_failed` reports nothing on a truncated crawl
+- [x] 6.1 Type checking passes: `npm run typecheck`
+- [x] 6.2 Linting and formatting pass: `npm run check`
+- [x] 6.3 Unit tests pass: `npm run test:unit`
+- [x] 6.4 Integration tests pass: `npm run test:integration`
+- [x] 6.5 A `Disallow` matching four sitemap URLs produces one finding listing four
+- [x] 6.6 A `googlebot` group is preferred over a permissive `*`
+- [x] 6.7 A noindex page absent from the sitemap produces no finding
+- [x] 6.8 `page_missing_from_sitemap` still reports on a truncated crawl
+- [x] 6.9 `sitemap_url_failed` reports nothing on a truncated crawl
 
 #### Manual
 
-- [ ] 6.10 The blocked-pages finding reads as the site contradicting itself, not as our judgement
-- [ ] 6.11 The three findings together do not swamp the existing eight on a real crawl
+- [x] 6.10 The blocked-pages finding reads as the site contradicting itself, not as our judgement
+- [x] 6.11 The three findings together do not swamp the existing eight on a real crawl
 
 ### Phase 7: Orphan pages
 

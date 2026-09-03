@@ -129,10 +129,16 @@ describe("detectMissingVariants against the fixture site", () => {
 				inScope,
 				// The fixture is small enough that every crawl here reaches the end.
 				crawlComplete: true,
-				reverified: [],
-				certificate: null,
-				robots: null,
-				sitemap: null,
+				reverified: result.reverified,
+				certificate: result.certificate,
+				/**
+				 * Taken from the crawl rather than stubbed to null, so the sitemap and
+				 * robots rules are exercised against the file the fixture actually
+				 * served. Stubbing them would leave the two channels tested only at
+				 * the parser level, with nothing proving they reach a rule.
+				 */
+				robots: result.robots,
+				sitemap: result.sitemap,
 			}),
 		};
 	}
@@ -419,6 +425,94 @@ describe("detectMissingVariants against the fixture site", () => {
 		]);
 	});
 
+	it("reports the sitemap URL that does not load", async () => {
+		/**
+		 * `/library/removed` is listed in the sitemap and 404s.
+		 *
+		 * The count is the assertion. The sitemap also lists `/private/secret`,
+		 * which the crawl was configured not to visit — and that must *not* appear
+		 * here, because its absence from the crawl is our configuration rather than
+		 * the site failing.
+		 */
+		const { findings } = await detect();
+		const failed = findings.filter(
+			(f) => f.type === FINDING_TYPES.SITEMAP_URL_FAILED,
+		);
+
+		expect(failed).toHaveLength(1);
+		expect(failed[0]?.detail.entries).toEqual([
+			{
+				raw: `${site.baseUrl}/library/removed`,
+				normalised: `${site.baseUrl}/library/removed`,
+				httpStatus: 404,
+				fetchError: null,
+			},
+		]);
+	});
+
+	it("reports the one live page the sitemap leaves out", async () => {
+		/**
+		 * The fixture's sitemap is deliberately near-complete, omitting exactly
+		 * `/library/guide-archived` — because a sparse sitemap makes this rule name
+		 * most of the site at once, which is the volume failure the slice is most
+		 * at risk of and which broke two unrelated assertions here on the first
+		 * attempt.
+		 *
+		 * The corpus-level count travels with the finding, so a reader can see how
+		 * long the list was that this page is missing from.
+		 */
+		const { findings } = await detect();
+		const missing = findings.filter(
+			(f) => f.type === FINDING_TYPES.PAGE_MISSING_FROM_SITEMAP,
+		);
+
+		expect(missing).toHaveLength(1);
+		expect(missing[0]?.url).toBeNull();
+		expect(missing[0]?.detail.urls).toEqual([
+			`${site.baseUrl}/library/guide-archived`,
+		]);
+		expect(missing[0]?.detail.discovery).toBe("robots");
+	});
+
+	it("reports the robots.txt rule blocking a URL the sitemap submits", async () => {
+		/**
+		 * The fixture disallows `/private` and its sitemap submits
+		 * `/private/secret`. Two opposing assertions by the same site, in two files,
+		 * and the finding is stated entirely in quotation.
+		 *
+		 * This is also the case that proves the rule ignores the crawl's configured
+		 * scope: `/private` is excluded here, so the page was never fetched and the
+		 * finding rests on nothing we observed.
+		 */
+		const { findings } = await detect();
+		const blocked = findings.filter(
+			(f) => f.type === FINDING_TYPES.ROBOTS_BLOCKS_INDEXABLE,
+		);
+
+		expect(blocked).toHaveLength(1);
+		expect(blocked[0]?.url).toBeNull();
+		expect(blocked[0]?.detail).toMatchObject({
+			rule: "/private",
+			ruleLine: "Disallow: /private",
+			urls: [`${site.baseUrl}/private/secret`],
+		});
+	});
+
+	it("evaluates robots.txt as googlebot rather than as the wildcard group", async () => {
+		/**
+		 * The fixture publishes a `googlebot` group alongside `*`, and Googlebot
+		 * ignores the wildcard entirely once a group names it. The finding must
+		 * therefore say which audience the blocking rule addressed — a site whose
+		 * wildcard group is permissive and whose googlebot group blocks everything
+		 * is catastrophically blocked in the way that counts.
+		 */
+		const { findings } = await detect();
+		const blocked = findings.filter(
+			(f) => f.type === FINDING_TYPES.ROBOTS_BLOCKS_INDEXABLE,
+		);
+
+		expect(blocked[0]?.detail.userAgentGroup).toBe("googlebot");
+	});
 	it("reports the one dead link no other rule speaks for", async () => {
 		/**
 		 * `/library/removed` is linked from `/library/guide` and never served.

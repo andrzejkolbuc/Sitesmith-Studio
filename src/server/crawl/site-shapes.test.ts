@@ -4,7 +4,7 @@ import { type ContentSummary, emptyContent } from "./content";
 import type { CrawledPage, Reverification } from "./crawler";
 import { detectMissingVariants } from "./findings";
 import { emptyMetadata, type PageMetadata } from "./metadata";
-import type { RobotsFile } from "./robots";
+import { parseRobots, type RobotsFile } from "./robots";
 import type { SitemapDocument } from "./sitemap";
 import type { CertificateObservation } from "./tls";
 import { localeFromUrl } from "./variants";
@@ -2804,5 +2804,263 @@ describe("security headers the site disagrees with itself about", () => {
 				],
 			}).filter(headerIssue),
 		).toEqual([]);
+	});
+});
+
+describe("what the sitemap submits, and what robots.txt blocks", () => {
+	const sitemapFailed = (f: { type: string }) =>
+		f.type === "sitemap_url_failed";
+	const missingFromSitemap = (f: { type: string }) =>
+		f.type === "page_missing_from_sitemap";
+	const blocked = (f: { type: string }) => f.type === "robots_blocks_indexable";
+
+	/** A sitemap listing the given paths, as the crawl would have parsed one. */
+	const sitemapOf = (...paths: string[]): SitemapDocument => ({
+		discovery: "robots",
+		sources: [`${BASE}/sitemap.xml`],
+		entries: paths.map((path) => ({
+			raw: `${BASE}${path}`,
+			url: `${BASE}${path}`,
+			source: `${BASE}/sitemap.xml`,
+		})),
+		truncated: false,
+	});
+
+	it("reports a sitemap URL the crawl recorded as failing", () => {
+		const findings = detailedFindingsFor({
+			pages: [page("/"), page("/gone", { status: 404 })],
+			sitemap: sitemapOf("/", "/gone"),
+		}).filter(sitemapFailed);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBeNull();
+		expect(findings[0]?.detail.entries).toMatchObject([
+			{ normalised: `${BASE}/gone`, httpStatus: 404 },
+		]);
+	});
+
+	it("says nothing about a sitemap URL the crawl simply never recorded", () => {
+		/**
+		 * The redirect trap, and it has no precedent in this codebase yet.
+		 *
+		 * The crawl records the URL the server *served* and discards a response
+		 * that redirects to a page already recorded — so a sitemap URL that 301s to
+		 * its canonical address was fetched successfully, is perfectly healthy, and
+		 * never appears under its own name. Deriving failure from absence would
+		 * report the site's own tidy redirects as broken sitemap entries: the
+		 * redirect-alias false positive, in a third setting.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [page("/")],
+				sitemap: sitemapOf("/", "/redirects-somewhere"),
+			}).filter(sitemapFailed),
+		).toEqual([]);
+	});
+
+	it("says nothing about a failing sitemap URL on a truncated crawl", () => {
+		expect(
+			detailedFindingsFor({
+				crawlComplete: false,
+				pages: [page("/"), page("/gone", { status: 404 })],
+				sitemap: sitemapOf("/", "/gone"),
+			}).filter(sitemapFailed),
+		).toEqual([]);
+	});
+
+	it("reports a live page the sitemap does not list", () => {
+		const findings = detailedFindingsFor({
+			pages: [page("/"), page("/orphaned-from-sitemap")],
+			sitemap: sitemapOf("/"),
+		}).filter(missingFromSitemap);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail).toMatchObject({
+			urls: [`${BASE}/orphaned-from-sitemap`],
+			sitemapEntryCount: 1,
+		});
+	});
+
+	it("still reports a page missing from the sitemap on a truncated crawl", () => {
+		/**
+		 * Deliberately ungated, unlike almost everything else here.
+		 *
+		 * This rule reasons from the sitemap's completeness plus a *positive*
+		 * observation — we fetched this page and it returned 200. Truncating the
+		 * crawl can only make it quieter, never wrong: a page we never fetched is
+		 * simply not among the pages being asked about.
+		 */
+		expect(
+			detailedFindingsFor({
+				crawlComplete: false,
+				pages: [page("/"), page("/orphaned-from-sitemap")],
+				sitemap: sitemapOf("/"),
+			}).filter(missingFromSitemap),
+		).toHaveLength(1);
+	});
+
+	it("says nothing about a noindex page the sitemap leaves out", () => {
+		/**
+		 * The site told search engines to skip this page, so omitting it from an
+		 * index submission is the site agreeing with itself. Reporting it would be
+		 * reporting a site for doing two things that match.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/"),
+					page("/hidden", {
+						metadata: { robots: [{ crawler: null, directives: ["noindex"] }] },
+					}),
+				],
+				sitemap: sitemapOf("/"),
+			}).filter(missingFromSitemap),
+		).toEqual([]);
+	});
+
+	it("says nothing about a page whose canonical names another address", () => {
+		/**
+		 * The site nominated a different URL for this content, so a sitemap listing
+		 * that URL instead is consistent. A self-referential canonical is not this
+		 * case and stays reportable.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					page("/"),
+					page("/duplicate", {
+						metadata: { canonicals: [`${BASE}/`] },
+					}),
+				],
+				sitemap: sitemapOf("/"),
+			}).filter(missingFromSitemap),
+		).toEqual([]);
+	});
+
+	it("says nothing about a page that failed, or one out of scope", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [page("/"), page("/gone", { status: 404 })],
+				sitemap: sitemapOf("/"),
+			}).filter(missingFromSitemap),
+		).toEqual([]);
+	});
+
+	it("reports one finding per blocking rule, listing every URL it matches", () => {
+		/**
+		 * FR-018 asks which robots.txt *rules* block pages — the rule is the
+		 * subject, the pages are the evidence. A single `Disallow: /` matching four
+		 * hundred sitemap URLs is one line to fix, not four hundred findings.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [page("/")],
+			sitemap: sitemapOf("/admin/a", "/admin/b", "/admin/c", "/admin/d", "/"),
+			robots: parseRobots(["User-agent: *", "Disallow: /admin"].join("\n")),
+		}).filter(blocked);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBeNull();
+		expect(findings[0]?.detail).toMatchObject({
+			rule: "/admin",
+			ruleLine: "Disallow: /admin",
+			ruleLineNumber: 2,
+			userAgentGroup: "*",
+			urls: [
+				`${BASE}/admin/a`,
+				`${BASE}/admin/b`,
+				`${BASE}/admin/c`,
+				`${BASE}/admin/d`,
+			],
+		});
+	});
+
+	it("prefers the googlebot group over a permissive wildcard", () => {
+		/**
+		 * Reads backwards until you remember whose instruction the finding is
+		 * about. We send no distinct user-agent, so on paper our group is `*` — but
+		 * the claim is about what the site tells *search engines*, and Googlebot
+		 * ignores the wildcard entirely once a group names it.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [page("/")],
+			sitemap: sitemapOf("/anything"),
+			robots: parseRobots(
+				[
+					"User-agent: *",
+					"Disallow:",
+					"User-agent: googlebot",
+					"Disallow: /",
+				].join("\n"),
+			),
+		}).filter(blocked);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail.userAgentGroup).toBe("googlebot");
+	});
+
+	it("says nothing when robots.txt and the sitemap do not overlap", () => {
+		expect(
+			detailedFindingsFor({
+				pages: [page("/")],
+				sitemap: sitemapOf("/public"),
+				robots: parseRobots(["User-agent: *", "Disallow: /admin"].join("\n")),
+			}).filter(blocked),
+		).toEqual([]);
+	});
+
+	it("says nothing about a Disallow matching a URL the sitemap does not list", () => {
+		/**
+		 * The rejected formulation, asserted as an absence. "Blocked but linked
+		 * from N pages" would fire on `/search`, `/cart`, `/login` and faceted
+		 * navigation — the canonical *correct* uses of Disallow — and `page.links`
+		 * is already in hand, which is what makes it tempting.
+		 */
+		expect(
+			detailedFindingsFor({
+				pages: [
+					{ ...page("/"), links: [`${BASE}/admin/panel`] },
+					page("/admin/panel"),
+				],
+				sitemap: sitemapOf("/"),
+				robots: parseRobots(["User-agent: *", "Disallow: /admin"].join("\n")),
+			}).filter(blocked),
+		).toEqual([]);
+	});
+
+	it("reports a blocked sitemap URL even where the crawl was told not to go", () => {
+		/**
+		 * The one rule here that ignores the configured scope, deliberately.
+		 *
+		 * Elsewhere `inScope` suppresses a finding because the evidence would be an
+		 * absence our configuration caused. Nothing is absent here — both facts are
+		 * published, in two files, by the same site — and a section excluded from
+		 * crawling is exactly where a contradiction is least likely to be noticed
+		 * by hand.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [page("/")],
+			inScope: (url) => !url.startsWith(`${BASE}/private`),
+			sitemap: sitemapOf("/private/secret"),
+			robots: parseRobots(["User-agent: *", "Disallow: /private"].join("\n")),
+		}).filter(blocked);
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail.urls).toEqual([`${BASE}/private/secret`]);
+	});
+
+	it("says nothing at all when the site published no sitemap", () => {
+		/**
+		 * Null is silence. All three rules rest on the sitemap being an assertion,
+		 * and a site that made none has asserted nothing to contradict.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [page("/"), page("/gone", { status: 404 })],
+			sitemap: null,
+			robots: parseRobots(["User-agent: *", "Disallow: /"].join("\n")),
+		});
+
+		expect(findings.filter(sitemapFailed)).toEqual([]);
+		expect(findings.filter(missingFromSitemap)).toEqual([]);
+		expect(findings.filter(blocked)).toEqual([]);
 	});
 });
