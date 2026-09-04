@@ -672,11 +672,11 @@ columns.
 
 #### Automated
 
-- [x] 1.1 Schema applies cleanly: `npm run db:push`
-- [x] 1.2 Integration tests pass: `npm run test:integration`
-- [x] 1.3 Type checking passes: `npm run typecheck`
-- [x] 1.4 Lint and format pass: `npm run check`
-- [x] 1.5 A completed run has non-null `crawlComplete` and `scope`; a scoped project's run records its paths
+- [x] 1.1 Schema applies cleanly: `npm run db:push` — 2f9d1b0
+- [x] 1.2 Integration tests pass: `npm run test:integration` — 2f9d1b0
+- [x] 1.3 Type checking passes: `npm run typecheck` — 2f9d1b0
+- [x] 1.4 Lint and format pass: `npm run check` — 2f9d1b0
+- [x] 1.5 A completed run has non-null `crawlComplete` and `scope`; a scoped project's run records its paths — 2f9d1b0
 
 #### Manual
 
@@ -686,11 +686,11 @@ columns.
 
 #### Automated
 
-- [ ] 2.1 Unit tests pass: `npm run test:unit`
-- [ ] 2.2 Type checking passes: `npm run typecheck`
-- [ ] 2.3 Lint and format pass: `npm run check`
-- [ ] 2.4 Every member of `FINDING_TYPES` has an asserted identity case
-- [ ] 2.5 `summarise.test.ts` and `correlate.test.ts` pass without modification
+- [x] 2.1 Unit tests pass: `npm run test:unit`
+- [x] 2.2 Type checking passes: `npm run typecheck`
+- [x] 2.3 Lint and format pass: `npm run check`
+- [x] 2.4 Every member of `FINDING_TYPES` has an asserted identity case
+- [x] 2.5 `summarise.test.ts` and `correlate.test.ts` pass without modification
 
 #### Manual
 
