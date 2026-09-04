@@ -3,7 +3,7 @@ project: "Sitesmith-Studio"
 version: 1
 status: draft
 created: 2026-08-21
-updated: 2026-09-03
+updated: 2026-09-04
 prd_version: 1
 main_goal: market-feedback
 top_blocker: capacity
@@ -56,11 +56,11 @@ works.
 | S-02 | hreflang-and-variant-parity     | see hreflang graph problems and variants that regressed while siblings did not | S-01             | US-01, FR-025, FR-026                                                                | done     |
 | S-03 | cross-variant-content-drift     | see content drift between language variants                                    | S-02             | FR-027                                                                               | done     |
 | S-04 | crawl-technical-checks          | see broken links, sitemap and robots problems, orphans, duplicates, TLS issues | S-01             | FR-016, FR-017, FR-018, FR-019, FR-020, FR-030                                       | done     |
-| S-05 | seo-metadata-checks             | see title, meta, canonical and noindex problems                                | S-01             | FR-021, FR-022, FR-023                                                               | done |
+| S-05 | seo-metadata-checks             | see title, meta, canonical and noindex problems                                | S-01             | FR-021, FR-022, FR-023                                                               | done     |
 | S-06 | browser-observed-checks         | see console errors, sampled performance scores, and image weight problems      | S-01             | FR-015, FR-028, FR-029                                                               | proposed |
 | S-07 | run-history-and-comparison      | compare a run against the previous one and see only what changed               | S-01             | US-02, FR-037, FR-038                                                                | proposed |
 | S-08 | visual-regression-baselines     | set a baseline and see which pages changed visually, ignoring volatile regions | S-06, S-07       | US-02, FR-031, FR-032, FR-033, FR-034, FR-035                                        | proposed |
-| S-09 | correlated-findings             | see one explained problem per underlying cause instead of many symptoms        | S-02, S-04, S-05 | US-01, FR-040                                                                        | proposed |
+| S-09 | correlated-findings             | see one explained problem per underlying cause instead of many symptoms        | S-02, S-04, S-05 | US-01, FR-040                                                                        | done     |
 | S-10 | roles-invites-and-client-access | invite team members and client viewers, scoped to the right projects           | F-01             | FR-001, FR-003, FR-004, FR-005, FR-010, NFR-2                                        | proposed |
 | S-11 | client-readable-report          | generate a client-readable report from a stored run                            | S-09, S-10       | FR-041                                                                               | proposed |
 | S-12 | quality-trend-history           | see scores and issue counts over time                                          | S-07             | FR-039                                                                               | proposed |
@@ -135,7 +135,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
   - How long does a full run of 400-1,200 URLs actually take? — Owner: user. Block: no. This slice is how the question gets answered; the PRD's Open Question 1 asks for a threshold, and a measurement is worth more than a guess.
   - Does deriving variant relationships from a site's own hreflang hold up on real client sites? — Owner: user. Block: no. Where derivation fails, the failure is itself a reportable finding, so a poor result is still a usable result.
 - **Risk:** The largest slice on this roadmap, and deliberately so - it is the north star, and a smaller version would not prove anything the free tools do not already do. Politeness (rate and concurrency limits, robots) belongs inside it rather than in a foundation, because this is the first crawl to touch a live client site and NFR-1 says causing an incident is worse than the regression being hunted. Expect `/10x-plan` to split this into more than one change; that is the right outcome, not a sign the slice is wrong.
-- **Status:** proposed
+- **Status:** built
 
 ### S-02: hreflang graph and cross-variant parity
 
@@ -236,7 +236,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Unknowns:**
   - What operationally counts as "the same underlying cause"? The PRD states the rule but not the test for it. — Owner: user. Block: no. This is a design decision to make while planning, not an external dependency.
 - **Risk:** This is the domain rule itself - the decision the product makes that no other tool makes for the user. It cannot come earlier because correlation needs several kinds of finding to correlate; with only one check type there is nothing to relate. Sequenced immediately after enough check slices exist to make it meaningful. If this slice does not produce findings that feel smarter than the raw list, the product is a formatter over other tools.
-- **Status:** proposed
+- **Status:** done
 
 ### S-10: Roles, invites and client access
 
@@ -304,18 +304,18 @@ Foundations below assume these are present and do NOT re-scaffold them.
 
 | Roadmap ID | Change ID                       | Suggested issue title                                       | Ready for `/10x-plan` | Notes                                          |
 | ---------- | ------------------------------- | ----------------------------------------------------------- | --------------------- | ---------------------------------------------- |
-| F-01       | tenant-scoped-owner-signin      | Tenant-scoped records and Owner sign-in                     | yes                   | Recommended first — unlocks the north star     |
+| F-01       | tenant-scoped-owner-signin      | Tenant-scoped records and Owner sign-in                     | done                  | Recommended first — unlocks the north star     |
 | F-02       | container-deploy-skeleton       | Container deploy skeleton                                   | yes                   | Unlocks only a nice-to-have; not urgent        |
-| S-01       | first-multilingual-crawl        | First multilingual crawl with missing-variant findings      | no                    | Needs F-01. The north star                     |
-| S-02       | hreflang-and-variant-parity     | hreflang graph validation and cross-variant parity          | no                    | Needs S-01                                     |
-| S-03       | cross-variant-content-drift     | Content drift between language variants                     | no                    | Blocked — define drift vs honest translation   |
-| S-04       | crawl-technical-checks          | Crawl-level technical checks                                | no                    | Needs S-01. Highly parallelisable              |
-| S-05       | seo-metadata-checks             | SEO metadata checks                                         | no                    | Needs S-01. Best effort-to-value ratio         |
-| S-06       | browser-observed-checks         | Console errors, sampled performance, image weight           | no                    | Needs S-01. Introduces page rendering          |
-| S-07       | run-history-and-comparison      | Run history and run-over-run comparison                     | no                    | Needs S-01                                     |
+| S-01       | first-multilingual-crawl        | First multilingual crawl with missing-variant findings      | done                  | Needs F-01. The north star                     |
+| S-02       | hreflang-and-variant-parity     | hreflang graph validation and cross-variant parity          | done                  | Needs S-01                                     |
+| S-03       | cross-variant-content-drift     | Content drift between language variants                     | done                  | Blocked — define drift vs honest translation   |
+| S-04       | crawl-technical-checks          | Crawl-level technical checks                                | done                  | Needs S-01. Highly parallelisable              |
+| S-05       | seo-metadata-checks             | SEO metadata checks                                         | done                  | Needs S-01. Best effort-to-value ratio         |
+| S-06       | browser-observed-checks         | Console errors, sampled performance, image weight           | yes                   | Needs S-01. Introduces page rendering          |
+| S-07       | run-history-and-comparison      | Run history and run-over-run comparison                     | yes                   | Needs S-01. Recommended next                   |
 | S-08       | visual-regression-baselines     | Visual regression with baselines and masked regions         | no                    | Blocked — snapshot retention window            |
-| S-09       | correlated-findings             | Correlated findings — one explained problem per cause       | no                    | Needs S-02, S-04, S-05. The domain rule        |
-| S-10       | roles-invites-and-client-access | Roles, invites and client access                            | no                    | Needs F-01. Parallel with all checking work    |
+| S-09       | correlated-findings             | Correlated findings — one explained problem per cause       | done                  | Needs S-02, S-04, S-05. The domain rule        |
+| S-10       | roles-invites-and-client-access | Roles, invites and client access                            | yes                   | Needs F-01. Parallel with all checking work    |
 | S-11       | client-readable-report          | Client-readable report from a stored run                    | no                    | Needs S-09, S-10                               |
 | S-12       | quality-trend-history           | Quality trend history                                       | no                    | Blocked — same retention question as S-08      |
 | S-13       | scheduled-and-staging-runs      | Scheduled runs and staging environments                     | no                    | Needs F-02, S-01                               |
