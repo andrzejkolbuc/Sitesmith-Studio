@@ -166,6 +166,14 @@ const CASES: Record<string, Case> = {
 		kind: "foreign-id",
 		input: (victim) => ({ runId: victim.run.id }),
 	},
+	"project.runs": {
+		kind: "foreign-id",
+		input: (victim) => ({ projectId: victim.project.id }),
+	},
+	"project.comparison": {
+		kind: "foreign-id",
+		input: (victim) => ({ runId: victim.run.id }),
+	},
 };
 
 /** Walks `caller.project.byId` from the string "project.byId". */

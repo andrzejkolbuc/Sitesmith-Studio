@@ -686,11 +686,11 @@ columns.
 
 #### Automated
 
-- [x] 2.1 Unit tests pass: `npm run test:unit`
-- [x] 2.2 Type checking passes: `npm run typecheck`
-- [x] 2.3 Lint and format pass: `npm run check`
-- [x] 2.4 Every member of `FINDING_TYPES` has an asserted identity case
-- [x] 2.5 `summarise.test.ts` and `correlate.test.ts` pass without modification
+- [x] 2.1 Unit tests pass: `npm run test:unit` — 2b22815
+- [x] 2.2 Type checking passes: `npm run typecheck` — 2b22815
+- [x] 2.3 Lint and format pass: `npm run check` — 2b22815
+- [x] 2.4 Every member of `FINDING_TYPES` has an asserted identity case — 2b22815
+- [x] 2.5 `summarise.test.ts` and `correlate.test.ts` pass without modification — 2b22815
 
 #### Manual
 
@@ -700,13 +700,13 @@ columns.
 
 #### Automated
 
-- [ ] 3.1 Unit tests pass: `npm run test:unit`
-- [ ] 3.2 Integration tests pass: `npm run test:integration`
-- [ ] 3.3 Type checking passes: `npm run typecheck`
-- [ ] 3.4 Lint and format pass: `npm run check`
-- [ ] 3.5 Two consecutive runs over an unchanged fixture produce zero `new` and zero `resolved`
-- [ ] 3.6 A scope change between runs produces `comparable: false`, reason `scope_changed`
-- [ ] 3.7 Existing crawl and router tests pass unmodified
+- [x] 3.1 Unit tests pass: `npm run test:unit`
+- [x] 3.2 Integration tests pass: `npm run test:integration`
+- [x] 3.3 Type checking passes: `npm run typecheck`
+- [x] 3.4 Lint and format pass: `npm run check`
+- [x] 3.5 Two consecutive runs over an unchanged fixture produce zero `new` and zero `resolved`
+- [x] 3.6 A scope change between runs produces `comparable: false`, reason `scope_changed`
+- [x] 3.7 Existing crawl and router tests pass unmodified
 
 #### Manual
 

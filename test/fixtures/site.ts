@@ -726,6 +726,24 @@ export type Fixture = {
 	requests: string[];
 	/** Concurrent in-flight requests, high-water mark. */
 	peakConcurrency: number;
+	/**
+	 * Change what the site serves, so two crawls can see two different sites.
+	 *
+	 * Run comparison has nothing to compare until this exists: every property
+	 * worth asserting — one page broke, one page was fixed, nothing changed — is
+	 * a statement about the difference between two crawls.
+	 *
+	 * Applied at request time over `SITE` rather than merged into it, so a test
+	 * that does not call this pays nothing. That matters here specifically: the
+	 * note at the top of this file records six added pages once pushing a
+	 * politeness test past its timeout, and permanent second-state pages would be
+	 * crawled by every test in the suite.
+	 *
+	 * A `null` value makes the path 404 — the commonest way a real page breaks. A
+	 * partial merges over the existing page, and over nothing at all for a path
+	 * `SITE` does not declare, which is how a test adds a page mid-suite.
+	 */
+	patch: (overrides: Record<string, Partial<Page> | null>) => void;
 	reset: () => void;
 	close: () => Promise<void>;
 };
@@ -818,6 +836,12 @@ export async function startFixtureSite(
 ): Promise<Fixture> {
 	const publishesSiteFiles = options.publishesSiteFiles ?? true;
 	const requests: string[] = [];
+
+	/**
+	 * Keyed by canonical path, the same normalisation `INDEX` uses, so a patch
+	 * written as `/de/` is found by a request the crawler normalised to `/de`.
+	 */
+	const patches = new Map<string, Partial<Page> | null>();
 
 	let inFlight = 0;
 	let peakConcurrency = 0;
@@ -948,7 +972,20 @@ export async function startFixtureSite(
 				return;
 			}
 
-			const page = INDEX[key];
+			/**
+			 * Patches are consulted ahead of `SITE`, so a test can break, fix or add
+			 * a page between two crawls. `null` is an explicit 404 rather than a
+			 * removal, because a 404 is what a deleted page actually does to a
+			 * crawler — and what the comparison has to notice.
+			 */
+			const patched = patches.get(key);
+			if (patched === null) {
+				res.writeHead(404, { "content-type": "text/html" });
+				res.end("<html><body>not found</body></html>");
+				return;
+			}
+
+			const page = patched ? { ...(INDEX[key] ?? {}), ...patched } : INDEX[key];
 			if (!page) {
 				res.writeHead(404, { "content-type": "text/html" });
 				res.end("<html><body>not found</body></html>");
@@ -974,9 +1011,20 @@ export async function startFixtureSite(
 		get peakConcurrency() {
 			return peakConcurrency;
 		},
+		patch(overrides: Record<string, Partial<Page> | null>) {
+			for (const [path, override] of Object.entries(overrides)) {
+				patches.set(canonicalPath(path), override);
+			}
+		},
 		reset() {
 			requests.length = 0;
 			peakConcurrency = 0;
+			/**
+			 * Cleared with the rest of the per-test state. A patch surviving into the
+			 * next test would make the fixture stop being the specification of what
+			 * each finding means, which is the one thing this file has to stay.
+			 */
+			patches.clear();
 		},
 		close: () =>
 			new Promise<void>((resolve, reject) =>
