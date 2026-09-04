@@ -1,9 +1,10 @@
 ---
 change_id: page-identity-under-redirects
 title: "Page identity under redirects"
-status: implemented
+status: archived
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-04
+archived_at: 2026-09-04T08:17:01Z
 prd_refs: [FR-024, FR-025, NFR-1]
 ---
 
