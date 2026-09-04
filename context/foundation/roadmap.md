@@ -58,7 +58,7 @@ works.
 | S-04 | crawl-technical-checks          | see broken links, sitemap and robots problems, orphans, duplicates, TLS issues | S-01             | FR-016, FR-017, FR-018, FR-019, FR-020, FR-030                                       | done     |
 | S-05 | seo-metadata-checks             | see title, meta, canonical and noindex problems                                | S-01             | FR-021, FR-022, FR-023                                                               | done     |
 | S-06 | browser-observed-checks         | see console errors, sampled performance scores, and image weight problems      | S-01             | FR-015, FR-028, FR-029                                                               | proposed |
-| S-07 | run-history-and-comparison      | compare a run against the previous one and see only what changed               | S-01             | US-02, FR-037, FR-038                                                                | proposed |
+| S-07 | run-history-and-comparison      | compare a run against the previous one and see only what changed               | S-01             | US-02, FR-037, FR-038                                                                | done     |
 | S-08 | visual-regression-baselines     | set a baseline and see which pages changed visually, ignoring volatile regions | S-06, S-07       | US-02, FR-031, FR-032, FR-033, FR-034, FR-035                                        | proposed |
 | S-09 | correlated-findings             | see one explained problem per underlying cause instead of many symptoms        | S-02, S-04, S-05 | US-01, FR-040                                                                        | done     |
 | S-10 | roles-invites-and-client-access | invite team members and client viewers, scoped to the right projects           | F-01             | FR-001, FR-003, FR-004, FR-005, FR-010, NFR-2                                        | proposed |
@@ -209,7 +209,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Blockers:** —
 - **Unknowns:** —
 - **Risk:** The second half of the domain rule - separating what changed from accumulated known state - and the thing that makes a go-live decision possible rather than just a list of problems. Cannot come earlier: it needs at least two stored runs to demonstrate anything. Cheap once S-01 stores runs, since it adds comparison rather than collection.
-- **Status:** proposed
+- **Status:** done
 
 ### S-08: Visual regression with baselines
 
@@ -312,7 +312,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 | S-04       | crawl-technical-checks          | Crawl-level technical checks                                | done                  | Needs S-01. Highly parallelisable              |
 | S-05       | seo-metadata-checks             | SEO metadata checks                                         | done                  | Needs S-01. Best effort-to-value ratio         |
 | S-06       | browser-observed-checks         | Console errors, sampled performance, image weight           | yes                   | Needs S-01. Introduces page rendering          |
-| S-07       | run-history-and-comparison      | Run history and run-over-run comparison                     | yes                   | Needs S-01. Recommended next                   |
+| S-07       | run-history-and-comparison      | Run history and run-over-run comparison                     | done                  | Needs S-01                                     |
 | S-08       | visual-regression-baselines     | Visual regression with baselines and masked regions         | no                    | Blocked — snapshot retention window            |
 | S-09       | correlated-findings             | Correlated findings — one explained problem per cause       | done                  | Needs S-02, S-04, S-05. The domain rule        |
 | S-10       | roles-invites-and-client-access | Roles, invites and client access                            | yes                   | Needs F-01. Parallel with all checking work    |
@@ -351,6 +351,8 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Observability tooling.** Why parked: no PRD requirement demands it, so no foundation opens for it. Revisit if operating scheduled runs proves opaque.
 
 ## Done
+
+- **S-07: User can view a project's run history and compare a run against the previous one, seeing what changed rather than everything that is wrong.** — Archived 2026-09-04 → `context/archive/2026-09-04-run-history-and-comparison/`. Lesson: an assertion that races its data passes on the wrong state.
 
 - **S-09: User can see findings that share an underlying cause reported as one explained problem, rather than as many unrelated symptoms on the same page.** — Archived 2026-09-04 → `context/archive/2026-09-03-correlated-findings/`. Lesson: —.
 

@@ -1,10 +1,10 @@
 ---
 change_id: run-history-and-comparison
 title: Run history and run-over-run comparison
-status: implemented
+status: archived
 created: 2026-09-04
 updated: 2026-09-04
-archived_at: null
+archived_at: 2026-09-04T16:49:55Z
 ---
 
 ## Notes
