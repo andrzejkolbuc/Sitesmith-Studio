@@ -352,6 +352,8 @@ Foundations below assume these are present and do NOT re-scaffold them.
 
 ## Done
 
+- **S-09: User can see findings that share an underlying cause reported as one explained problem, rather than as many unrelated symptoms on the same page.** — Archived 2026-09-04 → `context/archive/2026-09-03-correlated-findings/`. Lesson: —.
+
 - **S-04: User can see broken internal and external links, redirect chains, sitemap and robots problems, orphan pages, duplicate content, and certificate or security-header issues.** — Archived 2026-09-03 → `context/archive/2026-09-02-crawl-technical-checks/`. Lesson: a threshold that scales with the defect it hunts goes quiet exactly when it matters.
 
 - **S-05: User can see missing, duplicated or out-of-range titles and meta descriptions, canonical tag problems, and pages carrying a noindex directive in production.** — Archived 2026-09-02 → `context/archive/2026-09-01-seo-metadata-checks/`. Lesson: —.

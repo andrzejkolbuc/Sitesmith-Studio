@@ -1,10 +1,10 @@
 ---
 change_id: correlated-findings
 title: "One explained problem per underlying cause, instead of many symptoms"
-status: implemented
+status: archived
 created: 2026-09-03
 updated: 2026-09-04
-archived_at: null
+archived_at: 2026-09-04T08:16:40Z
 ---
 
 ## Notes
