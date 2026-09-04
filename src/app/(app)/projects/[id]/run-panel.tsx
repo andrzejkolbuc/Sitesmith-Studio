@@ -205,9 +205,26 @@ export function RunPanel({
 	const latest = latestRun.data;
 	const latestActive = latest ? ACTIVE_STATUSES.has(latest.status) : false;
 
+	/**
+	 * Polled off its own data rather than off the latest run.
+	 *
+	 * The list holds a row per run, and the row for a crawl in progress is wrong
+	 * the moment it is fetched — it says nought pages of a run that is still
+	 * counting. Keying the interval on whether *this list* still shows an active
+	 * run makes it self-correcting: it keeps asking until the refetch brings back
+	 * a settled row, and then stops. Keying it on `latestActive` instead would
+	 * stop one fetch too early and leave "Crawling · 0 pages" on screen for a run
+	 * that had finished.
+	 */
 	const history = api.project.runs.useQuery(
 		{ projectId },
-		{ enabled: Boolean(latest) },
+		{
+			enabled: Boolean(latest),
+			refetchInterval: (query) =>
+				query.state.data?.some((r) => ACTIVE_STATUSES.has(r.status))
+					? 1_500
+					: false,
+		},
 	);
 
 	const selectedRunId = pinnedRunId ?? latest?.id ?? null;

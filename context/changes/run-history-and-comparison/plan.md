@@ -680,7 +680,7 @@ columns.
 
 #### Manual
 
-- [ ] 1.6 The existing project page still renders against a dev database whose older runs have null columns
+- [x] 1.6 The existing project page still renders against a dev database whose older runs have null columns
 
 ### Phase 2: Finding identity across runs
 
@@ -694,7 +694,7 @@ columns.
 
 #### Manual
 
-- [ ] 2.6 The results view is visibly unchanged — same problems, same remainder, same counts
+- [x] 2.6 The results view is visibly unchanged — same problems, same remainder, same counts
 
 ### Phase 3: The comparison, server-side
 
@@ -710,41 +710,41 @@ columns.
 
 #### Manual
 
-- [ ] 3.8 No regression in run duration on a fixture crawl — the comparison does no crawling
+- [x] 3.8 No regression in run duration on a fixture crawl — the comparison does no crawling
 
 ### Phase 4: Run history and the diff in the view
 
 #### Automated
 
-- [x] 4.1 Unit tests pass: `npm run test:unit`
-- [x] 4.2 Integration tests pass: `npm run test:integration`
-- [x] 4.3 Existing e2e journeys pass unmodified: `npm run test:e2e`
-- [x] 4.4 Type checking passes: `npm run typecheck`
-- [x] 4.5 Lint and format pass: `npm run check`
-- [x] 4.6 Production build succeeds: `npm run build`
-- [x] 4.7 Every `ComparabilityReason` has a rendered sentence
+- [x] 4.1 Unit tests pass: `npm run test:unit` — 4daf622
+- [x] 4.2 Integration tests pass: `npm run test:integration` — 4daf622
+- [x] 4.3 Existing e2e journeys pass unmodified: `npm run test:e2e` — 4daf622
+- [x] 4.4 Type checking passes: `npm run typecheck` — 4daf622
+- [x] 4.5 Lint and format pass: `npm run check` — 4daf622
+- [x] 4.6 Production build succeeds: `npm run build` — 4daf622
+- [x] 4.7 Every `ComparabilityReason` has a rendered sentence — 4daf622
 
 #### Manual
 
-- [ ] 4.8 A project with one run renders exactly as before, with no history list and no markers
-- [ ] 4.9 Selecting an older run shows that run's findings and stops the panel polling
-- [ ] 4.10 Starting a check while viewing an older run still works and returns the view to the new run
-- [ ] 4.11 After a second run over an unchanged site, every finding reads as still present and none as new
-- [ ] 4.12 A run whose predecessor has null metadata shows the refusal sentence, not an empty area
+- [x] 4.8 A project with one run renders exactly as before, with no history list and no markers
+- [x] 4.9 Selecting an older run shows that run's findings and stops the panel polling
+- [x] 4.10 Starting a check while viewing an older run still works and returns the view to the new run
+- [x] 4.11 After a second run over an unchanged site, every finding reads as still present and none as new
+- [x] 4.12 A run whose predecessor has null metadata shows the refusal sentence, not an empty area
 
 ### Phase 5: Real-site proof
 
 #### Automated
 
-- [ ] 5.1 Whole suite passes: `npm run test:all`
-- [ ] 5.2 Type checking passes: `npm run typecheck`
-- [ ] 5.3 Lint and format pass: `npm run check`
-- [ ] 5.4 No temporary scripts or harnesses remain in the working tree
+- [x] 5.1 Whole suite passes: `npm run test:all`
+- [x] 5.2 Type checking passes: `npm run typecheck`
+- [x] 5.3 Lint and format pass: `npm run check`
+- [x] 5.4 No temporary scripts or harnesses remain in the working tree
 
 #### Manual
 
-- [ ] 5.5 Two runs over an unchanged real site report zero new and zero resolved findings
-- [ ] 5.6 Any finding that *is* reported as changed is traceable to a change on the site
-- [ ] 5.7 Narrowing the project scope produces the refusal, not a large resolved count
-- [ ] 5.8 Neither run degrades the client site — pacing unchanged from previous runs
-- [ ] 5.9 The annotated view is readable at real volume, not just at fixture volume
+- [x] 5.5 Two runs over an unchanged real site report zero new and zero resolved findings
+- [x] 5.6 Any finding that *is* reported as changed is traceable to a change on the site
+- [x] 5.7 Narrowing the project scope produces the refusal, not a large resolved count
+- [x] 5.8 Neither run degrades the client site — pacing unchanged from previous runs
+- [x] 5.9 The annotated view is readable at real volume, not just at fixture volume
