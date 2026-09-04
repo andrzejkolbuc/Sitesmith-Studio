@@ -165,8 +165,12 @@ export default async function NewProjectPage({
 							type="text"
 						/>
 						<span className="max-w-prose text-ink-soft text-xs leading-relaxed">
-							Comma-separated. Empty means the whole site. Excluded paths still
-							win, so listing a path in both leaves it excluded.
+							Comma-separated. Empty means the whole site. Each entry covers
+							that page and anything below it, so <code>/company</code> also
+							checks <code>/company/about</code> but not{" "}
+							<code>/company-profile</code>, and <code>/</code> means the
+							homepage on its own. Excluded paths still win, so listing a path
+							in both leaves it excluded.
 						</span>
 					</label>
 

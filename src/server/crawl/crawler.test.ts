@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { type Fixture, startFixtureSite } from "../../../test/fixtures/site";
 import { crawl, normaliseUrl } from "./crawler";
+import { inScopePath } from "./scope";
 
 let site: Fixture;
 
@@ -81,6 +82,50 @@ describe("crawl scope", () => {
 		expect(paths).toContain("/de");
 		expect(paths).not.toContain("/pricing");
 		expect(paths).not.toContain("/blog/monolingual");
+	});
+
+	it("follows an included path into its subtree", async () => {
+		/**
+		 * The case the segment-aware rule must not break. Naming a section means
+		 * the section, so a crawl scoped to `/de` still reaches the German pages
+		 * below it — otherwise "only these paths" would be unusable for the thing
+		 * people most want it for.
+		 */
+		const result = await crawl({ ...base(), includePaths: ["/de"] });
+		const paths = result.pages.map((p) => new URL(p.url).pathname);
+
+		expect(paths).toContain("/de/preise");
+		expect(paths.length).toBeGreaterThan(1);
+	});
+
+	it("crawls only the homepage when the root is the include list", async () => {
+		/**
+		 * The bug this rule was written for, end to end. A project configured with
+		 * `/` — meaning the homepage — crawled ninety-two pages of a live client
+		 * site in six languages, because every pathname starts with a slash and the
+		 * match was a bare `startsWith`.
+		 *
+		 * Asserted through the real crawl loop rather than against the predicate
+		 * alone: the predicate was never the thing anyone doubted, and the property
+		 * that matters is how many requests a stranger's server receives.
+		 */
+		const result = await crawl({ ...base(), includePaths: ["/"] });
+		const paths = result.pages.map((p) => new URL(p.url).pathname);
+
+		expect(paths).toEqual(["/"]);
+
+		/**
+		 * robots.txt and the sitemaps are exempt and stay exempt: they are what the
+		 * site says about itself, not pages of it, and the rules that read them
+		 * would go silent if scope could hide them. Everything else the crawler
+		 * asked for is a page request, and there should be exactly one.
+		 */
+		const siteControl = /^\/(robots\.txt|sitemap[\w.-]*\.xml(\.gz)?)$/;
+		const pageRequests = site.requests.filter((r) => !siteControl.test(r));
+
+		expect(
+			pageRequests.filter((r) => r !== "/" && !r.startsWith("/?")),
+		).toEqual([]);
 	});
 
 	it("crawls a page once even when linked under several spellings", async () => {
@@ -583,5 +628,124 @@ describe("redirects, walked rather than followed", () => {
 					path(alias.served) === "/final/page",
 			),
 		).toBe(true);
+	});
+});
+
+/**
+ * What "only these paths" actually admits.
+ *
+ * The rule shipped as a bare `startsWith`, which reads as obviously right and is
+ * wrong in two directions at once. A real project was configured with
+ * `/, /company` — meaning the homepage and the company page — and crawled
+ * ninety-two pages of a live client site in six languages before anyone stopped
+ * it, because every pathname starts with `/`.
+ *
+ * So an include entry now matches a path only when it *is* that path or
+ * continues it after a slash. `/` stops meaning the whole site, and `/company`
+ * stops meaning `/company-profile`.
+ *
+ * Exclusion deliberately keeps the broad `startsWith`, and the asymmetry is the
+ * point: over-matching an exclusion means not requesting a page, which fails
+ * safe against someone else's server, while over-matching an inclusion means
+ * requesting all of it.
+ */
+describe("inScopePath", () => {
+	describe("with no include list", () => {
+		it("admits anything the exclusions do not name", () => {
+			expect(inScopePath("/anything", [], [])).toBe(true);
+			expect(inScopePath("/", [], [])).toBe(true);
+		});
+	});
+
+	describe("include entries match a path or its descendants", () => {
+		it("admits the entry itself", () => {
+			expect(inScopePath("/company", ["/company"], [])).toBe(true);
+		});
+
+		it("admits what continues the entry after a slash", () => {
+			expect(inScopePath("/company/about", ["/company"], [])).toBe(true);
+			expect(inScopePath("/company/team/leadership", ["/company"], [])).toBe(
+				true,
+			);
+		});
+
+		it("refuses a path that merely starts with the same characters", () => {
+			/**
+			 * The boundary a bare `startsWith` has none of. `/company-profile` is not
+			 * inside `/company`; it is a different page whose name begins the same
+			 * way, and a crawl that fetched it would be requesting pages of someone
+			 * else's site that nobody asked for.
+			 */
+			expect(inScopePath("/company-profile", ["/company"], [])).toBe(false);
+			expect(inScopePath("/companywide", ["/company"], [])).toBe(false);
+			expect(inScopePath("/companies", ["/company"], [])).toBe(false);
+		});
+
+		it("refuses a path outside every entry", () => {
+			expect(inScopePath("/pricing", ["/company"], [])).toBe(false);
+		});
+	});
+
+	describe("the root as an include entry", () => {
+		it("means the homepage, not the whole site", () => {
+			/**
+			 * The bug this was found by. Under a bare `startsWith` every path on the
+			 * origin begins with `/`, so listing the homepage silently listed
+			 * everything — and the second entry the user wrote could not narrow it,
+			 * because the first had already admitted the site.
+			 */
+			expect(inScopePath("/", ["/"], [])).toBe(true);
+			expect(inScopePath("/pricing", ["/"], [])).toBe(false);
+			expect(inScopePath("/de/preise", ["/"], [])).toBe(false);
+		});
+
+		it("narrows to the homepage and one section when listed with it", () => {
+			const only = ["/", "/company"];
+
+			expect(inScopePath("/", only, [])).toBe(true);
+			expect(inScopePath("/company", only, [])).toBe(true);
+			expect(inScopePath("/company/about", only, [])).toBe(true);
+			expect(inScopePath("/pricing", only, [])).toBe(false);
+			expect(inScopePath("/it/risorse/eventi", only, [])).toBe(false);
+		});
+	});
+
+	describe("trailing slashes are punctuation, not scope", () => {
+		it("reads an entry the same with or without one", () => {
+			expect(inScopePath("/company/about", ["/company/"], [])).toBe(true);
+			expect(inScopePath("/company-profile", ["/company/"], [])).toBe(false);
+		});
+
+		it("reads a path the same with or without one", () => {
+			expect(inScopePath("/company/", ["/company"], [])).toBe(true);
+		});
+	});
+
+	describe("exclusion", () => {
+		it("still matches broadly, and the asymmetry is deliberate", () => {
+			/**
+			 * `/administration` is excluded by `/admin`. That is over-matching, and it
+			 * is the safe direction: the cost is a page of someone else's site we do
+			 * not fetch. Narrowing this to match inclusion would make a crawl start
+			 * requesting paths an operator had already said to stay out of.
+			 */
+			expect(inScopePath("/administration", [], ["/admin"])).toBe(false);
+			expect(inScopePath("/admin/users", [], ["/admin"])).toBe(false);
+		});
+
+		it("wins over an include entry that also matches", () => {
+			expect(
+				inScopePath("/company/secret", ["/company"], ["/company/secret"]),
+			).toBe(false);
+		});
+
+		it("excludes everything when the root is excluded", () => {
+			/**
+			 * Consistent with the above rather than special-cased: an operator who
+			 * writes `/` in the exclusions has said to fetch nothing, and a crawl that
+			 * quietly ignored that would be the unsafe direction.
+			 */
+			expect(inScopePath("/anything", [], ["/"])).toBe(false);
+		});
 	});
 });

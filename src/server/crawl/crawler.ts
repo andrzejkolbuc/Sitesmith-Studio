@@ -20,6 +20,7 @@ import {
 	type PageMetadata,
 } from "./metadata";
 import { parseRobots, type RobotsFile } from "./robots";
+import { inScopePath } from "./scope";
 import {
 	decodeSitemapBody,
 	MAX_SITEMAP_DOCUMENTS,
@@ -293,10 +294,7 @@ function inScope(
 
 	if (parsed.origin !== origin) return false;
 
-	const path = parsed.pathname;
-	if (excludePaths.some((prefix) => path.startsWith(prefix))) return false;
-	if (includePaths.length === 0) return true;
-	return includePaths.some((prefix) => path.startsWith(prefix));
+	return inScopePath(parsed.pathname, includePaths, excludePaths);
 }
 
 /** Extracts hreflang declarations, resolved against the page's own URL. */

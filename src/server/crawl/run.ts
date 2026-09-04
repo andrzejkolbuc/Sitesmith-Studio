@@ -4,6 +4,7 @@ import type { db as database } from "~/server/db";
 import { findings, pages, projects, runs } from "~/server/db/schema";
 import { crawl } from "./crawler";
 import { detectMissingVariants } from "./findings";
+import { inScopePath } from "./scope";
 import { groupVariants } from "./variants";
 
 /**
@@ -134,6 +135,13 @@ async function execute(
 		.set({ status: RUN_STATUS.RUNNING, startedAt: new Date() })
 		.where(eq(runs.id, runId));
 
+	/**
+	 * The same scope the crawler applied, so the rules cannot disagree with it.
+	 *
+	 * This was a second copy of the predicate, and a copy is how the two drift:
+	 * a rule that thinks a URL was in scope while the crawler never requested it
+	 * reports a page as unreachable when the truth is that we never looked.
+	 */
 	const inScope = (url: string): boolean => {
 		let path: string;
 		try {
@@ -141,9 +149,7 @@ async function execute(
 		} catch {
 			return false;
 		}
-		if (project.excludePaths.some((p) => path.startsWith(p))) return false;
-		if (project.includePaths.length === 0) return true;
-		return project.includePaths.some((p) => path.startsWith(p));
+		return inScopePath(path, project.includePaths, project.excludePaths);
 	};
 
 	/**
