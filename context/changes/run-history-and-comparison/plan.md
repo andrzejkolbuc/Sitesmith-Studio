@@ -736,10 +736,10 @@ columns.
 
 #### Automated
 
-- [x] 5.1 Whole suite passes: `npm run test:all`
-- [x] 5.2 Type checking passes: `npm run typecheck`
-- [x] 5.3 Lint and format pass: `npm run check`
-- [x] 5.4 No temporary scripts or harnesses remain in the working tree
+- [x] 5.1 Whole suite passes: `npm run test:all` — bdcdeca
+- [x] 5.2 Type checking passes: `npm run typecheck` — bdcdeca
+- [x] 5.3 Lint and format pass: `npm run check` — bdcdeca
+- [x] 5.4 No temporary scripts or harnesses remain in the working tree — bdcdeca
 
 #### Manual
 
