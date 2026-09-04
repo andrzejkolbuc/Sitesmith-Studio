@@ -402,6 +402,30 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 
 	const frontier: string[] = [start];
 	const seen = new Set<string>([start]);
+
+	/**
+	 * Named paths are requested, not merely permitted.
+	 *
+	 * Scope is otherwise a filter on what a crawl *follows*, which means a set of
+	 * paths that do not link to one another yields the start URL and nothing else.
+	 * That is not hypothetical: a project scoped to `/, /company` fetched a single
+	 * page of a client's site, because the site renders its navigation in the
+	 * browser and the server-side markup linked neither of them.
+	 *
+	 * Asking for a path is asking for it to be checked. A seeded URL that turns
+	 * out not to exist is recorded as a page that failed, and cannot become a
+	 * broken-link finding — nothing linked to it, so it never enters the link
+	 * graph those findings are built from.
+	 */
+	for (const entry of includePaths) {
+		const seeded = normaliseUrl(entry, origin);
+		if (!seeded) continue;
+		if (!inScope(seeded, origin, includePaths, excludePaths)) continue;
+		if (seen.has(seeded)) continue;
+
+		seen.add(seeded);
+		frontier.push(seeded);
+	}
 	/**
 	 * URLs the crawl has actually recorded a page for, which is not the same set
 	 * as the URLs it has requested: a redirect means the two differ.

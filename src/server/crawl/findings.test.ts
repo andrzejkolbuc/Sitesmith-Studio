@@ -144,6 +144,7 @@ describe("detectMissingVariants against the fixture site", () => {
 				requested: result.requested,
 				external: result.external,
 				aliases: result.aliases,
+				scopeNarrowed: false,
 			}),
 		};
 	}
@@ -730,6 +731,7 @@ describe("detectMissingVariants edge cases", () => {
 			external: { checked: [], complete: false },
 			aliases: [],
 			inScope: allInScope,
+			scopeNarrowed: false,
 		});
 
 		expect(findings).toHaveLength(0);
@@ -786,6 +788,7 @@ describe("detectMissingVariants edge cases", () => {
 			external: { checked: [], complete: false },
 			aliases: [],
 			inScope: allInScope,
+			scopeNarrowed: false,
 		});
 
 		// The breakage is reported...
@@ -845,6 +848,7 @@ describe("detectMissingVariants edge cases", () => {
 			external: { checked: [], complete: false },
 			aliases: [],
 			inScope: allInScope,
+			scopeNarrowed: false,
 		});
 
 		const missing = findings.filter(
@@ -881,6 +885,7 @@ describe("detectMissingVariants edge cases", () => {
 			external: { checked: [], complete: false },
 			aliases: [],
 			inScope: allInScope,
+			scopeNarrowed: false,
 		});
 
 		expect(

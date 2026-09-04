@@ -128,6 +128,63 @@ describe("crawl scope", () => {
 		).toEqual([]);
 	});
 
+	it("requests an included path nothing in scope links to", async () => {
+		/**
+		 * Scope filters what a crawl follows, so a set of paths that do not link to
+		 * each other used to yield the start URL alone. That is not a hypothetical:
+		 * a project scoped to `/, /company` against a client's site fetched one page,
+		 * because the site renders its navigation in the browser and the server-side
+		 * markup links neither.
+		 *
+		 * Naming a path is asking for it to be checked, so each entry is requested
+		 * directly as well as being a filter on what gets followed.
+		 */
+		const result = await crawl({
+			...base(),
+			includePaths: ["/", "/archive/unlinked"],
+		});
+		const paths = result.pages.map((p) => new URL(p.url).pathname).sort();
+
+		// `/archive/unlinked` is in the fixture's sitemap and linked from nowhere.
+		expect(paths).toEqual(["/", "/archive/unlinked"]);
+	});
+
+	it("does not invent a broken link out of a seeded path that is missing", async () => {
+		/**
+		 * The cost of seeding, and the guard on it. An entry naming something that
+		 * is not a page gets requested and answers 404 — but nothing linked to it,
+		 * so it is a page that failed rather than a link that is broken. Reporting
+		 * it as a dead link would be reporting our own configuration as the
+		 * client's defect.
+		 */
+		const result = await crawl({
+			...base(),
+			includePaths: ["/", "/nothing-here"],
+		});
+		const missing = result.pages.find(
+			(p) => new URL(p.url).pathname === "/nothing-here",
+		);
+
+		expect(missing?.httpStatus).toBe(404);
+		expect(
+			result.pages.some((p) =>
+				p.links.includes(`${site.baseUrl}/nothing-here`),
+			),
+		).toBe(false);
+	});
+
+	it("seeds nothing extra when no paths are named", async () => {
+		/**
+		 * An empty include list means the whole site, and the whole site is reached
+		 * by following links from the start URL. Seeding must not change what an
+		 * unscoped crawl does.
+		 */
+		const result = await crawl(base());
+
+		expect(result.pages.length).toBeGreaterThan(3);
+		expect(result.abortedReason).toBeNull();
+	});
+
 	it("crawls a page once even when linked under several spellings", async () => {
 		await crawl(base());
 

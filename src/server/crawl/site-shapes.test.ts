@@ -120,6 +120,8 @@ function findingsFor(options: {
 	requested?: string[];
 	/** Defaults to an incomplete, empty sweep: most cases are not about it. */
 	external?: ExternalSweep;
+	/** Defaults to a whole-site crawl: most cases describe an unscoped project. */
+	scopeNarrowed?: boolean;
 }): Summary[] {
 	return detectMissingVariants({
 		pages: options.pages,
@@ -135,6 +137,7 @@ function findingsFor(options: {
 		external: options.external ?? { checked: [], complete: false },
 		/** Not exposed here: the alias cases are all detail cases. */
 		aliases: [],
+		scopeNarrowed: options.scopeNarrowed ?? false,
 	})
 		.map((finding) => ({ type: finding.type, url: finding.url }))
 		.sort(
@@ -174,6 +177,8 @@ function detailedFindingsFor(options: {
 	requested?: string[];
 	/** Defaults to an incomplete, empty sweep: most cases are not about it. */
 	external?: ExternalSweep;
+	/** Defaults to a whole-site crawl: most cases describe an unscoped project. */
+	scopeNarrowed?: boolean;
 	/** Defaults to none: most cases describe routes that went where they were asked. */
 	aliases?: Alias[];
 }) {
@@ -190,6 +195,7 @@ function detailedFindingsFor(options: {
 		requested: options.requested ?? options.pages.map((p) => p.url),
 		external: options.external ?? { checked: [], complete: false },
 		aliases: options.aliases ?? [],
+		scopeNarrowed: options.scopeNarrowed ?? false,
 	});
 }
 
@@ -3146,6 +3152,36 @@ describe("pages the sitemap lists that nothing links to", () => {
 		expect(findings).toHaveLength(1);
 		expect(findings[0]?.url).toBeNull();
 		expect(findings[0]?.detail.urls).toEqual([`${BASE}/archive/unlinked`]);
+	});
+
+	it("says nothing when the project narrowed what the crawl could visit", () => {
+		/**
+		 * The third version of a mistake this rule has now made twice on live client
+		 * sites, and the reason it carries two guards already: a run stopping at its
+		 * ceiling once reported the ceiling as eighteen defects, and a leaf start URL
+		 * once invented forty-four.
+		 *
+		 * This one arrives through the include list. A project scoped to a handful of
+		 * paths cannot see the pages that link to anything else — they were excluded
+		 * on purpose — so "nothing links here" is a statement about the scope we were
+		 * given, not about the site. It was found on a client project scoped to
+		 * `/, /company`, which reported both company pages as orphans on the strength
+		 * of a crawl that had been told not to look anywhere they might be linked
+		 * from.
+		 *
+		 * Silence rather than a narrower claim, for the same reason `crawlComplete`
+		 * buys silence: the evidence an orphan claim needs is a page that would link
+		 * here and does not, and a scoped crawl cannot produce it.
+		 */
+		const findings = detailedFindingsFor({
+			pages: [linking("/", ["/about"]), page("/about")],
+			requested: [`${BASE}/`, `${BASE}/about`],
+			entryUrl: `${BASE}/`,
+			sitemap: sitemapOf("/", "/about", "/archive/unlinked"),
+			scopeNarrowed: true,
+		}).filter(orphaned);
+
+		expect(findings).toEqual([]);
 	});
 
 	it("says nothing when the crawl only saw a corner of the site", () => {

@@ -237,6 +237,12 @@ async function execute(
 		requested: result.requested,
 		external: result.external,
 		aliases: result.aliases,
+		/**
+		 * A project that named the paths to check told the crawl not to visit the
+		 * rest of its own site, and the orphan rule cannot reason from absence
+		 * across a boundary it was told not to cross.
+		 */
+		scopeNarrowed: project.includePaths.length > 0,
 	});
 
 	if (detected.length > 0) {

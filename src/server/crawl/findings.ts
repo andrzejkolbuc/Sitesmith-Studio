@@ -130,6 +130,19 @@ export type DetectOptions = {
 	/** Where the crawl entered, so the orphan rule can exempt it. */
 	entryUrl: string | null;
 	/**
+	 * Whether the project restricted the crawl to a subset of its own site.
+	 *
+	 * Required rather than optional, for the reason `crawlComplete` is: a caller
+	 * that forgot would get the confident-and-wrong behaviour rather than the safe
+	 * one.
+	 *
+	 * The orphan rule is the one that needs it. A scoped crawl was told not to
+	 * visit most of the site, so it cannot have seen the pages that link to
+	 * anything outside the scope — and "nothing links here" then describes the
+	 * instruction we were given rather than the site we were checking.
+	 */
+	scopeNarrowed: boolean;
+	/**
 	 * Every in-scope URL the crawl put on its frontier.
 	 *
 	 * The orphan rule reads this rather than `pages`: a URL absent from here was
@@ -203,6 +216,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		requested,
 		external,
 		aliases,
+		scopeNarrowed,
 	} = options;
 
 	const variants = groupVariants(pages);
@@ -1865,6 +1879,20 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 			// mostly orphaned, and a rule that went quiet in proportion would go
 			// quiet exactly when it mattered most. It also needs no threshold, which
 			// is what `lessons.md` asks of any inference we make ourselves.
+			//
+			// **And gated on the project not having narrowed the crawl.** The third
+			// version of the same mistake, found the same way as the first two. A
+			// project scoped to a handful of paths was told not to visit the rest of
+			// the site, so the pages that would link to anything outside that scope
+			// were never fetched — and the rule read their absence as the site
+			// linking nowhere. On a client project scoped to `/, /company` it
+			// reported both company pages as orphans, on the strength of a crawl
+			// instructed not to look anywhere they might be linked from.
+			//
+			// The ancestor test does not catch it: the site root is an ancestor of
+			// everything and is almost always in scope, so it passes while the pages
+			// that actually carry the links sit outside. Silence is the only honest
+			// answer, and it is the same trade `crawlComplete` already makes.
 			const recordedAncestor = (url: string): boolean => {
 				let parsed: URL;
 				try {
@@ -1894,7 +1922,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 				return false;
 			};
 
-			if (crawlComplete) {
+			if (crawlComplete && !scopeNarrowed) {
 				const orphans: string[] = [];
 				const everRequested = new Set(requested);
 
