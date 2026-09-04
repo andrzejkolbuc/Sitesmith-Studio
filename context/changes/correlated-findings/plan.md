@@ -489,7 +489,7 @@ the next time they are viewed, because the rule reads only rows the crawl alread
 
 #### Manual
 
-- [ ] 1.6 The results view is visibly unchanged: same headings, same finding counts, same page counts
+- [x] 1.6 The results view is visibly unchanged: same headings, same finding counts, same page counts — 350eec6
 
 ### Phase 2: The correlation rule
 
@@ -503,7 +503,7 @@ the next time they are viewed, because the rule reads only rows the crawl alread
 
 #### Manual
 
-- [ ] 2.6 Each shape test's expectation was written before the rule was run against it, and any expectation changed afterwards is recorded with the reason it was wrong
+- [x] 2.6 Each shape test's expectation was written before the rule was run against it, and any expectation changed afterwards is recorded with the reason it was wrong — af8bf57
 
 ### Phase 3: The view
 
@@ -516,11 +516,11 @@ the next time they are viewed, because the rule reads only rows the crawl alread
 
 #### Manual
 
-- [ ] 3.5 Against stored run `29fa2fc7`, correlated problems appear above the type groups
-- [ ] 3.6 Every finding appears exactly once across the two sections — no duplication, nothing lost
-- [ ] 3.7 The type-group counts below match the remainder, not the run's total finding count
-- [ ] 3.8 A run with no correlations renders no problems section and looks as it does today
-- [ ] 3.9 Long origin lists are capped rather than pushing the page
+- [x] 3.5 Against stored run `29fa2fc7`, correlated problems appear above the type groups — 39222c7
+- [x] 3.6 Every finding appears exactly once across the two sections — no duplication, nothing lost — 39222c7
+- [x] 3.7 The type-group counts below match the remainder, not the run's total finding count — 39222c7
+- [x] 3.8 A run with no correlations renders no problems section and looks as it does today — 39222c7
+- [x] 3.9 Long origin lists are capped rather than pushing the page — 39222c7
 
 ### Phase 4: Real-site proof
 
@@ -534,8 +534,8 @@ the next time they are viewed, because the rule reads only rows the crawl alread
 
 #### Manual
 
-- [ ] 4.6 Each correlated problem on run `29fa2fc7` is confirmed by hand against "would one edit fix all of these?", and any that fails is recorded and the rule narrowed rather than the verdict softened
-- [ ] 4.7 The twenty broken links and eight diverged variants appear as one problem
-- [ ] 4.8 `link_external_broken` is not folded in with the internal dead links
-- [ ] 4.9 The proof records the prediction made before implementation and explains any divergence
-- [ ] 4.10 The monolingual limit is written down in `change.md`
+- [x] 4.6 Each correlated problem on run `29fa2fc7` is confirmed by hand against "would one edit fix all of these?", and any that fails is recorded and the rule narrowed rather than the verdict softened — 4cdbe2a
+- [x] 4.7 The twenty broken links and eight diverged variants appear as one problem — 4cdbe2a
+- [x] 4.8 `link_external_broken` is not folded in with the internal dead links — 4cdbe2a
+- [x] 4.9 The proof records the prediction made before implementation and explains any divergence — 4cdbe2a
+- [x] 4.10 The monolingual limit is written down in `change.md` — 4cdbe2a
