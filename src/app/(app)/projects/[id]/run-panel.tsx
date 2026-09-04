@@ -2,9 +2,20 @@
 
 import { useMemo, useState } from "react";
 
+import type { FindingStatus } from "~/server/crawl/comparison";
 import { api } from "~/trpc/react";
+import {
+	comparisonState,
+	newCount,
+	REASON_HEADING,
+	REASON_SENTENCE,
+	splitResolved,
+	spreadSentence,
+	statusIndex,
+} from "./comparison-view";
 import { type CorrelatedProblem, correlate } from "./correlate";
 import { buildParity, type Cell } from "./parity";
+import { RunHistory } from "./run-history";
 import { countPages, summariseList } from "./summarise";
 
 /**
@@ -17,7 +28,7 @@ import { countPages, summariseList } from "./summarise";
 
 const ACTIVE_STATUSES = new Set(["queued", "running"]);
 
-const STATUS_LABEL: Record<string, string> = {
+export const STATUS_LABEL: Record<string, string> = {
 	queued: "Queued",
 	running: "Crawling",
 	done: "Complete",
@@ -30,7 +41,7 @@ const STATUS_LABEL: Record<string, string> = {
  * outcome and says so quietly; marking it green would spend the reader's
  * attention on the one thing that needs none.
  */
-const STATUS_STYLE: Record<string, string> = {
+export const STATUS_STYLE: Record<string, string> = {
 	queued: "border-rule text-ink-soft",
 	running: "border-ink text-ink",
 	done: "border-rule text-ink-soft",
@@ -167,8 +178,20 @@ export function RunPanel({
 	expectedLocales: string[];
 }) {
 	const [startError, setStartError] = useState<string | null>(null);
+	/**
+	 * Null means "follow the latest run", which is the state the panel had before
+	 * history existed and the state it returns to when a new check starts. An
+	 * explicit id means the reader chose to look backwards.
+	 */
+	const [pinnedRunId, setPinnedRunId] = useState<string | null>(null);
 	const utils = api.useUtils();
 
+	/**
+	 * Polling tracks the *latest* run regardless of what is being viewed. A crawl
+	 * in progress has to keep reporting its page count even while the reader is
+	 * looking at last week's run, and the start control's precondition is about
+	 * the latest run, not the selected one.
+	 */
 	const latestRun = api.project.latestRun.useQuery(
 		{ projectId },
 		{
@@ -179,38 +202,104 @@ export function RunPanel({
 		},
 	);
 
-	const run = latestRun.data;
-	const isActive = run ? ACTIVE_STATUSES.has(run.status) : false;
+	const latest = latestRun.data;
+	const latestActive = latest ? ACTIVE_STATUSES.has(latest.status) : false;
+
+	const history = api.project.runs.useQuery(
+		{ projectId },
+		{ enabled: Boolean(latest) },
+	);
+
+	const selectedRunId = pinnedRunId ?? latest?.id ?? null;
+	const viewingLatest = selectedRunId === latest?.id;
+
+	/**
+	 * The run being shown. Taken from the history list when one is pinned, so the
+	 * panel's stats describe the run whose findings are below them rather than
+	 * whichever run happens to be newest.
+	 */
+	const run = viewingLatest
+		? latest
+		: (history.data?.find((r) => r.id === selectedRunId) ?? latest);
+
+	const isActive = viewingLatest && latestActive;
 	const settled = Boolean(run) && !isActive;
 
 	const findings = api.project.findings.useQuery(
-		{ runId: run?.id ?? "" },
+		{ runId: selectedRunId ?? "" },
 		{ enabled: settled },
 	);
 
 	const pages = api.project.runPages.useQuery(
-		{ runId: run?.id ?? "" },
+		{ runId: selectedRunId ?? "" },
 		{ enabled: settled },
 	);
 
 	/**
-	 * The domain rule, run over rows both queries already fetched.
+	 * What changed since the run before this one.
+	 *
+	 * A separate query from `findings` rather than a replacement for it: the
+	 * findings list must render even when the comparison declines, so the view
+	 * never depends on a comparison it may not be allowed to make.
+	 */
+	const comparison = api.project.comparison.useQuery(
+		{ runId: selectedRunId ?? "" },
+		{ enabled: settled },
+	);
+
+	/**
+	 * The comparison carries the same current findings the plain query does, plus
+	 * the resolved ones. It leads, and `findings` stands in until it arrives or if
+	 * it fails — the results must render whether or not a comparison was possible.
+	 */
+	const annotated = useMemo(
+		() =>
+			comparison.data?.findings ??
+			(findings.data ?? []).map((finding) => ({
+				...finding,
+				status: null as FindingStatus | null,
+			})),
+		[comparison.data, findings.data],
+	);
+
+	const { present, resolved } = useMemo(
+		() => splitResolved(annotated),
+		[annotated],
+	);
+
+	const statuses = useMemo(() => statusIndex(annotated), [annotated]);
+
+	const state = comparisonState(comparison.data?.comparability ?? null);
+
+	/**
+	 * The domain rule, run over rows the queries already fetched.
 	 *
 	 * Read time rather than at detection: the rule is young, and freezing its
 	 * output into the run would mean every improvement to it left old runs
 	 * describing a site by a rule nobody would write today. Cheap enough that the
 	 * question does not arise — a few hundred findings against a few hundred
 	 * pages, with a hash lookup per URL.
+	 *
+	 * Over the findings this run still has, never the resolved ones. Folding a
+	 * fixed problem in with live ones would put an edit the reader no longer has
+	 * to make in the section that exists to tell them what to do.
 	 */
 	const correlated = useMemo(
-		() => correlate(findings.data ?? [], pages.data ?? []),
-		[findings.data, pages.data],
+		() => correlate(present, pages.data ?? []),
+		[present, pages.data],
 	);
 
 	const startRun = api.project.startRun.useMutation({
 		onMutate: () => setStartError(null),
 		onSuccess: async () => {
+			/**
+			 * Following the new run is the whole point of having started it. A reader
+			 * who was looking at history and pressed the button would otherwise watch
+			 * an old run while the new one crawled invisibly.
+			 */
+			setPinnedRunId(null);
 			await utils.project.latestRun.invalidate({ projectId });
+			await utils.project.runs.invalidate({ projectId });
 		},
 		onError: (error) => {
 			setStartError(
@@ -230,13 +319,19 @@ export function RunPanel({
 				 * and server-rendered markup is inert until hydration, so an enabled
 				 * button in that window silently swallows the press.
 				 */}
+				{/*
+				 * Gated on the *latest* run, not the one being viewed. Reading an older
+				 * run while a crawl is live must not re-enable the control — the server
+				 * would refuse the second run, and the reader would have been invited
+				 * to press a button that could only fail.
+				 */}
 				<button
 					className="rounded-sm bg-ink px-5 py-2.5 font-medium text-paper text-sm transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-35"
-					disabled={latestRun.isPending || isActive || startRun.isPending}
+					disabled={latestRun.isPending || latestActive || startRun.isPending}
 					onClick={() => startRun.mutate({ projectId })}
 					type="button"
 				>
-					{isActive ? "Check in progress…" : "Run a check"}
+					{latestActive ? "Check in progress…" : "Run a check"}
 				</button>
 
 				{run ? (
@@ -280,12 +375,36 @@ export function RunPanel({
 				</p>
 			) : null}
 
+			<RunHistory
+				onSelect={setPinnedRunId}
+				runs={history.data ?? []}
+				selectedRunId={selectedRunId}
+				statusLabel={STATUS_LABEL}
+				statusStyle={STATUS_STYLE}
+			/>
+
+			{/*
+			 * Why no comparison is shown. An unexplained absence is what makes people
+			 * stop trusting a tool, so the refusal names the precondition that failed
+			 * — and the run's own findings still render underneath it.
+			 */}
+			{settled && state.kind === "refused" ? (
+				<div className="mt-8 border-flag border-l-2 bg-flag-soft px-4 py-3">
+					<p className="font-medium text-flag text-sm">
+						{REASON_HEADING[state.reason]}
+					</p>
+					<p className="mt-1 max-w-prose text-flag text-sm leading-relaxed">
+						{REASON_SENTENCE[state.reason]}
+					</p>
+				</div>
+			) : null}
+
 			{settled && pages.data && pages.data.length > 0 ? (
 				<ParityGrid expectedLocales={expectedLocales} pages={pages.data} />
 			) : null}
 
 			{settled && correlated.problems.length > 0 ? (
-				<Problems problems={correlated.problems} />
+				<Problems problems={correlated.problems} statuses={statuses} />
 			) : null}
 
 			{/*
@@ -300,8 +419,18 @@ export function RunPanel({
 					isLoading={findings.isLoading}
 					items={correlated.remainder}
 					runFailed={run?.status === "failed" || run?.status === "interrupted"}
+					statuses={statuses}
 				/>
 			) : null}
+
+			{/*
+			 * What is no longer wrong, kept apart from what still is.
+			 *
+			 * Below the live findings and visually quieter, because a fixed page must
+			 * not compete for attention with a broken one — that inversion is the
+			 * thing this whole slice exists to prevent.
+			 */}
+			{settled && resolved.length > 0 ? <Resolved items={resolved} /> : null}
 
 			{/* Only once the absence of a run is a fact rather than a pending answer. */}
 			{!run && !latestRun.isPending ? (
@@ -524,7 +653,13 @@ function problemSentence(problem: CorrelatedProblem): string {
 	}
 }
 
-function Problems({ problems }: { problems: CorrelatedProblem[] }) {
+function Problems({
+	problems,
+	statuses,
+}: {
+	problems: CorrelatedProblem[];
+	statuses: Map<string, FindingStatus | null>;
+}) {
 	return (
 		<section className="mt-12">
 			<header className="flex flex-wrap items-baseline justify-between gap-3">
@@ -546,15 +681,32 @@ function Problems({ problems }: { problems: CorrelatedProblem[] }) {
 				{problems.map((problem) => {
 					const where = summariseList(problem.originPages);
 
+					/**
+					 * How much of this problem is new.
+					 *
+					 * A known problem that has spread reads differently from one that
+					 * appeared whole, and the per-finding marks alone would make the
+					 * reader count. Silent when the answer is all or none, since the
+					 * badge beside it already says so.
+					 */
+					const added = newCount(
+						problem.findings.map((f) => f.id),
+						statuses,
+					);
+					const spread = spreadSentence(added, problem.findings.length);
+					const entirelyNew = added > 0 && added === problem.findings.length;
+
 					return (
 						<article className="border-rule border-l-2 pl-5" key={problem.key}>
 							<h3 className="flex flex-wrap items-baseline gap-x-3 font-display font-semibold text-base text-ink">
 								{problemSentence(problem)}
+								{entirelyNew ? <StatusMark status="new" /> : null}
 								<span className="tnum font-mono font-normal text-ink-faint text-xs">
 									{problem.findings.length} findings
 									{" · "}
 									{problem.originPages.length}{" "}
 									{problem.originPages.length === 1 ? "page" : "pages"} to edit
+									{spread ? ` · ${spread}` : ""}
 								</span>
 							</h3>
 
@@ -609,14 +761,34 @@ type FindingRow = {
 	detail: Record<string, unknown>;
 };
 
+/**
+ * The mark on a finding that changed since the previous run.
+ *
+ * Only `new` is marked. "Still present" is the ordinary case and marking it
+ * would put a badge on almost every row, which spends the reader's attention on
+ * the one thing that needs none — the same reasoning that leaves a finished run
+ * uncoloured above.
+ */
+function StatusMark({ status }: { status: FindingStatus | null | undefined }) {
+	if (status !== "new") return null;
+
+	return (
+		<span className="rounded-full border border-mark/30 bg-mark-soft px-2 py-0.5 font-mono text-[11px] text-mark uppercase tracking-wider">
+			New
+		</span>
+	);
+}
+
 function Findings({
 	items,
 	isLoading,
 	runFailed,
+	statuses,
 }: {
 	items: FindingRow[];
 	isLoading: boolean;
 	runFailed: boolean;
+	statuses: Map<string, FindingStatus | null>;
 }) {
 	if (isLoading) {
 		return <p className="mt-8 text-ink-faint text-sm">Loading findings…</p>;
@@ -667,13 +839,68 @@ function Findings({
 
 					<ul className="divide-y divide-rule-soft">
 						{rows.map((row) => (
-							<li className="py-4 text-sm" key={row.id}>
-								<Evidence detail={row.detail} type={row.type} />
+							<li className="flex items-start gap-3 py-4 text-sm" key={row.id}>
+								<div className="min-w-0 flex-1">
+									<Evidence detail={row.detail} type={row.type} />
+								</div>
+								<StatusMark status={statuses.get(row.id)} />
 							</li>
 						))}
 					</ul>
 				</div>
 			))}
+		</div>
+	);
+}
+
+/**
+ * Findings the previous run had and this one does not.
+ *
+ * Rendered from the previous run's rows, since there is no current row to
+ * render — they are the half of "what changed" that exists only in the older
+ * run. Grouped by type like the live list, and deliberately plainer: this is
+ * the section a reader confirms and moves on from.
+ */
+function Resolved({ items }: { items: FindingRow[] }) {
+	const byType = new Map<string, FindingRow[]>();
+	for (const item of items) {
+		byType.set(item.type, [...(byType.get(item.type) ?? []), item]);
+	}
+
+	return (
+		<div className="mt-14 border-rule border-t pt-8">
+			<h2 className="font-display font-semibold text-ink text-xl">
+				No longer reported
+				<span className="ml-3 font-mono font-normal text-ink-faint text-xs">
+					{items.length} {items.length === 1 ? "finding" : "findings"}
+				</span>
+			</h2>
+			<p className="mt-2 max-w-prose text-ink-soft text-sm leading-relaxed">
+				Present in the previous run and absent from this one. Both runs covered
+				the same site under the same scope, so these are changes on the site
+				rather than differences in what was checked.
+			</p>
+
+			<div className="mt-8 flex flex-col gap-8 opacity-75">
+				{[...byType.entries()].map(([type, rows]) => (
+					<div key={type}>
+						<h3 className="flex flex-wrap items-baseline gap-x-3 border-rule-soft border-b pb-2 font-display font-semibold text-base text-ink-soft">
+							{FINDING_LABEL[type] ?? type}
+							<span className="tnum font-mono font-normal text-ink-faint text-xs">
+								{rows.length} {rows.length === 1 ? "finding" : "findings"}
+							</span>
+						</h3>
+
+						<ul className="divide-y divide-rule-soft">
+							{rows.map((row) => (
+								<li className="py-4 text-sm" key={row.id}>
+									<Evidence detail={row.detail} type={row.type} />
+								</li>
+							))}
+						</ul>
+					</div>
+				))}
+			</div>
 		</div>
 	);
 }

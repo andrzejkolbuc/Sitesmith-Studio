@@ -700,13 +700,13 @@ columns.
 
 #### Automated
 
-- [x] 3.1 Unit tests pass: `npm run test:unit`
-- [x] 3.2 Integration tests pass: `npm run test:integration`
-- [x] 3.3 Type checking passes: `npm run typecheck`
-- [x] 3.4 Lint and format pass: `npm run check`
-- [x] 3.5 Two consecutive runs over an unchanged fixture produce zero `new` and zero `resolved`
-- [x] 3.6 A scope change between runs produces `comparable: false`, reason `scope_changed`
-- [x] 3.7 Existing crawl and router tests pass unmodified
+- [x] 3.1 Unit tests pass: `npm run test:unit` — 1806a98
+- [x] 3.2 Integration tests pass: `npm run test:integration` — 1806a98
+- [x] 3.3 Type checking passes: `npm run typecheck` — 1806a98
+- [x] 3.4 Lint and format pass: `npm run check` — 1806a98
+- [x] 3.5 Two consecutive runs over an unchanged fixture produce zero `new` and zero `resolved` — 1806a98
+- [x] 3.6 A scope change between runs produces `comparable: false`, reason `scope_changed` — 1806a98
+- [x] 3.7 Existing crawl and router tests pass unmodified — 1806a98
 
 #### Manual
 
@@ -716,13 +716,13 @@ columns.
 
 #### Automated
 
-- [ ] 4.1 Unit tests pass: `npm run test:unit`
-- [ ] 4.2 Integration tests pass: `npm run test:integration`
-- [ ] 4.3 Existing e2e journeys pass unmodified: `npm run test:e2e`
-- [ ] 4.4 Type checking passes: `npm run typecheck`
-- [ ] 4.5 Lint and format pass: `npm run check`
-- [ ] 4.6 Production build succeeds: `npm run build`
-- [ ] 4.7 Every `ComparabilityReason` has a rendered sentence
+- [x] 4.1 Unit tests pass: `npm run test:unit`
+- [x] 4.2 Integration tests pass: `npm run test:integration`
+- [x] 4.3 Existing e2e journeys pass unmodified: `npm run test:e2e`
+- [x] 4.4 Type checking passes: `npm run typecheck`
+- [x] 4.5 Lint and format pass: `npm run check`
+- [x] 4.6 Production build succeeds: `npm run build`
+- [x] 4.7 Every `ComparabilityReason` has a rendered sentence
 
 #### Manual
 

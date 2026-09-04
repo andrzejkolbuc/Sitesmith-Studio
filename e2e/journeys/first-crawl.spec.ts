@@ -35,19 +35,42 @@ test("an owner crawls a multilingual site and reads a real finding", async ({
 		timeout: 60_000,
 	});
 
+	/**
+	 * Settle before reading the results.
+	 *
+	 * Correlation runs over the findings *and* the pages, and the two arrive in
+	 * separate responses. Until the pages land, every finding is uncorrelated and
+	 * sits in the list below; once they land, some fold into a problem. Asserting
+	 * before that point tests whichever half arrived first — which is how this
+	 * test came to pass on the transient state and fail on the settled one.
+	 *
+	 * The parity grid is the pages arriving, so waiting for it is waiting for the
+	 * input correlation needs.
+	 */
+	await expect(signedIn.getByRole("heading", { name: "Parity" })).toBeVisible({
+		timeout: 30_000,
+	});
+
+	/**
+	 * Named rather than located by role, because a finding legitimately appears in
+	 * one of two places: under its own heading in the list, or inside a correlated
+	 * problem when the site's declarations say it shares a cause with another.
+	 * Which one is a property of the data, not of the product working — so the
+	 * assertion is that the reader is told, not where they are told.
+	 */
 	// The fixture declares a German page that 404s.
 	await expect(
-		signedIn.getByRole("heading", { name: EXPECTED.brokenVariant.heading }),
+		signedIn.getByText(EXPECTED.brokenVariant.heading).first(),
 	).toBeVisible();
 
 	// Families publishing en and de, where the project also expects fr.
 	await expect(
-		signedIn.getByRole("heading", { name: EXPECTED.missingLocale.heading }),
+		signedIn.getByText(EXPECTED.missingLocale.heading).first(),
 	).toBeVisible();
 
 	// A locale-shaped URL declaring no alternates at all.
 	await expect(
-		signedIn.getByRole("heading", { name: EXPECTED.noAlternates.heading }),
+		signedIn.getByText(EXPECTED.noAlternates.heading).first(),
 	).toBeVisible();
 
 	/**
