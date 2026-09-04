@@ -136,6 +136,57 @@ describe("run lifecycle", () => {
 		expect(stored.some((f) => f.pageId !== null)).toBe(true);
 	});
 
+	/**
+	 * What a later run needs in order to be allowed to compare itself to this one.
+	 *
+	 * Asserted on the row rather than on the crawl result, because the point of
+	 * this phase is that the answer survives the run — it was computed and thrown
+	 * away before, and a comparison that cannot tell a truncated crawl from a
+	 * complete one reports our own missing data as pages the client fixed.
+	 */
+	it("records what makes the run comparable", async () => {
+		const { tenant, project } = await seedProject("mu");
+
+		const { runId } = await runToCompletion(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+		});
+
+		const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
+
+		expect(run?.crawlComplete).toBe(true);
+		expect(run?.reachedPageLimit).toBe(false);
+		expect(run?.scope).toEqual({
+			includePaths: [],
+			excludePaths: ["/private", "/flaky"],
+			locales: ["en", "de", "fr"],
+		});
+	});
+
+	/**
+	 * The case the snapshot exists for. A project narrowed after its first run is
+	 * the situation that produced this column: the same site, crawled under two
+	 * different instructions, where every page outside the new scope would
+	 * otherwise read as a problem that had been fixed.
+	 */
+	it("snapshots a narrowed scope rather than the empty default", async () => {
+		const { tenant, project } = await seedProject("nu");
+
+		await db
+			.update(projects)
+			.set({ includePaths: ["/handbook"] })
+			.where(eq(projects.id, project.id));
+
+		const { runId } = await runToCompletion(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+		});
+
+		const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
+
+		expect(run?.scope?.includePaths).toEqual(["/handbook"]);
+	});
+
 	it("records the abort reason when a crawl stops early", async () => {
 		const { tenant, project } = await seedProject("delta");
 
@@ -154,6 +205,30 @@ describe("run lifecycle", () => {
 
 		expect(run?.status).toBe(RUN_STATUS.FAILED);
 		expect(run?.error).toMatch(/consecutive failures/i);
+	});
+
+	/**
+	 * The negative half of the column, proven on a real abort rather than on a
+	 * constructed row. A boolean tested only in its true state is a boolean whose
+	 * false branch nothing has ever exercised — and false is the branch that stops
+	 * a comparison from running.
+	 */
+	it("marks an aborted run as not comparable", async () => {
+		const { tenant, project } = await seedProject("xi");
+
+		await db
+			.update(projects)
+			.set({ startUrl: `${site.baseUrl}/flaky-hub`, excludePaths: [] })
+			.where(eq(projects.id, project.id));
+
+		const { runId } = await runToCompletion(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+		});
+
+		const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
+
+		expect(run?.crawlComplete).toBe(false);
 	});
 });
 

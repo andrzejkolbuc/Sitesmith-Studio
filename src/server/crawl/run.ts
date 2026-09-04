@@ -220,13 +220,22 @@ async function execute(
 			.where(and(eq(pages.runId, runId), eq(pages.url, variant.url)));
 	}
 
+	/**
+	 * A run that stopped early cannot tell a missing page from an unvisited one,
+	 * so the rules that reason from absence stay quiet.
+	 *
+	 * Named rather than inlined because it is now read twice: once by the rules
+	 * below, and once by the run row, where it is what lets a later comparison
+	 * decide whether this run may be compared at all. A comparison reasons from
+	 * absence in exactly the same way — "this finding is gone" — so it needs the
+	 * same answer, and a run that did not record one cannot be compared.
+	 */
+	const crawlComplete =
+		result.abortedReason === null && !result.reachedPageLimit;
+
 	const detected = detectMissingVariants({
 		pages: result.pages,
-		/**
-		 * A run that stopped early cannot tell a missing page from an unvisited one,
-		 * so the rules that reason from absence stay quiet.
-		 */
-		crawlComplete: result.abortedReason === null && !result.reachedPageLimit,
+		crawlComplete,
 		expectedLocales: project.locales,
 		inScope,
 		reverified: result.reverified,
@@ -274,6 +283,18 @@ async function execute(
 			pagesCrawled: result.pages.length,
 			findingsCount: detected.length,
 			error: result.abortedReason,
+			crawlComplete,
+			reachedPageLimit: result.reachedPageLimit,
+			/**
+			 * From the project row this run was handed when it started, not a fresh
+			 * read. An edit made while the crawl was in flight did not change what
+			 * the crawl did, and the snapshot has to describe the crawl.
+			 */
+			scope: {
+				includePaths: project.includePaths,
+				excludePaths: project.excludePaths,
+				locales: project.locales,
+			},
 		})
 		.where(eq(runs.id, runId));
 }

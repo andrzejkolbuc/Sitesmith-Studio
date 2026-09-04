@@ -232,6 +232,40 @@ export const runs = createTable(
 		findingsCount: d.integer().notNull().default(0),
 		/** Why the run aborted — the failure burst, a fetch error, or a crash. */
 		error: d.text(),
+		/**
+		 * Whether the crawl saw the whole site it was given: no abort, no ceiling.
+		 *
+		 * Nullable, and null means *not recorded* rather than false. A run from
+		 * before comparison existed, or one whose process died before it could
+		 * write this, genuinely has no answer — and the honest handling of "we did
+		 * not observe it" is silence, not a default. Do not "fix" this to
+		 * `notNull().default(false)`: that would assert every historical run was
+		 * truncated, and a comparison reading the assertion would report our own
+		 * missing data as pages the client had fixed.
+		 */
+		crawlComplete: d.boolean(),
+		/**
+		 * Whether the page ceiling stopped the crawl.
+		 *
+		 * Recorded separately from `crawlComplete` because an abort is already
+		 * recoverable from `status` and `error`, while a run that hit the ceiling
+		 * looks like an ordinary success from every other column.
+		 */
+		reachedPageLimit: d.boolean(),
+		/**
+		 * The project configuration this crawl actually ran under.
+		 *
+		 * Snapshotted because `projects` is mutable and a run outlives the config
+		 * that produced it. Narrowing `includePaths` between two runs changes what
+		 * the crawl was even asked to look at, so without this the next run would
+		 * report the pages it was told not to visit as problems that had been
+		 * fixed.
+		 */
+		scope: d.jsonb().$type<{
+			includePaths: string[];
+			excludePaths: string[];
+			locales: string[];
+		}>(),
 		createdAt: d
 			.timestamp({ withTimezone: true })
 			.$defaultFn(() => /* @__PURE__ */ new Date())
