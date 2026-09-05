@@ -3,7 +3,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import type { db as database } from "~/server/db";
 import { findings, pages, projects, runs } from "~/server/db/schema";
 import { crawl } from "./crawler";
-import { detectMissingVariants } from "./findings";
+import { detectMissingVariants, FINDING_TYPES } from "./findings";
 import { inScopePath } from "./scope";
 import { groupVariants } from "./variants";
 
@@ -295,6 +295,16 @@ async function execute(
 				excludePaths: project.excludePaths,
 				locales: project.locales,
 			},
+			/**
+			 * Derived from the rules this build actually has, so adding a rule
+			 * updates the recorded set with no further action. Sorted so two runs
+			 * of the same code produce an identical array whatever order the rules
+			 * happen to be declared in.
+			 *
+			 * A run that threw never reaches here and leaves the column null, which
+			 * is the correct answer: we do not know what it would have checked.
+			 */
+			ruleSet: [...Object.values(FINDING_TYPES)].sort(),
 		})
 		.where(eq(runs.id, runId));
 }

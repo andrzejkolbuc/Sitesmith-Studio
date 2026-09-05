@@ -14,6 +14,7 @@ import {
 } from "~/server/db/schema";
 import { type Fixture, startFixtureSite } from "../../../test/fixtures/site";
 import { resetDatabase } from "../../../test/reset";
+import { FINDING_TYPES } from "./findings";
 import { RUN_STATUS, runToCompletion, startRun, sweepStaleRuns } from "./run";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
@@ -161,6 +162,26 @@ describe("run lifecycle", () => {
 			excludePaths: ["/private", "/flaky"],
 			locales: ["en", "de", "fr"],
 		});
+	});
+
+	/**
+	 * The recorded rule set has to be the set the code actually has, not a list
+	 * that drifted from it. Asserted against `FINDING_TYPES` itself rather than
+	 * against a literal, so a rule added without the column following fails here
+	 * — the failure this column exists to prevent is a silent one, where a type
+	 * nobody was checking yet reads on the trend as a site with no problem.
+	 */
+	it("records the rule set that produced the run", async () => {
+		const { tenant, project } = await seedProject("xi");
+
+		const { runId } = await runToCompletion(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+		});
+
+		const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
+
+		expect(run?.ruleSet).toEqual([...Object.values(FINDING_TYPES)].sort());
 	});
 
 	/**

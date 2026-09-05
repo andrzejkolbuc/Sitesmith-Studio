@@ -266,6 +266,21 @@ export const runs = createTable(
 			excludePaths: string[];
 			locales: string[];
 		}>(),
+		/**
+		 * The detection rules that could have fired on this run.
+		 *
+		 * Derived from `FINDING_TYPES` at the moment the run closed, never
+		 * maintained by hand: a list somebody has to remember to update has exactly
+		 * one failure mode, and its consequence is a trend claiming two
+		 * incomparable runs are comparable.
+		 *
+		 * Nullable for the same reason `crawlComplete` is: null means *not
+		 * recorded*, which is what every run from before this column genuinely is.
+		 * Without it a finding type with no rows is ambiguous between "the rule
+		 * found nothing" and "the rule did not exist yet", and only the first is a
+		 * statement about the site.
+		 */
+		ruleSet: d.jsonb().$type<string[]>(),
 		createdAt: d
 			.timestamp({ withTimezone: true })
 			.$defaultFn(() => /* @__PURE__ */ new Date())

@@ -533,15 +533,15 @@ findings. No stored data changes, and the refusal is the correct answer.
 
 #### Automated
 
-- [ ] 1.1 Schema applies cleanly: `npm run db:push`
-- [ ] 1.2 Integration tests pass: `npm run test:integration`
-- [ ] 1.3 Type checking passes: `npm run typecheck`
-- [ ] 1.4 Lint and format pass: `npm run check`
-- [ ] 1.5 A completed run's `ruleSet` matches `FINDING_TYPES` exactly
+- [x] 1.1 Schema applies cleanly: `npm run db:push`
+- [x] 1.2 Integration tests pass: `npm run test:integration`
+- [x] 1.3 Type checking passes: `npm run typecheck`
+- [x] 1.4 Lint and format pass: `npm run check`
+- [x] 1.5 A completed run's `ruleSet` matches `FINDING_TYPES` exactly
 
 #### Manual
 
-- [ ] 1.6 The project page still renders against a dev database whose older runs have a null `ruleSet`
+- [x] 1.6 The project page still renders against a dev database whose older runs have a null `ruleSet`
 
 ### Phase 2: Rule-set comparability
 
