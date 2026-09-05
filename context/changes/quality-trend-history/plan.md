@@ -547,27 +547,27 @@ findings. No stored data changes, and the refusal is the correct answer.
 
 #### Automated
 
-- [x] 2.1 Unit tests pass: `npm run test:unit`
-- [x] 2.2 Integration tests pass: `npm run test:integration`
-- [x] 2.3 Type checking passes: `npm run typecheck`
-- [x] 2.4 Lint and format pass: `npm run check`
-- [x] 2.5 Every `ComparabilityReason` has a heading and a sentence
-- [x] 2.6 Two runs differing only in rule set report `rules_changed`
+- [x] 2.1 Unit tests pass: `npm run test:unit` — 3a892e6
+- [x] 2.2 Integration tests pass: `npm run test:integration` — 3a892e6
+- [x] 2.3 Type checking passes: `npm run typecheck` — 3a892e6
+- [x] 2.4 Lint and format pass: `npm run check` — 3a892e6
+- [x] 2.5 Every `ComparabilityReason` has a heading and a sentence — 3a892e6
+- [x] 2.6 Two runs differing only in rule set report `rules_changed` — 3a892e6
 
 #### Manual
 
-- [x] 2.7 An existing project still shows its previous refusal reason, not the new one
+- [x] 2.7 An existing project still shows its previous refusal reason, not the new one — 3a892e6
 
 ### Phase 3: The trend model
 
 #### Automated
 
-- [ ] 3.1 Unit tests pass: `npm run test:unit`
-- [ ] 3.2 Integration tests pass: `npm run test:integration`
-- [ ] 3.3 Type checking passes: `npm run typecheck`
-- [ ] 3.4 Lint and format pass: `npm run check`
-- [ ] 3.5 A type outside a run's `ruleSet` renders as not-checked, never as zero
-- [ ] 3.6 A scope change between runs removes the later run from the series
+- [x] 3.1 Unit tests pass: `npm run test:unit`
+- [x] 3.2 Integration tests pass: `npm run test:integration`
+- [x] 3.3 Type checking passes: `npm run typecheck`
+- [x] 3.4 Lint and format pass: `npm run check`
+- [x] 3.5 A type outside a run's `ruleSet` renders as not-checked, never as zero
+- [x] 3.6 A scope change between runs removes the later run from the series
 
 ### Phase 4: The trend grid
 

@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, count, desc, eq, inArray, lt } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -23,6 +23,16 @@ import { findings, pages, projects, runs } from "~/server/db/schema";
  * id the caller supplied. An id is not a permission — a caller can guess or
  * replay one, so ownership is re-established on every read.
  */
+/**
+ * How many runs the trend aggregate will look back over.
+ *
+ * Bounds the query as a project accumulates years of history. Kept in step with
+ * `MAX_COLUMNS` in the grid; if the two drift, the grid still draws the most
+ * recent runs, so the consequence is how much history is shown and never which
+ * runs are trusted.
+ */
+const TREND_RUN_LIMIT = 12;
+
 export const projectRouter = createTRPCRouter({
 	list: tenantProcedure.query(async ({ ctx }) => {
 		return ctx.db.query.projects.findMany({
@@ -238,6 +248,89 @@ export const projectRouter = createTRPCRouter({
 				comparability: verdict,
 				findings: compareFindings(before, current),
 			};
+		}),
+
+	/**
+	 * Per-type finding counts across the runs of a project that may be trended.
+	 *
+	 * Eligibility is `comparability` itself rather than a second check written to
+	 * resemble it. "May these two runs be drawn on one axis" is the comparison's
+	 * question, and a trend that answered it differently would eventually
+	 * contradict the diff sitting above it on the same page.
+	 *
+	 * The most recent run is the reference: it is the one the reader is looking
+	 * at, and it is the one whose conditions the older runs have to match to be
+	 * plotted beside it.
+	 *
+	 * Counted here rather than in the browser, for the reason the comparison is:
+	 * a project with fifty runs of five hundred findings would otherwise send a
+	 * quarter of a million rows to draw two dozen numbers.
+	 */
+	trend: tenantProcedure
+		.input(z.object({ projectId: z.string() }))
+		.query(async ({ ctx, input }) => {
+			const history = await ctx.db.query.runs.findMany({
+				where: and(
+					tenantScope(runs, ctx.tenantId),
+					eq(runs.projectId, input.projectId),
+				),
+				orderBy: [desc(runs.createdAt)],
+				limit: TREND_RUN_LIMIT,
+			});
+
+			/**
+			 * The reference is the most recent run that is sound on its own terms —
+			 * one that recorded what it covered and covered the whole of it. That is
+			 * exactly `comparability(run, run)`, so the definition is still the
+			 * guard's and not a second one written to resemble it.
+			 *
+			 * Not simply the newest run, because a run is not comparable to itself
+			 * when it was truncated: taking one of those as the axis would reject
+			 * every other run with it and erase a project's whole history over a
+			 * single interrupted crawl. The interrupted run drops out of the series;
+			 * the runs either side of it still belong on one axis.
+			 */
+			const reference = history.find(
+				(run) => comparability(run, run).comparable,
+			);
+			/**
+			 * No sound run yet is an ordinary state, not a fault — a project created
+			 * five minutes ago, or one whose only runs predate this recording. It
+			 * returns an empty series and lets the view say so.
+			 */
+			if (!reference) return { runs: [], counts: [] };
+
+			const qualifying = history.filter(
+				(run) => comparability(run, reference).comparable,
+			);
+
+			/**
+			 * Oldest first, which is the reading order of the grid. A project with
+			 * fewer than two qualifying runs still returns what it has: the emptiness
+			 * is a fact the view has to explain, not one to hide by returning nothing.
+			 */
+			const ordered = [...qualifying].reverse();
+			if (ordered.length === 0) return { runs: ordered, counts: [] };
+
+			const counts = await ctx.db
+				.select({
+					runId: findings.runId,
+					type: findings.type,
+					count: count(),
+				})
+				.from(findings)
+				.where(
+					and(
+						tenantScope(findings, ctx.tenantId),
+						inArray(
+							findings.runId,
+							ordered.map((run) => run.id),
+						),
+					),
+				)
+				.groupBy(findings.runId, findings.type);
+
+			return { runs: ordered, counts };
 		}),
 
 	runPages: tenantProcedure
