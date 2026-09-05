@@ -22,3 +22,10 @@
 - **Problem**: `first-crawl.spec.ts` asserted a finding's type-group heading. That heading exists only while the finding is uncorrelated — once the pages query resolves, correlation folds the finding into a problem and the heading is gone by design. The test therefore asserted a state that exists for a few hundred milliseconds, passed for the wrong reason, and failed 2 runs in 3 once an added query shifted the timing. It had been latently broken since correlation shipped, and the suite reported green throughout.
 - **Rule**: Assert on the settled state, and make the test wait for the input that settles it rather than for the thing being asserted. Where a fact can legitimately be rendered in more than one place, assert the fact — that the reader is told — not the container it happens to land in, because which container is a property of the data and not of the product working.
 - **Applies to**: plan, implement, impl-review
+
+## A rule shipping is not the site changing
+
+- **Context**: Any feature that relates two runs to each other — a comparison, a trend, a regression claim — and any detection rule whose output feeds one.
+- **Problem**: S-07's comparison checked completeness and scope but not which rules ran, so the first comparison after any new rule shipped would report every finding that rule produced as `new` — the site breaking on the day we started checking. yazaki's ten runs read 12 → 8 → 9 → 42 → 66 → 67, and almost all of that movement is rules arriving, not the site changing. Nothing recorded which rules produced a run, and the fact is unrecoverable afterwards.
+- **Rule**: Before reporting that anything changed between two runs, establish that both were produced by the same version of us — same rules, same scope, same completeness — and record what produced a run at the moment it runs, because it cannot be recovered later. Where the conditions differ, refuse and say plainly that the difference is ours.
+- **Applies to**: frame, plan, implement, impl-review
