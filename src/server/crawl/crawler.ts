@@ -13,7 +13,13 @@
 
 import { type ContentSummary, emptyContent, extractContent } from "./content";
 import { checkExternalLinks, type ExternalSweep } from "./external";
-import { emptyImages, extractImages, type ImageSummary } from "./images";
+import {
+	emptyImages,
+	extractImages,
+	type ImageSummary,
+	type ImageWeightSweep,
+	sweepImageWeights,
+} from "./images";
 import {
 	emptyMetadata,
 	extractMetadata,
@@ -185,6 +191,14 @@ export type CrawlResult = {
 	/** Set when the crawl stopped early; null when it finished normally. */
 	abortedReason: string | null;
 	reachedPageLimit: boolean;
+	/**
+	 * What the pages' images weigh, as their own servers declared it.
+	 *
+	 * Bounded the way the external sweep is bounded, and reporting `complete` for
+	 * the same reason: an unweighed image is not a small one, so a rule reading
+	 * an incomplete sweep must stay silent rather than conclude from what it got.
+	 */
+	imageWeights: ImageWeightSweep;
 	/**
 	 * Transient-looking failures, re-requested once after the crawl drained.
 	 *
@@ -392,6 +406,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 			entryUrl: null,
 			requested: [],
 			external: { checked: [], complete: false },
+			imageWeights: { weighed: [], complete: false },
 			aliases: [],
 		};
 	}
@@ -950,6 +965,26 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 				})
 			: { checked: [], complete: false };
 
+	/**
+	 * Every distinct image the crawl saw, asked once for its size.
+	 *
+	 * Deduplicated across pages: a logo on five hundred pages is one file and one
+	 * request. The ceiling is derived from the pages crawled, exactly as the
+	 * external sweep derives its own, so a run's request count stays something an
+	 * operator can reason about before agreeing to it — a site is free to
+	 * reference more images than it has pages, and without this the sweep would
+	 * be bounded by nothing at all.
+	 */
+	const imageWeights =
+		abortedReason === null
+			? await sweepImageWeights({
+					urls: [...new Set(pages.flatMap((page) => page.images.urls))].sort(),
+					pacer: { claim: claimSlot },
+					requestTimeoutMs,
+					maxRequests: pages.length,
+				})
+			: { weighed: [], complete: false };
+
 	const reverified: Reverification[] = [];
 
 	if (abortedReason === null) {
@@ -983,6 +1018,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 		pages,
 		abortedReason,
 		reachedPageLimit,
+		imageWeights,
 		reverified,
 		certificate,
 		robots,

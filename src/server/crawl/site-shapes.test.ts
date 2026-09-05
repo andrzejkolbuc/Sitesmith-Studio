@@ -4,7 +4,11 @@ import { type ContentSummary, emptyContent } from "./content";
 import type { Alias, CrawledPage, Hop, Reverification } from "./crawler";
 import type { ExternalSweep } from "./external";
 import { detectMissingVariants } from "./findings";
-import { emptyImages, type ImageSummary } from "./images";
+import {
+	emptyImages,
+	type ImageSummary,
+	type ImageWeightSweep,
+} from "./images";
 import { emptyMetadata, type PageMetadata } from "./metadata";
 import { parseRobots, type RobotsFile } from "./robots";
 import type { SitemapDocument } from "./sitemap";
@@ -128,6 +132,12 @@ function findingsFor(options: {
 	requested?: string[];
 	/** Defaults to an incomplete, empty sweep: most cases are not about it. */
 	external?: ExternalSweep;
+	/**
+	 * Defaults to a *complete* empty sweep: a case naming no heavy image is
+	 * saying the site has none, not that we failed to look. The incomplete case
+	 * is stated explicitly by the one test that is about it.
+	 */
+	imageWeights?: ImageWeightSweep;
 	/** Defaults to a whole-site crawl: most cases describe an unscoped project. */
 	scopeNarrowed?: boolean;
 }): Summary[] {
@@ -142,6 +152,7 @@ function findingsFor(options: {
 		sitemap: options.sitemap ?? null,
 		entryUrl: options.entryUrl ?? null,
 		requested: options.requested ?? options.pages.map((p) => p.url),
+		imageWeights: options.imageWeights ?? { weighed: [], complete: true },
 		external: options.external ?? { checked: [], complete: false },
 		/** Not exposed here: the alias cases are all detail cases. */
 		aliases: [],
@@ -185,6 +196,8 @@ function detailedFindingsFor(options: {
 	requested?: string[];
 	/** Defaults to an incomplete, empty sweep: most cases are not about it. */
 	external?: ExternalSweep;
+	/** Defaults to a complete empty sweep: no heavy image means the site has none. */
+	imageWeights?: ImageWeightSweep;
 	/** Defaults to a whole-site crawl: most cases describe an unscoped project. */
 	scopeNarrowed?: boolean;
 	/** Defaults to none: most cases describe routes that went where they were asked. */
@@ -201,6 +214,7 @@ function detailedFindingsFor(options: {
 		sitemap: options.sitemap ?? null,
 		entryUrl: options.entryUrl ?? null,
 		requested: options.requested ?? options.pages.map((p) => p.url),
+		imageWeights: options.imageWeights ?? { weighed: [], complete: true },
 		external: options.external ?? { checked: [], complete: false },
 		aliases: options.aliases ?? [],
 		scopeNarrowed: options.scopeNarrowed ?? false,
@@ -3382,6 +3396,7 @@ describe("links that leave the site", () => {
 	it("reports a link to a page another site says is gone", () => {
 		const findings = detailedFindingsFor({
 			pages: [linking("/", ["https://elsewhere.test/gone"])],
+			imageWeights: { weighed: [], complete: true },
 			external: sweep([
 				{ url: "https://elsewhere.test/gone", httpStatus: 404 },
 			]),
@@ -3407,6 +3422,7 @@ describe("links that leave the site", () => {
 		expect(
 			detailedFindingsFor({
 				pages: [linking("/", ["https://elsewhere.test/closed"])],
+				imageWeights: { weighed: [], complete: true },
 				external: sweep([
 					{ url: "https://elsewhere.test/closed", httpStatus: 403 },
 				]),
@@ -3418,6 +3434,7 @@ describe("links that leave the site", () => {
 		expect(
 			detailedFindingsFor({
 				pages: [linking("/", ["https://elsewhere.test/down"])],
+				imageWeights: { weighed: [], complete: true },
 				external: sweep([
 					{ url: "https://elsewhere.test/down", httpStatus: 503 },
 				]),
@@ -3431,6 +3448,7 @@ describe("links that leave the site", () => {
 		expect(
 			detailedFindingsFor({
 				pages,
+				imageWeights: { weighed: [], complete: true },
 				external: sweep([
 					{
 						url: "https://gone.test/x",
@@ -3445,6 +3463,7 @@ describe("links that leave the site", () => {
 		expect(
 			detailedFindingsFor({
 				pages,
+				imageWeights: { weighed: [], complete: true },
 				external: sweep([
 					{
 						url: "https://gone.test/x",
@@ -3467,6 +3486,7 @@ describe("links that leave the site", () => {
 		expect(
 			detailedFindingsFor({
 				pages: [linking("/", ["https://elsewhere.test/gone"])],
+				imageWeights: { weighed: [], complete: true },
 				external: sweep(
 					[{ url: "https://elsewhere.test/gone", httpStatus: 404 }],
 					false,
@@ -3774,5 +3794,115 @@ describe("images the page asked the browser to load", () => {
 				],
 			}),
 		).toEqual([]);
+	});
+});
+
+/**
+ * The one image rule that needed a request.
+ *
+ * The weight is the site's own `Content-Length`; the threshold is ours. Both
+ * appear in the finding, so the cases here fix that the reader is handed the
+ * number they would need in order to disagree with us.
+ */
+describe("images heavy enough to be worth a look", () => {
+	const heavyFindings = (options: Parameters<typeof detailedFindingsFor>[0]) =>
+		detailedFindingsFor(options).filter((f) => f.type === "image_oversized");
+
+	const carrying = (urls: string[]) =>
+		page("/en/home", { images: { total: urls.length, urls } });
+
+	it("reports a page carrying an image over the threshold", () => {
+		const findings = heavyFindings({
+			pages: [carrying([`${BASE}/hero.jpg`])],
+			imageWeights: {
+				weighed: [{ url: `${BASE}/hero.jpg`, bytes: 1_400_000 }],
+				complete: true,
+			},
+		});
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail.count).toBe(1);
+	});
+
+	/**
+	 * The threshold travels with the finding. A reader who thinks 600kB is fine
+	 * for a full-bleed hero can see the number we judged against and argue with
+	 * the judgement, rather than only with the verdict.
+	 */
+	it("reports the threshold beside the measurement", () => {
+		const findings = heavyFindings({
+			pages: [carrying([`${BASE}/hero.jpg`])],
+			imageWeights: {
+				weighed: [{ url: `${BASE}/hero.jpg`, bytes: 1_400_000 }],
+				complete: true,
+			},
+		});
+
+		expect(findings[0]?.detail.thresholdBytes).toBe(500_000);
+		expect(findings[0]?.detail.images).toEqual([
+			{ url: `${BASE}/hero.jpg`, bytes: 1_400_000 },
+		]);
+	});
+
+	it("says nothing about an image under the threshold", () => {
+		expect(
+			heavyFindings({
+				pages: [carrying([`${BASE}/small.jpg`])],
+				imageWeights: {
+					weighed: [{ url: `${BASE}/small.jpg`, bytes: 12_000 }],
+					complete: true,
+				},
+			}),
+		).toEqual([]);
+	});
+
+	/**
+	 * The silence discipline `external.ts` states and rule 23 already follows: an
+	 * image the sweep never reached is not a small one, and concluding from a
+	 * partial sweep reports our own ceiling as the site being tidy.
+	 */
+	it("says nothing at all when the sweep did not finish", () => {
+		expect(
+			heavyFindings({
+				pages: [carrying([`${BASE}/hero.jpg`])],
+				imageWeights: {
+					weighed: [{ url: `${BASE}/hero.jpg`, bytes: 1_400_000 }],
+					complete: false,
+				},
+			}),
+		).toEqual([]);
+	});
+
+	/**
+	 * A chunked response declares no length. Unknown is not light — the honest
+	 * handling of "we could not measure it" is to say nothing about it.
+	 */
+	it("says nothing about an image whose size was never declared", () => {
+		expect(
+			heavyFindings({
+				pages: [carrying([`${BASE}/hero.jpg`])],
+				imageWeights: {
+					weighed: [{ url: `${BASE}/hero.jpg`, bytes: null }],
+					complete: true,
+				},
+			}),
+		).toEqual([]);
+	});
+
+	it("reports one finding per page, however many of its images are heavy", () => {
+		const findings = heavyFindings({
+			pages: [carrying([`${BASE}/a.jpg`, `${BASE}/b.jpg`, `${BASE}/c.jpg`])],
+			imageWeights: {
+				weighed: [
+					{ url: `${BASE}/a.jpg`, bytes: 900_000 },
+					{ url: `${BASE}/b.jpg`, bytes: 900_000 },
+					{ url: `${BASE}/c.jpg`, bytes: 900_000 },
+				],
+				complete: true,
+			},
+		});
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.detail.count).toBe(3);
 	});
 });

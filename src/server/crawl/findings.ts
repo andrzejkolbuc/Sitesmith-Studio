@@ -1,6 +1,7 @@
 import { BLOCK_NAMES, type ContentSummary } from "./content";
 import type { Alias, CrawledPage, Hop, Reverification } from "./crawler";
 import { type ExternalSweep, isGone } from "./external";
+import type { ImageWeightSweep } from "./images";
 import { parseRobotsHeader } from "./metadata";
 import { evaluatePath, type RobotsFile, type RobotsRule } from "./robots";
 import { reconcile, type SitemapDocument } from "./sitemap";
@@ -76,6 +77,8 @@ export const FINDING_TYPES = {
 	IMAGE_MISSING_DIMENSIONS: "image_missing_dimensions",
 	/** Images offered in no format newer than JPEG or PNG. */
 	IMAGE_LEGACY_FORMAT: "image_legacy_format",
+	/** An image whose file is heavy enough to be worth a look. */
+	IMAGE_OVERSIZED: "image_oversized",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -157,6 +160,14 @@ export type DetectOptions = {
 	/** The links leaving the site, as checked after the crawl drained. */
 	external: ExternalSweep;
 	/**
+	 * What the pages' images weigh, and whether we got through them all.
+	 *
+	 * Its `complete` flag is load-bearing in the same way the external sweep's
+	 * is: an image the sweep never reached is not a small one, and a rule that
+	 * concluded from a partial sweep would be reporting our own ceiling.
+	 */
+	imageWeights: ImageWeightSweep;
+	/**
 	 * Routes that led somewhere other than where they were asked for.
 	 *
 	 * Read beside `pages` rather than instead of it, because the two hold
@@ -184,6 +195,16 @@ const satisfies = (present: Set<string>, expected: string): boolean => {
 	if (present.has(expected)) return true;
 	return [...present].some((locale) => locale.startsWith(`${expected}-`));
 };
+
+/**
+ * The weight above which an image is worth mentioning.
+ *
+ * Ours, not the site's, and therefore reported alongside every finding it
+ * produces rather than applied silently. Five hundred kilobytes is roughly where
+ * a single image stops being incidental on a mobile connection; a reader who
+ * disagrees can see the threshold in the finding and judge for themselves.
+ */
+export const MAX_IMAGE_BYTES = 500_000;
 
 const isError = (page: CrawledPage): boolean =>
 	page.fetchError !== null ||
@@ -219,6 +240,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		entryUrl,
 		requested,
 		external,
+		imageWeights,
 		aliases,
 		scopeNarrowed,
 	} = options;
@@ -2215,6 +2237,52 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 				listed: page.images.legacyUrls.length,
 			},
 		});
+	}
+
+	// ── Rule 27: an image heavy enough to be worth a look ─────────────────────
+	//
+	// FR-029's third signal, and the only one that needed a request. The weight is
+	// the site's own `Content-Length` — what its server said it was sending — so
+	// the observation is theirs. The *threshold* is ours, which is why it travels
+	// in the detail beside the measurement: a reader who thinks 400kB is fine for
+	// a hero image can see the number we judged and disagree with the judgement
+	// rather than only with the verdict.
+	//
+	// Silent on an incomplete sweep, following rule 23 and the external sweep it
+	// reads: an image we never weighed is not a small one, and concluding from a
+	// partial sweep would report our own ceiling as the site being tidy.
+	if (imageWeights.complete) {
+		const heavy = new Map<string, number>();
+		for (const weight of imageWeights.weighed) {
+			if (weight.bytes !== null && weight.bytes > MAX_IMAGE_BYTES) {
+				heavy.set(weight.url, weight.bytes);
+			}
+		}
+
+		for (const page of [...pages].sort((a, b) => a.url.localeCompare(b.url))) {
+			if (isError(page)) continue;
+			if (!page.images) continue;
+			if (!page.content.isHtml) continue;
+
+			const offenders = page.images.urls
+				.filter((url) => heavy.has(url))
+				.sort()
+				.map((url) => ({ url, bytes: heavy.get(url) as number }));
+			if (offenders.length === 0) continue;
+
+			findings.push({
+				type: FINDING_TYPES.IMAGE_OVERSIZED,
+				url: page.url,
+				detail: {
+					url: page.url,
+					count: offenders.length,
+					/** The number that made us say so, so it can be argued with. */
+					thresholdBytes: MAX_IMAGE_BYTES,
+					images: offenders.slice(0, 10),
+					listed: Math.min(offenders.length, 10),
+				},
+			});
+		}
 	}
 
 	return findings;

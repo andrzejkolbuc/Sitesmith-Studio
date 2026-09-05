@@ -29,6 +29,14 @@ type Page = {
 	/** locale → path, rendered as hreflang links. */
 	alternates?: Record<string, string>;
 	links?: string[];
+	/**
+	 * Images this page references, rendered as bare `img` elements.
+	 *
+	 * Bare — no width or height — because the undimensioned case is the ordinary
+	 * one on a real site; a test wanting the dimensioned case states it in its
+	 * own markup rather than here.
+	 */
+	images?: string[];
 	body?: string;
 	/**
 	 * Wraps the body in `<main>`, so the content extractor can isolate it.
@@ -284,6 +292,11 @@ const SITE: Record<string, Page> = {
 		alternates: { en: "/handbook", de: "/de/handbuch", fr: "/fr/manuel" },
 		body: HANDBOOK_EN,
 		main: true,
+		/**
+		 * The same heavy file as `/quote`, which is the point: one image on two
+		 * pages must cost the weight sweep exactly one request.
+		 */
+		images: ["/img/heavy.jpg", "/img/light.jpg"],
 	},
 	"/de/handbuch": {
 		alternates: { en: "/handbook", de: "/de/handbuch", fr: "/fr/manuel" },
@@ -310,6 +323,8 @@ const SITE: Record<string, Page> = {
 	 */
 	"/quote": {
 		alternates: { en: "/quote", de: "/de/angebot", fr: "/fr/devis" },
+		/** The same heavy file `/handbook` carries. See the note there. */
+		images: ["/img/heavy.jpg"],
 		body: `<h2>Request a quote</h2>
     <p>Tell us about the site you would like checked and we will come back to you
     with a price. Most projects are quoted within two working days, and larger
@@ -760,6 +775,10 @@ function render(path: string, page: Page): string {
 		.map((href) => `<a href="${href}">${href}</a>`)
 		.join("\n    ");
 
+	const images = (page.images ?? [])
+		.map((src) => `<img src="${src}">`)
+		.join(String.fromCharCode(10) + "    ");
+
 	/**
 	 * The head, assembled from the metadata fields.
 	 *
@@ -807,6 +826,7 @@ function render(path: string, page: Page): string {
   <body>
     ${region}
     ${links}
+    ${images}
   </body>
 </html>`;
 }
@@ -860,6 +880,24 @@ export async function startFixtureSite(
 				await new Promise((resolve) => setTimeout(resolve, 2_000));
 				res.writeHead(200, { "content-type": "text/html" });
 				res.end("<html><body>slow</body></html>");
+				return;
+			}
+
+			/**
+			 * Images, served with a declared length and no body worth reading.
+			 *
+			 * `/img/heavy.jpg` is over the weight threshold and `/img/light.jpg` is
+			 * well under it, so a test can state which it means. Both are counted in
+			 * `requests`, which is what lets a test prove the sweep asked once for a
+			 * file that appears on several pages.
+			 */
+			if (pathname?.startsWith("/img/")) {
+				const bytes = pathname.includes("heavy") ? 1_400_000 : 8_000;
+				res.writeHead(200, {
+					"content-type": "image/jpeg",
+					"content-length": String(bytes),
+				});
+				res.end();
 				return;
 			}
 

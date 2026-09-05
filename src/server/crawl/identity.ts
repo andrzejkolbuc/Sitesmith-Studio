@@ -171,6 +171,7 @@ export function findingIdentity(finding: {
 		 */
 		case "image_missing_dimensions":
 		case "image_legacy_format":
+		case "image_oversized":
 			return key(type, text(detail.url));
 
 		/**

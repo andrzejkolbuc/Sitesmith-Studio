@@ -652,27 +652,27 @@ is unbuilt.
 
 #### Automated
 
-- [x] 1.1 Schema applies cleanly: `npm run db:push`
-- [x] 1.2 Unit tests pass: `npm run test:unit`
-- [x] 1.3 Integration tests pass: `npm run test:integration`
-- [x] 1.4 Type checking passes: `npm run typecheck`
-- [x] 1.5 Lint and format pass: `npm run check`
-- [x] 1.6 A page with no `images` summary produces neither image finding
+- [x] 1.1 Schema applies cleanly: `npm run db:push` — 79aaccf
+- [x] 1.2 Unit tests pass: `npm run test:unit` — 79aaccf
+- [x] 1.3 Integration tests pass: `npm run test:integration` — 79aaccf
+- [x] 1.4 Type checking passes: `npm run typecheck` — 79aaccf
+- [x] 1.5 Lint and format pass: `npm run check` — 79aaccf
+- [x] 1.6 A page with no `images` summary produces neither image finding — 79aaccf
 
 #### Manual
 
-- [x] 1.7 A real project's run reports image findings whose cited URLs are genuinely missing dimensions when checked in the browser
+- [x] 1.7 A real project's run reports image findings whose cited URLs are genuinely missing dimensions when checked in the browser — 79aaccf
 
 ### Phase 2: What the images actually weigh
 
 #### Automated
 
-- [ ] 2.1 Unit tests pass: `npm run test:unit`
-- [ ] 2.2 Integration tests pass: `npm run test:integration`
-- [ ] 2.3 Type checking passes: `npm run typecheck`
-- [ ] 2.4 Lint and format pass: `npm run check`
-- [ ] 2.5 An incomplete sweep produces no `IMAGE_OVERSIZED` findings
-- [ ] 2.6 One image URL referenced by several pages costs exactly one request
+- [x] 2.1 Unit tests pass: `npm run test:unit`
+- [x] 2.2 Integration tests pass: `npm run test:integration`
+- [x] 2.3 Type checking passes: `npm run typecheck`
+- [x] 2.4 Lint and format pass: `npm run check`
+- [x] 2.5 An incomplete sweep produces no `IMAGE_OVERSIZED` findings
+- [x] 2.6 One image URL referenced by several pages costs exactly one request
 
 #### Manual
 

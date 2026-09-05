@@ -119,6 +119,7 @@ export function evidenceRoles(finding: {
 		 */
 		case "image_missing_dimensions":
 		case "image_legacy_format":
+		case "image_oversized":
 			return both(one(detail.url));
 
 		/**

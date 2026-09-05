@@ -230,3 +230,136 @@ export function extractImages(
 		urls: refs.slice(0, MAX_LISTED * 4).map((r) => r.url),
 	};
 }
+
+/**
+ * What the images actually weigh.
+ *
+ * The markup above says which images a page asked for; only the server can say
+ * how big they are. This asks — once per distinct URL, over HEAD, at the rate
+ * the operator configured — and it is the same bargain `external.ts` struck for
+ * the same reason: a sweep that makes an unpredictable number of requests to a
+ * client's site is worse than no sweep, because causing an incident is a worse
+ * outcome than the regression being hunted.
+ *
+ * Unlike the external sweep, every host here is the client's own, so there is no
+ * third-party politeness question — but the ceiling and the failure budget still
+ * apply. A run whose request count depends on how many pictures somebody
+ * uploaded is a run nobody can reason about in advance.
+ *
+ * `Content-Length` is the site's own statement about the file it served. Where
+ * it is absent — a chunked response — the weight is simply unknown, and unknown
+ * is recorded as unknown rather than as zero.
+ */
+
+export type ImageWeight = {
+	url: string;
+	/** Bytes as the server declared them; null when it declared none. */
+	bytes: number | null;
+};
+
+export type ImageWeightSweep = {
+	weighed: ImageWeight[];
+	/**
+	 * Whether the sweep got through everything it was given.
+	 *
+	 * False when the ceiling or the failure budget stopped it. The rule must stay
+	 * silent about an incomplete sweep, following `external.ts`: an unweighed
+	 * image is not a small one.
+	 */
+	complete: boolean;
+};
+
+export type ImageWeightOptions = {
+	urls: string[];
+	/** The crawl's pacer, lent so a sweep cannot run at a rate the crawl would not. */
+	pacer: { claim: () => Promise<void> };
+	requestTimeoutMs: number;
+	/** Ceiling on requests, derived by the caller from the pages crawled. */
+	maxRequests: number;
+};
+
+/** Statuses the specification defines for a host that does not implement HEAD. */
+const HEAD_UNSUPPORTED_FOR_IMAGES = new Set([405, 501]);
+
+/** Proportion of failures that ends the sweep, matching the external sweep's. */
+const IMAGE_FAILURE_RATE = 0.3;
+const IMAGE_FAILURE_SAMPLE = 20;
+
+export async function sweepImageWeights(
+	options: ImageWeightOptions,
+): Promise<ImageWeightSweep> {
+	const { urls, pacer, requestTimeoutMs, maxRequests } = options;
+
+	const weighed: ImageWeight[] = [];
+	let attempted = 0;
+	let failures = 0;
+	let complete = true;
+
+	for (const url of urls) {
+		if (attempted >= maxRequests) {
+			complete = false;
+			break;
+		}
+
+		if (
+			attempted >= IMAGE_FAILURE_SAMPLE &&
+			failures / attempted >= IMAGE_FAILURE_RATE
+		) {
+			complete = false;
+			break;
+		}
+
+		attempted += 1;
+		let response = await head(url, "HEAD");
+
+		if (response !== null && HEAD_UNSUPPORTED_FOR_IMAGES.has(response.status)) {
+			attempted += 1;
+			response = await head(url, "GET");
+		}
+
+		if (response === null) {
+			failures += 1;
+			continue;
+		}
+
+		if (!response.ok) continue;
+
+		const declared = response.headers.get("content-length");
+		const bytes = declared === null ? null : Number.parseInt(declared, 10);
+
+		weighed.push({
+			url,
+			bytes: bytes !== null && Number.isFinite(bytes) ? bytes : null,
+		});
+	}
+
+	return { weighed, complete };
+
+	async function head(
+		target: string,
+		method: "HEAD" | "GET",
+	): Promise<Response | null> {
+		await pacer.claim();
+
+		const controller = new AbortController();
+		const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
+
+		try {
+			/**
+			 * The body is never read. A HEAD has none, and on the GET fallback the
+			 * only thing wanted is the header the status line came with — pulling
+			 * the image down to learn its size would cost precisely the bytes the
+			 * finding is about.
+			 */
+			return await fetch(target, {
+				method,
+				signal: controller.signal,
+				redirect: "follow",
+			});
+		} catch {
+			return null;
+		} finally {
+			clearTimeout(timer);
+		}
+	}
+}

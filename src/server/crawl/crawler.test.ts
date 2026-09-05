@@ -806,3 +806,53 @@ describe("inScopePath", () => {
 		});
 	});
 });
+
+/**
+ * The image weight sweep, over real HTTP.
+ *
+ * `images.test.ts` fixes the sweep's budget against a stubbed `fetch`. What only
+ * a real crawl can show is the deduplication at the call site: the sweep is
+ * handed the union of every page's images, so a file carried by several pages
+ * must cost exactly one request however many pages reference it.
+ */
+describe("image weights", () => {
+	it("asks once for an image that appears on several pages", async () => {
+		const result = await crawl(base());
+
+		const carrying = result.pages.filter((p) =>
+			p.images.urls.some((u) => u.endsWith("/img/heavy.jpg")),
+		);
+		expect(
+			carrying.length,
+			"the fixture should carry one image on at least two pages",
+		).toBeGreaterThan(1);
+
+		expect(site.requests.filter((r) => r === "/img/heavy.jpg")).toHaveLength(1);
+	});
+
+	it("records the weight the server declared", async () => {
+		const result = await crawl(base());
+
+		const heavy = result.imageWeights.weighed.find((w) =>
+			w.url.endsWith("/img/heavy.jpg"),
+		);
+		const light = result.imageWeights.weighed.find((w) =>
+			w.url.endsWith("/img/light.jpg"),
+		);
+
+		expect(heavy?.bytes).toBe(1_400_000);
+		expect(light?.bytes).toBe(8_000);
+		expect(result.imageWeights.complete).toBe(true);
+	});
+
+	/**
+	 * The crawl never renders, so it never *loads* an image. The sweep asks for
+	 * headers only — a run that pulled every picture down would cost precisely the
+	 * bytes the finding is about.
+	 */
+	it("never downloads an image body", async () => {
+		await crawl(base());
+
+		expect(site.requests.filter((r) => r.startsWith("/img/")).length).toBe(2);
+	});
+});

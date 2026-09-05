@@ -794,6 +794,18 @@ const ROLE_CASES: Record<string, RoleCase> = {
 		subject: [`${R}/en/home`],
 		origin: [`${R}/en/home`],
 	},
+	image_oversized: {
+		url: `${R}/en/home`,
+		detail: {
+			url: `${R}/en/home`,
+			count: 2,
+			thresholdBytes: 500_000,
+			images: [{ url: `${R}/hero.jpg`, bytes: 1_400_000 }],
+			listed: 1,
+		},
+		subject: [`${R}/en/home`],
+		origin: [`${R}/en/home`],
+	},
 	image_legacy_format: {
 		url: `${R}/en/home`,
 		detail: {

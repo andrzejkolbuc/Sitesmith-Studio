@@ -246,6 +246,7 @@ async function execute(
 		entryUrl: result.entryUrl,
 		requested: result.requested,
 		external: result.external,
+		imageWeights: result.imageWeights,
 		aliases: result.aliases,
 		/**
 		 * A project that named the paths to check told the crawl not to visit the

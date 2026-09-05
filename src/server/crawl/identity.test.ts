@@ -176,6 +176,13 @@ const SAMPLES: Record<string, Record<string, unknown>> = {
 		images: ["https://x.test/a.jpg"],
 		listed: 1,
 	},
+	[FINDING_TYPES.IMAGE_OVERSIZED]: {
+		url: "https://x.test/en/home",
+		count: 2,
+		thresholdBytes: 500_000,
+		images: [{ url: "https://x.test/hero.jpg", bytes: 1_400_000 }],
+		listed: 1,
+	},
 	[FINDING_TYPES.REDIRECT_CHAIN]: {
 		kind: "chain",
 		from: "https://x.test/old",

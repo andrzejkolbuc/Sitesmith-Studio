@@ -34,4 +34,5 @@ export const FINDING_LABEL: Record<string, string> = {
 	redirect_chain: "Redirects that go through several hops, or in circles",
 	image_missing_dimensions: "Images that shift the layout as they load",
 	image_legacy_format: "Images served in no modern format",
+	image_oversized: "Images heavy enough to slow the page",
 };
