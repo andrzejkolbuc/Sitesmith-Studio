@@ -281,6 +281,29 @@ export const runs = createTable(
 		 * statement about the site.
 		 */
 		ruleSet: d.jsonb().$type<string[]>(),
+		/**
+		 * What the render pass covered, and whether it got through.
+		 *
+		 * Recorded because a sample is a claim about coverage: a reader shown four
+		 * measured pages of a five-hundred-page site has to be told it was four,
+		 * and a later trend over vitals has to be able to tell an unmeasured page
+		 * from a fast one.
+		 *
+		 * Nullable, meaning *not recorded* — a run from before rendering existed,
+		 * or one that died before it could write this. Do not default it: a zero
+		 * would assert that every historical run rendered nothing, which is a
+		 * different claim from having no answer.
+		 */
+		renderSummary: d.jsonb().$type<{
+			/** Pages the sample chose. */
+			chosen: number;
+			/** Of those, how many produced a measurement. */
+			measured: number;
+			/** The cap in force, so the reader can be told what bounded it. */
+			cap: number;
+			/** False when the browser could not be used at all. */
+			complete: boolean;
+		}>(),
 		createdAt: d
 			.timestamp({ withTimezone: true })
 			.$defaultFn(() => /* @__PURE__ */ new Date())

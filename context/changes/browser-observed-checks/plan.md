@@ -667,12 +667,12 @@ is unbuilt.
 
 #### Automated
 
-- [x] 2.1 Unit tests pass: `npm run test:unit`
-- [x] 2.2 Integration tests pass: `npm run test:integration`
-- [x] 2.3 Type checking passes: `npm run typecheck`
-- [x] 2.4 Lint and format pass: `npm run check`
-- [x] 2.5 An incomplete sweep produces no `IMAGE_OVERSIZED` findings
-- [x] 2.6 One image URL referenced by several pages costs exactly one request
+- [x] 2.1 Unit tests pass: `npm run test:unit` — 579cda1
+- [x] 2.2 Integration tests pass: `npm run test:integration` — 579cda1
+- [x] 2.3 Type checking passes: `npm run typecheck` — 579cda1
+- [x] 2.4 Lint and format pass: `npm run check` — 579cda1
+- [x] 2.5 An incomplete sweep produces no `IMAGE_OVERSIZED` findings — 579cda1
+- [x] 2.6 One image URL referenced by several pages costs exactly one request — 579cda1
 
 #### Manual
 
@@ -682,11 +682,11 @@ is unbuilt.
 
 #### Automated
 
-- [ ] 3.1 Unit tests pass: `npm run test:unit`
-- [ ] 3.2 Type checking passes: `npm run typecheck`
-- [ ] 3.3 Lint and format pass: `npm run check`
-- [ ] 3.4 The sample never exceeds `MAX_RENDERS`, whatever the locale count
-- [ ] 3.5 Every declared locale is represented before any locale is represented twice
+- [x] 3.1 Unit tests pass: `npm run test:unit`
+- [x] 3.2 Type checking passes: `npm run typecheck`
+- [x] 3.3 Lint and format pass: `npm run check`
+- [x] 3.4 The sample never exceeds `MAX_RENDERS`, whatever the locale count
+- [x] 3.5 Every declared locale is represented before any locale is represented twice
 
 ### Phase 4: What the browser sees
 
