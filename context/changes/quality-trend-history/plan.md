@@ -562,31 +562,31 @@ findings. No stored data changes, and the refusal is the correct answer.
 
 #### Automated
 
-- [x] 3.1 Unit tests pass: `npm run test:unit`
-- [x] 3.2 Integration tests pass: `npm run test:integration`
-- [x] 3.3 Type checking passes: `npm run typecheck`
-- [x] 3.4 Lint and format pass: `npm run check`
-- [x] 3.5 A type outside a run's `ruleSet` renders as not-checked, never as zero
-- [x] 3.6 A scope change between runs removes the later run from the series
+- [x] 3.1 Unit tests pass: `npm run test:unit` — a276d21
+- [x] 3.2 Integration tests pass: `npm run test:integration` — a276d21
+- [x] 3.3 Type checking passes: `npm run typecheck` — a276d21
+- [x] 3.4 Lint and format pass: `npm run check` — a276d21
+- [x] 3.5 A type outside a run's `ruleSet` renders as not-checked, never as zero — a276d21
+- [x] 3.6 A scope change between runs removes the later run from the series — a276d21
 
 ### Phase 4: The trend grid
 
 #### Automated
 
-- [ ] 4.1 Unit tests pass: `npm run test:unit`
-- [ ] 4.2 Integration tests pass: `npm run test:integration`
-- [ ] 4.3 Existing e2e journeys pass: `npm run test:e2e`
-- [ ] 4.4 Type checking passes: `npm run typecheck`
-- [ ] 4.5 Lint and format pass: `npm run check`
-- [ ] 4.6 Production build succeeds: `npm run build`
-- [ ] 4.7 `FINDING_LABEL` has exactly one definition in the codebase
+- [x] 4.1 Unit tests pass: `npm run test:unit`
+- [x] 4.2 Integration tests pass: `npm run test:integration`
+- [x] 4.3 Existing e2e journeys pass: `npm run test:e2e`
+- [x] 4.4 Type checking passes: `npm run typecheck`
+- [x] 4.5 Lint and format pass: `npm run check`
+- [x] 4.6 Production build succeeds: `npm run build`
+- [x] 4.7 `FINDING_LABEL` has exactly one definition in the codebase
 
 #### Manual
 
-- [ ] 4.8 A project with no qualifying runs shows the explanation, not an empty frame
-- [ ] 4.9 A project with two qualifying runs shows a two-column grid with flat rows
-- [ ] 4.10 The grid is legible on a project with many finding types
-- [ ] 4.11 The rest of the project page is unchanged
+- [x] 4.8 A project with no qualifying runs shows the explanation, not an empty frame
+- [x] 4.9 A project with two qualifying runs shows a two-column grid with flat rows
+- [x] 4.10 The grid is legible on a project with many finding types
+- [x] 4.11 The rest of the project page is unchanged
 
 ### Phase 5: Real-site proof
 

@@ -14,9 +14,11 @@ import {
 	statusIndex,
 } from "./comparison-view";
 import { type CorrelatedProblem, correlate } from "./correlate";
+import { FINDING_LABEL } from "./finding-labels";
 import { buildParity, type Cell } from "./parity";
 import { RunHistory } from "./run-history";
 import { countPages, summariseList } from "./summarise";
+import { TrendGrid } from "./trend-grid";
 
 /**
  * Triggering a run and reading what it found.
@@ -47,35 +49,6 @@ export const STATUS_STYLE: Record<string, string> = {
 	done: "border-rule text-ink-soft",
 	failed: "border-mark bg-mark-soft text-mark",
 	interrupted: "border-flag bg-flag-soft text-flag",
-};
-
-/** Human-readable description of each finding type. */
-const FINDING_LABEL: Record<string, string> = {
-	missing_locale: "Missing language variant",
-	hreflang_target_failed: "Declared variant is broken",
-	hreflang_target_unreached: "Declared variant was never reached",
-	no_hreflang: "No language variants declared",
-	hreflang_family_inconsistent: "Language links that disagree",
-	variant_diverged: "One variant broken, its siblings fine",
-	content_untranslated: "Content that was never translated",
-	content_structure_differs: "Variants that do not contain the same things",
-	metadata_missing: "Pages missing a title or description",
-	metadata_duplicated: "One title or description on several pages",
-	canonical_missing: "Pages declaring no canonical URL",
-	canonical_conflicting: "Canonical tags that disagree",
-	canonical_target_broken: "Canonical pointing somewhere broken",
-	noindex_present: "Pages asking not to be indexed",
-	content_duplicated: "One page's content at several URLs",
-	link_broken: "Links to a page that does not load",
-	certificate_problem: "Certificate problems",
-	security_header_contradiction:
-		"Security headers the site disagrees with itself about",
-	sitemap_url_failed: "Sitemap URLs that do not load",
-	page_missing_from_sitemap: "Live pages the sitemap does not list",
-	robots_blocks_indexable: "robots.txt blocks a page the sitemap submits",
-	page_orphaned: "Pages the sitemap lists that nothing links to",
-	link_external_broken: "Links to other sites that are gone",
-	redirect_chain: "Redirects that go through several hops, or in circles",
 };
 
 /** Security headers in the reader's words, the same split `FIELD_LABEL` makes. */
@@ -399,6 +372,14 @@ export function RunPanel({
 				statusLabel={STATUS_LABEL}
 				statusStyle={STATUS_STYLE}
 			/>
+
+			{/*
+			 * Below the history, because it is the history's other reading: the list
+			 * says what each run found, the grid says whether that has been moving.
+			 * It is about the project rather than the selected run, so it does not
+			 * change as the reader moves between runs.
+			 */}
+			<TrendGrid history={history.data ?? []} projectId={projectId} />
 
 			{/*
 			 * Why no comparison is shown. An unexplained absence is what makes people

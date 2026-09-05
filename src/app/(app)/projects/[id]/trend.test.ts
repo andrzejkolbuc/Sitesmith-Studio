@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { buildTrend, type TrendCount, type TrendRun } from "./trend";
+import type { ComparableRun } from "~/server/crawl/comparison";
+import { FINDING_TYPES } from "~/server/crawl/findings";
+import { FINDING_LABEL } from "./finding-labels";
+import {
+	buildTrend,
+	GAP_SENTENCE,
+	type TrendCount,
+	type TrendRun,
+	trendGap,
+} from "./trend";
 
 const run = (id: string, day: number, ruleSet: string[] | null): TrendRun => ({
 	id,
@@ -174,5 +183,93 @@ describe("buildTrend", () => {
 		);
 
 		expect(cellsOf(trend, "surprise_type")).toEqual([{ kind: "not-checked" }]);
+	});
+});
+
+const RULES = ["link_broken", "no_hreflang"];
+
+const sound = (over: Partial<ComparableRun> = {}): ComparableRun => ({
+	crawlComplete: true,
+	scope: { includePaths: [], excludePaths: ["/private"], locales: ["en"] },
+	ruleSet: RULES,
+	...over,
+});
+
+describe("trendGap", () => {
+	it("says nothing when there are two comparable runs to draw", () => {
+		expect(trendGap([sound(), sound()], 2)).toBeNull();
+	});
+
+	it("names a project that has never been checked", () => {
+		expect(trendGap([], 0)).toEqual({ kind: "no_runs" });
+	});
+
+	/**
+	 * One run is not a fault and must not read as one. The reader is told the
+	 * next check draws the first comparison, rather than being shown a section
+	 * that looks broken.
+	 */
+	it("names a single run as one point rather than a failure", () => {
+		expect(trendGap([sound()], 1)).toEqual({ kind: "one_run" });
+	});
+
+	/**
+	 * The case the explanation exists for: runs the reader can see in the history
+	 * above, absent from the grid below it. Saying nothing would read as a bug in
+	 * the grid; naming the precondition tells them what happened.
+	 */
+	it("names why an existing run could not be drawn", () => {
+		expect(
+			trendGap(
+				[
+					sound(),
+					sound({
+						scope: {
+							includePaths: ["/handbook"],
+							excludePaths: ["/private"],
+							locales: ["en"],
+						},
+					}),
+				],
+				1,
+			),
+		).toEqual({ kind: "excluded", reason: "scope_changed" });
+	});
+
+	it("names the newest run's own verdict when no run is sound", () => {
+		expect(trendGap([sound({ crawlComplete: false }), sound()], 0)).toEqual({
+			kind: "excluded",
+			reason: "incomplete_crawl",
+		});
+	});
+
+	/**
+	 * Runs from before this recording answer `not_recorded`, which is the reason
+	 * an existing project sees on the day this ships.
+	 */
+	it("names unrecorded conditions on runs that predate the column", () => {
+		expect(trendGap([sound({ ruleSet: null }), sound()], 0)).toEqual({
+			kind: "excluded",
+			reason: "not_recorded",
+		});
+	});
+
+	it("has a sentence for every gap it can report", () => {
+		for (const kind of ["no_runs", "one_run"] as const) {
+			expect(GAP_SENTENCE[kind].length).toBeGreaterThan(20);
+		}
+	});
+});
+
+describe("row labels", () => {
+	/**
+	 * A row header the reader cannot read is a row they cannot act on. The grid
+	 * falls back to the raw type rather than blanking, but every type the rules
+	 * can emit should have words.
+	 */
+	it("labels every finding type the rules can produce", () => {
+		for (const type of Object.values(FINDING_TYPES)) {
+			expect(FINDING_LABEL[type], type).toBeTruthy();
+		}
 	});
 });

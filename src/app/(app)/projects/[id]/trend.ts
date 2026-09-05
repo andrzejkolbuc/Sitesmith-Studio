@@ -1,3 +1,9 @@
+import {
+	type ComparabilityReason,
+	type ComparableRun,
+	comparability,
+} from "~/server/crawl/comparison";
+
 /**
  * The trend grid: finding types down, runs across.
  *
@@ -18,6 +24,70 @@
  * nobody looked, and reporting that as "no problems" is a statement about us
  * dressed up as a statement about them.
  */
+
+/**
+ * Why there is no grid yet, when there is not one.
+ *
+ * A section that renders an empty frame, or hides itself, teaches the reader
+ * that the feature is broken or absent. Naming the missing precondition is the
+ * same discipline the comparison's refusal follows, and it draws on the same
+ * vocabulary so that one page never explains the same fact two ways.
+ */
+export type TrendGap =
+	/** The project has never been checked. */
+	| { kind: "no_runs" }
+	/** One run, and one point is not a trend. Nothing is wrong. */
+	| { kind: "one_run" }
+	/** Runs exist that could not be drawn beside the reference. */
+	| { kind: "excluded"; reason: ComparabilityReason };
+
+/** What to say when the grid has fewer than two columns. Null when it does not. */
+export function trendGap(
+	/** The project's whole run history, newest first. */
+	history: ComparableRun[],
+	/** How many runs the trend actually returned. */
+	plotted: number,
+): TrendGap | null {
+	if (plotted >= 2) return null;
+
+	const newest = history[0];
+	if (!newest) return { kind: "no_runs" };
+	if (history.length === 1 && plotted === 1) return { kind: "one_run" };
+
+	/**
+	 * The same reference the aggregate picks: the most recent run that is sound
+	 * on its own terms. Where there is none, the newest run's own verdict on
+	 * itself is the reason — it is what stopped anything from being drawn.
+	 */
+	const reference = history.find((run) => comparability(run, run).comparable);
+	if (!reference) {
+		const verdict = comparability(newest, newest);
+		return verdict.comparable
+			? { kind: "one_run" }
+			: { kind: "excluded", reason: verdict.reason };
+	}
+
+	/**
+	 * The newest run that could not join the reference. The newest, because it is
+	 * the one whose exclusion the reader is most likely to be asking about.
+	 */
+	for (const run of history) {
+		if (run === reference) continue;
+		const verdict = comparability(run, reference);
+		if (!verdict.comparable)
+			return { kind: "excluded", reason: verdict.reason };
+	}
+
+	return { kind: "one_run" };
+}
+
+/** The two gaps that are not a refusal, in the reader's words. */
+export const GAP_SENTENCE: Record<"no_runs" | "one_run", string> = {
+	no_runs:
+		"Nothing has been checked yet. A trend appears once this project has been checked twice under the same settings.",
+	one_run:
+		"Only one check counts towards a trend so far, and one point is not a trend. The next check under the same settings will draw the first comparison.",
+};
 
 export type TrendCell =
 	| { kind: "count"; value: number }
