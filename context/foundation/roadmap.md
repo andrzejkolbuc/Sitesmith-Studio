@@ -63,7 +63,7 @@ works.
 | S-09 | correlated-findings             | see one explained problem per underlying cause instead of many symptoms        | S-02, S-04, S-05 | US-01, FR-040                                                                        | done     |
 | S-10 | roles-invites-and-client-access | invite team members and client viewers, scoped to the right projects           | F-01             | FR-001, FR-003, FR-004, FR-005, FR-010, NFR-2                                        | proposed |
 | S-11 | client-readable-report          | generate a client-readable report from a stored run                            | S-09, S-10       | FR-041                                                                               | proposed |
-| S-12 | quality-trend-history           | see scores and issue counts over time                                          | S-07             | FR-039                                                                               | proposed |
+| S-12 | quality-trend-history           | see issue counts over time (scores half needs S-06)                            | S-07             | FR-039 (partly)                                                                      | proposed |
 | S-13 | scheduled-and-staging-runs      | schedule recurring runs and check protected or staging environments            | F-02, S-01       | FR-042, FR-043                                                                       | proposed |
 | S-14 | assisted-finding-prioritisation | have findings ranked by which matter most                                      | S-09             | FR-044                                                                               | proposed |
 
@@ -266,8 +266,14 @@ Foundations below assume these are present and do NOT re-scaffold them.
 
 - **Outcome:** User can see scores and issue counts tracked over time, revealing drift rather than only last-run state.
 - **Change ID:** `quality-trend-history`
-- **PRD refs:** FR-039
-- **Prerequisites:** S-07
+- **PRD refs:** FR-039 — **partly met.** This slice delivers the issue-counts
+  half only. FR-039's "scores" are Core Web Vitals and page performance scores
+  (`prd.md:62`, `prd.md:247`), which **S-06 `browser-observed-checks`** produces
+  and which does not exist yet. FR-039 must stay open when S-12 closes, and S-06
+  is its unrecorded prerequisite for the remainder — the roadmap's original
+  prerequisite list for S-12 (S-07 alone) was incomplete for the full
+  requirement.
+- **Prerequisites:** S-07 (met) — and **S-06 for the scores half**, unbuilt.
 - **Parallel with:** S-08, S-09, S-10, S-11, S-13, S-14
 - **Blockers:** —
 - **Unknowns:**

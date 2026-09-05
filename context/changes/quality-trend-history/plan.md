@@ -573,32 +573,32 @@ findings. No stored data changes, and the refusal is the correct answer.
 
 #### Automated
 
-- [x] 4.1 Unit tests pass: `npm run test:unit`
-- [x] 4.2 Integration tests pass: `npm run test:integration`
-- [x] 4.3 Existing e2e journeys pass: `npm run test:e2e`
-- [x] 4.4 Type checking passes: `npm run typecheck`
-- [x] 4.5 Lint and format pass: `npm run check`
-- [x] 4.6 Production build succeeds: `npm run build`
-- [x] 4.7 `FINDING_LABEL` has exactly one definition in the codebase
+- [x] 4.1 Unit tests pass: `npm run test:unit` — 8267621
+- [x] 4.2 Integration tests pass: `npm run test:integration` — 8267621
+- [x] 4.3 Existing e2e journeys pass: `npm run test:e2e` — 8267621
+- [x] 4.4 Type checking passes: `npm run typecheck` — 8267621
+- [x] 4.5 Lint and format pass: `npm run check` — 8267621
+- [x] 4.6 Production build succeeds: `npm run build` — 8267621
+- [x] 4.7 `FINDING_LABEL` has exactly one definition in the codebase — 8267621
 
 #### Manual
 
-- [x] 4.8 A project with no qualifying runs shows the explanation, not an empty frame
-- [x] 4.9 A project with two qualifying runs shows a two-column grid with flat rows
-- [x] 4.10 The grid is legible on a project with many finding types
-- [x] 4.11 The rest of the project page is unchanged
+- [x] 4.8 A project with no qualifying runs shows the explanation, not an empty frame — 8267621
+- [x] 4.9 A project with two qualifying runs shows a two-column grid with flat rows — 8267621
+- [x] 4.10 The grid is legible on a project with many finding types — 8267621
+- [x] 4.11 The rest of the project page is unchanged — 8267621
 
 ### Phase 5: Real-site proof
 
 #### Automated
 
-- [ ] 5.1 Whole suite passes: `npm run test:all`
-- [ ] 5.2 Type checking passes: `npm run typecheck`
-- [ ] 5.3 Lint and format pass: `npm run check`
-- [ ] 5.4 No temporary scripts or harnesses remain in the working tree
+- [x] 5.1 Whole suite passes: `npm run test:all`
+- [x] 5.2 Type checking passes: `npm run typecheck`
+- [x] 5.3 Lint and format pass: `npm run check`
+- [x] 5.4 No temporary scripts or harnesses remain in the working tree
 
 #### Manual
 
-- [ ] 5.5 Two runs of an unchanged real project produce a grid whose rows are all flat
-- [ ] 5.6 Every plotted cell is attributable to the site rather than to our rule set
-- [ ] 5.7 The roadmap records FR-039 as partly met, naming S-06
+- [x] 5.5 Two runs of an unchanged real project produce a grid whose rows are all flat
+- [x] 5.6 Every plotted cell is attributable to the site rather than to our rule set
+- [x] 5.7 The roadmap records FR-039 as partly met, naming S-06

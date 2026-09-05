@@ -20,12 +20,29 @@ import { buildTrend, GAP_SENTENCE, type TrendCell, trendGap } from "./trend";
  * marking one point does not unmake it.
  */
 
-function when(value: Date): string {
+function onDay(value: Date): string {
 	return new Date(value).toLocaleString(undefined, {
 		day: "numeric",
 		month: "short",
 	});
 }
+
+function atTime(value: Date): string {
+	return new Date(value).toLocaleString(undefined, {
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+}
+
+/**
+ * A column's date and time together, as the run history writes them.
+ *
+ * The time is not decoration. Two checks of the same project on one day are the
+ * ordinary case — it is what "run it again and see" produces — and a header
+ * naming only the day gives the reader two identical columns they cannot tell
+ * apart or match against the history above.
+ */
+const when = (value: Date): string => `${onDay(value)}, ${atTime(value)}`;
 
 export function TrendGrid({
 	projectId,
@@ -103,7 +120,10 @@ function Grid({ trend }: { trend: ReturnType<typeof buildTrend> }) {
 									key={run.id}
 									scope="col"
 								>
-									{when(run.createdAt)}
+									{onDay(run.createdAt)}
+									<span className="block font-normal text-ink-faint">
+										{atTime(run.createdAt)}
+									</span>
 								</th>
 							))}
 						</tr>
