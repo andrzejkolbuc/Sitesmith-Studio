@@ -1,9 +1,17 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { db as database } from "~/server/db";
-import { findings, pages, projects, runs } from "~/server/db/schema";
+import {
+	findings,
+	pageObservations,
+	pages,
+	projects,
+	runs,
+} from "~/server/db/schema";
 import { crawl } from "./crawler";
 import { detectMissingVariants, FINDING_TYPES } from "./findings";
+import { renderSample } from "./render";
+import { chooseRenderSample, countInboundLinks } from "./sample";
 import { inScopePath } from "./scope";
 import { groupVariants } from "./variants";
 
@@ -62,7 +70,12 @@ export class RunAlreadyActiveError extends Error {
  */
 export async function startRun(
 	db: Database,
-	input: { tenantId: string; projectId: string },
+	input: {
+		tenantId: string;
+		projectId: string;
+		/** See {@link runToCompletion}. Zero skips the render pass. */
+		maxRenders?: number;
+	},
 ): Promise<{ runId: string }> {
 	const { tenantId, projectId } = input;
 
@@ -87,7 +100,7 @@ export async function startRun(
 	if (!run) throw new Error("Failed to create the run.");
 
 	// Deliberately not awaited: the caller gets the id immediately.
-	void execute(db, run.id, project).catch(async (caught) => {
+	void execute(db, run.id, project, input.maxRenders).catch(async (caught) => {
 		await db
 			.update(runs)
 			.set({
@@ -104,7 +117,23 @@ export async function startRun(
 /** Awaits the crawl instead of backgrounding it. Used by tests. */
 export async function runToCompletion(
 	db: Database,
-	input: { tenantId: string; projectId: string },
+	input: {
+		tenantId: string;
+		projectId: string;
+		/**
+		 * How many pages this run may render, overriding the default cap.
+		 *
+		 * Zero skips the render pass entirely, and exists for the test suite: a
+		 * browser costs seconds per page, and the twenty-odd run-level cases that
+		 * are about crawling, comparison or tenancy should not each pay for one.
+		 * The pass has its own tests; making every unrelated case launch Chromium
+		 * would buy no coverage and cost minutes.
+		 *
+		 * Not exposed to users — see the plan's note on why a per-project toggle
+		 * would be a switch nobody can flip.
+		 */
+		maxRenders?: number;
+	},
 ): Promise<{ runId: string }> {
 	const { tenantId, projectId } = input;
 
@@ -119,7 +148,7 @@ export async function runToCompletion(
 		.returning();
 	if (!run) throw new Error("Failed to create the run.");
 
-	await execute(db, run.id, project);
+	await execute(db, run.id, project, input.maxRenders);
 	return { runId: run.id };
 }
 
@@ -129,6 +158,7 @@ async function execute(
 	db: Database,
 	runId: string,
 	project: ProjectRow,
+	maxRenders?: number,
 ): Promise<void> {
 	await db
 		.update(runs)
@@ -234,6 +264,47 @@ async function execute(
 	const crawlComplete =
 		result.abortedReason === null && !result.reachedPageLimit;
 
+	/**
+	 * What a browser saw, for the few pages the sample chose.
+	 *
+	 * After the crawl and before detection, because the console rule reads it —
+	 * and deliberately wrapped so that nothing here can fail the run. A browser
+	 * that will not launch is our problem; reporting it as the client's site
+	 * failing would be the fourth entry in `lessons.md` written a fifth time.
+	 */
+	const inbound = countInboundLinks(result.pages);
+	const sample = chooseRenderSample(
+		result.pages.map((page) => ({
+			url: page.url,
+			/**
+			 * The locale the run already derived for the pages table, not a second
+			 * derivation. Two definitions of "this page is in that language" would
+			 * eventually let the sample and the parity grid disagree on one screen.
+			 */
+			locale: variants.get(page.url)?.locale ?? null,
+			httpStatus: page.httpStatus,
+			fetchError: page.fetchError,
+			isHtml: page.content.isHtml,
+			inboundLinks: inbound.get(page.url) ?? 0,
+		})),
+		project.locales,
+		result.entryUrl,
+		maxRenders,
+	);
+
+	/**
+	 * A budget of zero means "do not render", and the pass is skipped rather than
+	 * called with nothing — a browser launched to render an empty list would be
+	 * seconds spent to learn what the caller already said.
+	 */
+	const render =
+		maxRenders === 0
+			? { observations: [], complete: true }
+			: await renderSample({
+					urls: sample.urls,
+					origin: new URL(project.startUrl).origin,
+				}).catch(() => ({ observations: [], complete: false }));
+
 	const detected = detectMissingVariants({
 		pages: result.pages,
 		crawlComplete,
@@ -247,6 +318,7 @@ async function execute(
 		requested: result.requested,
 		external: result.external,
 		imageWeights: result.imageWeights,
+		render,
 		aliases: result.aliases,
 		/**
 		 * A project that named the paths to check told the crawl not to visit the
@@ -275,6 +347,58 @@ async function execute(
 				detail: finding.detail,
 			})),
 		);
+	}
+
+	/**
+	 * One row per measured page, and none for the rest.
+	 *
+	 * Absence is the representation: a page with no row was not measured, which
+	 * is a different fact from a page that was measured and found nothing wrong.
+	 * A row is written even when the render failed, because "this page timed out"
+	 * and "this page was never in the sample" are also different facts, and a
+	 * reader shown neither would assume the second.
+	 */
+	if (render.observations.length > 0) {
+		const observedIdByUrl = new Map(
+			(
+				await db.query.pages.findMany({
+					where: eq(pages.runId, runId),
+					columns: { id: true, url: true },
+				})
+			).map((page) => [page.url, page.id]),
+		);
+
+		const rows = render.observations.flatMap((observation) => {
+			const pageId = observedIdByUrl.get(observation.url);
+			if (!pageId) return [];
+
+			return [
+				{
+					tenantId: project.tenantId,
+					runId,
+					pageId,
+					ttfbMs:
+						observation.vitals.ttfbMs === null
+							? null
+							: Math.round(observation.vitals.ttfbMs),
+					lcpMs:
+						observation.vitals.lcpMs === null
+							? null
+							: Math.round(observation.vitals.lcpMs),
+					/** Text, so the precision the browser reported survives the round trip. */
+					cls:
+						observation.vitals.cls === null
+							? null
+							: String(observation.vitals.cls),
+					firstPartyErrors: observation.firstPartyErrors,
+					thirdPartyErrors: observation.thirdPartyErrors,
+					samples: observation.samples,
+					renderError: observation.renderError,
+				},
+			];
+		});
+
+		if (rows.length > 0) await db.insert(pageObservations).values(rows);
 	}
 
 	await db
@@ -307,6 +431,18 @@ async function execute(
 			 * is the correct answer: we do not know what it would have checked.
 			 */
 			ruleSet: [...Object.values(FINDING_TYPES)].sort(),
+			/**
+			 * What the render pass covered. A sample is a claim about coverage, so
+			 * the claim is recorded beside the run rather than left for a reader to
+			 * infer from how many observation rows happen to exist.
+			 */
+			renderSummary: {
+				chosen: sample.urls.length,
+				measured: render.observations.filter((o) => o.renderError === null)
+					.length,
+				cap: sample.cap,
+				complete: render.complete,
+			},
 		})
 		.where(eq(runs.id, runId));
 }

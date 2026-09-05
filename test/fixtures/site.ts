@@ -37,6 +37,14 @@ type Page = {
 	 * own markup rather than here.
 	 */
 	images?: string[];
+	/**
+	 * Inline script, emitted in the body.
+	 *
+	 * The only way to give the render pass something real to observe: a console
+	 * error exists only once a browser executes the page, so the fixture has to
+	 * be able to fail on purpose.
+	 */
+	script?: string;
 	body?: string;
 	/**
 	 * Wraps the body in `<main>`, so the content extractor can isolate it.
@@ -775,9 +783,11 @@ function render(path: string, page: Page): string {
 		.map((href) => `<a href="${href}">${href}</a>`)
 		.join("\n    ");
 
+	const script = page.script ? `<script>${page.script}</script>` : "";
+
 	const images = (page.images ?? [])
 		.map((src) => `<img src="${src}">`)
-		.join(String.fromCharCode(10) + "    ");
+		.join("\n    ");
 
 	/**
 	 * The head, assembled from the metadata fields.
@@ -827,6 +837,7 @@ function render(path: string, page: Page): string {
     ${region}
     ${links}
     ${images}
+    ${script}
   </body>
 </html>`;
 }
@@ -891,13 +902,59 @@ export async function startFixtureSite(
 			 * `requests`, which is what lets a test prove the sweep asked once for a
 			 * file that appears on several pages.
 			 */
+			/**
+			 * Pages that fail on purpose, for the render pass.
+			 *
+			 * Served here rather than added to `SITE` deliberately: they exist to be
+			 * fetched by URL by a browser, not to be crawled. Putting them in the
+			 * index made them pages the sitemap lists that nothing links to, which
+			 * is the definition of an orphan — so the fixture grew two defects and
+			 * the orphan rule dutifully reported them.
+			 */
+			if (pathname === "/broken-script" || pathname === "/logs-error") {
+				const script =
+					pathname === "/broken-script"
+						? "throw new Error('fixture: first-party failure');"
+						: "console.error('fixture: logged failure');";
+				res.writeHead(200, { "content-type": "text/html" });
+				res.end(
+					`<html><head><title>${pathname}</title></head><body><p>hello</p><script>${script}</script></body></html>`,
+				);
+				return;
+			}
+
 			if (pathname?.startsWith("/img/")) {
 				const bytes = pathname.includes("heavy") ? 1_400_000 : 8_000;
+
+				/**
+				 * HEAD answers with the declared weight; GET answers with a real, tiny
+				 * image.
+				 *
+				 * The weight sweep only ever sends HEAD, so the declared size is what
+				 * it reads. A browser rendering a sampled page sends GET, and handing
+				 * it a truncated body would make it log a failed resource — turning
+				 * every page carrying a fixture image into a console-error case and
+				 * quietly breaking the tests that assert a clean page.
+				 */
+				if (req.method === "HEAD") {
+					res.writeHead(200, {
+						"content-type": "image/jpeg",
+						"content-length": String(bytes),
+					});
+					res.end();
+					return;
+				}
+
+				/** A 1x1 transparent GIF: the smallest thing a browser will decode. */
+				const pixel = Buffer.from(
+					"R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
+					"base64",
+				);
 				res.writeHead(200, {
-					"content-type": "image/jpeg",
-					"content-length": String(bytes),
+					"content-type": "image/gif",
+					"content-length": String(pixel.length),
 				});
-				res.end();
+				res.end(pixel);
 				return;
 			}
 

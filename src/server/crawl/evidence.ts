@@ -120,6 +120,8 @@ export function evidenceRoles(finding: {
 		case "image_missing_dimensions":
 		case "image_legacy_format":
 		case "image_oversized":
+		/** The page runs the script, so it is both what is wrong and what emits it. */
+		case "console_error":
 			return both(one(detail.url));
 
 		/**

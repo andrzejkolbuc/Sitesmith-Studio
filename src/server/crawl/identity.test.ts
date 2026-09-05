@@ -183,6 +183,12 @@ const SAMPLES: Record<string, Record<string, unknown>> = {
 		images: [{ url: "https://x.test/hero.jpg", bytes: 1_400_000 }],
 		listed: 1,
 	},
+	[FINDING_TYPES.CONSOLE_ERROR]: {
+		url: "https://x.test/en/home",
+		count: 2,
+		thirdPartyCount: 1,
+		messages: ["TypeError: undefined is not a function"],
+	},
 	[FINDING_TYPES.REDIRECT_CHAIN]: {
 		kind: "chain",
 		from: "https://x.test/old",

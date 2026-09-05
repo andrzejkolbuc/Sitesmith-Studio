@@ -35,4 +35,5 @@ export const FINDING_LABEL: Record<string, string> = {
 	image_missing_dimensions: "Images that shift the layout as they load",
 	image_legacy_format: "Images served in no modern format",
 	image_oversized: "Images heavy enough to slow the page",
+	console_error: "Pages whose own scripts fail as they load",
 };

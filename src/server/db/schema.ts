@@ -401,6 +401,89 @@ export const pages = createTable(
 	],
 );
 
+/**
+ * What a browser saw on one page, for the few pages a run renders.
+ *
+ * A table rather than columns on `pages` because only a sample is measured:
+ * absence of a row *is* "not measured", which is the distinction the whole
+ * render half turns on. Nullable columns on every page would make an unmeasured
+ * page and a page with nothing to report look the same, and only one of those is
+ * a statement about the site.
+ */
+export const pageObservations = createTable(
+	"page_observation",
+	(d) => ({
+		id: d
+			.varchar({ length: 255 })
+			.notNull()
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		tenantId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => tenants.id),
+		runId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => runs.id),
+		pageId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => pages.id),
+		/**
+		 * The browser's own numbers, read from its PerformanceObserver.
+		 *
+		 * Null per metric rather than zero: a page that never produced an LCP —
+		 * one with no contentful paint at all — has no value, and zero would read
+		 * as instantaneous.
+		 */
+		ttfbMs: d.integer(),
+		lcpMs: d.integer(),
+		/** Cumulative Layout Shift. Stored as text to keep its precision exact. */
+		cls: d.varchar({ length: 32 }),
+		/** Console errors from the site's own scripts. */
+		firstPartyErrors: d.integer().notNull().default(0),
+		/** Console errors from scripts the site loaded from elsewhere. */
+		thirdPartyErrors: d.integer().notNull().default(0),
+		/** A few of the messages, truncated at capture. */
+		samples: d
+			.jsonb()
+			.$type<
+				Array<{ message: string; source: string | null; firstParty: boolean }>
+			>(),
+		/** Why this page has no measurement; null when it has one. */
+		renderError: d.text(),
+		createdAt: d
+			.timestamp({ withTimezone: true })
+			.$defaultFn(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	}),
+	(t) => [
+		index("observation_tenant_id_idx").on(t.tenantId),
+		index("observation_run_id_idx").on(t.runId),
+		/** One observation per page per run, enforced rather than assumed. */
+		uniqueIndex("observation_run_page_uq").on(t.runId, t.pageId),
+	],
+);
+
+export const pageObservationsRelations = relations(
+	pageObservations,
+	({ one }) => ({
+		tenant: one(tenants, {
+			fields: [pageObservations.tenantId],
+			references: [tenants.id],
+		}),
+		run: one(runs, {
+			fields: [pageObservations.runId],
+			references: [runs.id],
+		}),
+		page: one(pages, {
+			fields: [pageObservations.pageId],
+			references: [pages.id],
+		}),
+	}),
+);
+
 export const pagesRelations = relations(pages, ({ one }) => ({
 	tenant: one(tenants, { fields: [pages.tenantId], references: [tenants.id] }),
 	run: one(runs, { fields: [pages.runId], references: [runs.id] }),

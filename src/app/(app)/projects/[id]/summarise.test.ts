@@ -794,6 +794,17 @@ const ROLE_CASES: Record<string, RoleCase> = {
 		subject: [`${R}/en/home`],
 		origin: [`${R}/en/home`],
 	},
+	console_error: {
+		url: `${R}/en/home`,
+		detail: {
+			url: `${R}/en/home`,
+			count: 2,
+			thirdPartyCount: 1,
+			messages: ["TypeError: undefined is not a function"],
+		},
+		subject: [`${R}/en/home`],
+		origin: [`${R}/en/home`],
+	},
 	image_oversized: {
 		url: `${R}/en/home`,
 		detail: {

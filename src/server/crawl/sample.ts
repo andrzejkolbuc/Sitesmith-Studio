@@ -82,7 +82,12 @@ export function chooseRenderSample(
 	cap: number = MAX_RENDERS,
 ): RenderSample {
 	const locales = declaredLocales.map((l) => l.toLowerCase());
-	const limit = Math.max(1, cap);
+	/**
+	 * Zero means none. Clamping it up to one, as a defensive `Math.max` would,
+	 * turns "render nothing" into "render something" — a caller that asked for no
+	 * measurement must not receive one.
+	 */
+	const limit = Math.max(0, cap);
 	const candidates = pages.filter(renderable);
 
 	const chosen: string[] = [];
@@ -101,7 +106,9 @@ export function chooseRenderSample(
 	 * the project — and on most sites it is the page a visitor sees first, which
 	 * makes it the page whose vitals anyone would ask about first.
 	 */
-	if (entryUrl && candidates.some((p) => p.url === entryUrl)) take(entryUrl);
+	if (limit > 0 && entryUrl && candidates.some((p) => p.url === entryUrl)) {
+		take(entryUrl);
+	}
 
 	/**
 	 * Per declared locale, that locale's pages ranked by how much the site links

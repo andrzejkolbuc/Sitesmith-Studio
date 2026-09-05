@@ -10,6 +10,7 @@ import {
 	type ImageWeightSweep,
 } from "./images";
 import { emptyMetadata, type PageMetadata } from "./metadata";
+import type { RenderResult } from "./render";
 import { parseRobots, type RobotsFile } from "./robots";
 import type { SitemapDocument } from "./sitemap";
 import type { CertificateObservation } from "./tls";
@@ -138,6 +139,8 @@ function findingsFor(options: {
 	 * is stated explicitly by the one test that is about it.
 	 */
 	imageWeights?: ImageWeightSweep;
+	/** Defaults to a complete pass with nothing observed: most cases render nothing. */
+	render?: RenderResult;
 	/** Defaults to a whole-site crawl: most cases describe an unscoped project. */
 	scopeNarrowed?: boolean;
 }): Summary[] {
@@ -152,6 +155,7 @@ function findingsFor(options: {
 		sitemap: options.sitemap ?? null,
 		entryUrl: options.entryUrl ?? null,
 		requested: options.requested ?? options.pages.map((p) => p.url),
+		render: options.render ?? { observations: [], complete: true },
 		imageWeights: options.imageWeights ?? { weighed: [], complete: true },
 		external: options.external ?? { checked: [], complete: false },
 		/** Not exposed here: the alias cases are all detail cases. */
@@ -198,6 +202,8 @@ function detailedFindingsFor(options: {
 	external?: ExternalSweep;
 	/** Defaults to a complete empty sweep: no heavy image means the site has none. */
 	imageWeights?: ImageWeightSweep;
+	/** Defaults to a complete pass with nothing observed: most cases render nothing. */
+	render?: RenderResult;
 	/** Defaults to a whole-site crawl: most cases describe an unscoped project. */
 	scopeNarrowed?: boolean;
 	/** Defaults to none: most cases describe routes that went where they were asked. */
@@ -214,6 +220,7 @@ function detailedFindingsFor(options: {
 		sitemap: options.sitemap ?? null,
 		entryUrl: options.entryUrl ?? null,
 		requested: options.requested ?? options.pages.map((p) => p.url),
+		render: { observations: [], complete: true },
 		imageWeights: options.imageWeights ?? { weighed: [], complete: true },
 		external: options.external ?? { checked: [], complete: false },
 		aliases: options.aliases ?? [],
@@ -3396,6 +3403,7 @@ describe("links that leave the site", () => {
 	it("reports a link to a page another site says is gone", () => {
 		const findings = detailedFindingsFor({
 			pages: [linking("/", ["https://elsewhere.test/gone"])],
+			render: { observations: [], complete: true },
 			imageWeights: { weighed: [], complete: true },
 			external: sweep([
 				{ url: "https://elsewhere.test/gone", httpStatus: 404 },
@@ -3422,6 +3430,7 @@ describe("links that leave the site", () => {
 		expect(
 			detailedFindingsFor({
 				pages: [linking("/", ["https://elsewhere.test/closed"])],
+				render: { observations: [], complete: true },
 				imageWeights: { weighed: [], complete: true },
 				external: sweep([
 					{ url: "https://elsewhere.test/closed", httpStatus: 403 },
@@ -3434,6 +3443,7 @@ describe("links that leave the site", () => {
 		expect(
 			detailedFindingsFor({
 				pages: [linking("/", ["https://elsewhere.test/down"])],
+				render: { observations: [], complete: true },
 				imageWeights: { weighed: [], complete: true },
 				external: sweep([
 					{ url: "https://elsewhere.test/down", httpStatus: 503 },
@@ -3448,6 +3458,7 @@ describe("links that leave the site", () => {
 		expect(
 			detailedFindingsFor({
 				pages,
+				render: { observations: [], complete: true },
 				imageWeights: { weighed: [], complete: true },
 				external: sweep([
 					{
@@ -3463,6 +3474,7 @@ describe("links that leave the site", () => {
 		expect(
 			detailedFindingsFor({
 				pages,
+				render: { observations: [], complete: true },
 				imageWeights: { weighed: [], complete: true },
 				external: sweep([
 					{
@@ -3486,6 +3498,7 @@ describe("links that leave the site", () => {
 		expect(
 			detailedFindingsFor({
 				pages: [linking("/", ["https://elsewhere.test/gone"])],
+				render: { observations: [], complete: true },
 				imageWeights: { weighed: [], complete: true },
 				external: sweep(
 					[{ url: "https://elsewhere.test/gone", httpStatus: 404 }],
@@ -3814,6 +3827,7 @@ describe("images heavy enough to be worth a look", () => {
 	it("reports a page carrying an image over the threshold", () => {
 		const findings = heavyFindings({
 			pages: [carrying([`${BASE}/hero.jpg`])],
+			render: { observations: [], complete: true },
 			imageWeights: {
 				weighed: [{ url: `${BASE}/hero.jpg`, bytes: 1_400_000 }],
 				complete: true,
@@ -3832,6 +3846,7 @@ describe("images heavy enough to be worth a look", () => {
 	it("reports the threshold beside the measurement", () => {
 		const findings = heavyFindings({
 			pages: [carrying([`${BASE}/hero.jpg`])],
+			render: { observations: [], complete: true },
 			imageWeights: {
 				weighed: [{ url: `${BASE}/hero.jpg`, bytes: 1_400_000 }],
 				complete: true,
@@ -3848,6 +3863,7 @@ describe("images heavy enough to be worth a look", () => {
 		expect(
 			heavyFindings({
 				pages: [carrying([`${BASE}/small.jpg`])],
+				render: { observations: [], complete: true },
 				imageWeights: {
 					weighed: [{ url: `${BASE}/small.jpg`, bytes: 12_000 }],
 					complete: true,
@@ -3865,6 +3881,7 @@ describe("images heavy enough to be worth a look", () => {
 		expect(
 			heavyFindings({
 				pages: [carrying([`${BASE}/hero.jpg`])],
+				render: { observations: [], complete: true },
 				imageWeights: {
 					weighed: [{ url: `${BASE}/hero.jpg`, bytes: 1_400_000 }],
 					complete: false,
@@ -3881,6 +3898,7 @@ describe("images heavy enough to be worth a look", () => {
 		expect(
 			heavyFindings({
 				pages: [carrying([`${BASE}/hero.jpg`])],
+				render: { observations: [], complete: true },
 				imageWeights: {
 					weighed: [{ url: `${BASE}/hero.jpg`, bytes: null }],
 					complete: true,
@@ -3892,6 +3910,7 @@ describe("images heavy enough to be worth a look", () => {
 	it("reports one finding per page, however many of its images are heavy", () => {
 		const findings = heavyFindings({
 			pages: [carrying([`${BASE}/a.jpg`, `${BASE}/b.jpg`, `${BASE}/c.jpg`])],
+			render: { observations: [], complete: true },
 			imageWeights: {
 				weighed: [
 					{ url: `${BASE}/a.jpg`, bytes: 900_000 },

@@ -174,6 +174,18 @@ describe("chooseRenderSample", () => {
 		expect(paths(sample.urls)).toEqual(["/b"]);
 	});
 
+	/**
+	 * A caller asking for no measurement must receive none. The entry page is
+	 * taken unconditionally otherwise, which quietly turned "render nothing" into
+	 * "render one page" — and a run that rendered when it was told not to is a
+	 * run whose cost nobody agreed to.
+	 */
+	it("chooses nothing when the cap is zero, entry page included", () => {
+		const pages = [page("/"), page("/en/popular", { inboundLinks: 99 })];
+
+		expect(chooseRenderSample(pages, ["en"], `${BASE}/`, 0).urls).toEqual([]);
+	});
+
 	it("returns an empty sample rather than throwing on empty input", () => {
 		expect(chooseRenderSample([], ["en"], null)).toEqual({
 			urls: [],

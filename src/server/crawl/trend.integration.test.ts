@@ -99,7 +99,7 @@ function callerFor(userId: string, tenantId: string) {
 }
 
 const crawl = async (tenantId: string, projectId: string) =>
-	(await runToCompletion(db, { tenantId, projectId })).runId;
+	(await runToCompletion(db, { tenantId, projectId, maxRenders: 0 })).runId;
 
 describe("which runs the trend will plot", () => {
 	/**

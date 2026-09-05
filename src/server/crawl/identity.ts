@@ -175,6 +175,15 @@ export function findingIdentity(finding: {
 			return key(type, text(detail.url));
 
 		/**
+		 * The page, not the messages or their number. A script that fails on every
+		 * load is one problem however many times it shouts, and keying on the text
+		 * would report a new problem each time an error message gained a line
+		 * number.
+		 */
+		case "console_error":
+			return key(type, text(detail.url));
+
+		/**
 		 * The duplicated string, in its field and its language. The pages carrying
 		 * it are exactly the population — the whole point of the finding is that
 		 * the set has more than one member, and a set that grows is the same

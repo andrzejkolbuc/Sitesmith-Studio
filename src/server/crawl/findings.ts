@@ -3,6 +3,7 @@ import type { Alias, CrawledPage, Hop, Reverification } from "./crawler";
 import { type ExternalSweep, isGone } from "./external";
 import type { ImageWeightSweep } from "./images";
 import { parseRobotsHeader } from "./metadata";
+import type { RenderResult } from "./render";
 import { evaluatePath, type RobotsFile, type RobotsRule } from "./robots";
 import { reconcile, type SitemapDocument } from "./sitemap";
 import type { CertificateObservation } from "./tls";
@@ -79,6 +80,8 @@ export const FINDING_TYPES = {
 	IMAGE_LEGACY_FORMAT: "image_legacy_format",
 	/** An image whose file is heavy enough to be worth a look. */
 	IMAGE_OVERSIZED: "image_oversized",
+	/** A page whose own scripts failed while it loaded. */
+	CONSOLE_ERROR: "console_error",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -168,6 +171,14 @@ export type DetectOptions = {
 	 */
 	imageWeights: ImageWeightSweep;
 	/**
+	 * What a browser saw, for the pages a run rendered.
+	 *
+	 * Only a sample is rendered, so most pages have no observation — and its
+	 * `complete` flag matters the same way the sweeps' does: a page we could not
+	 * render has no console errors in the sense that nobody looked.
+	 */
+	render: RenderResult;
+	/**
 	 * Routes that led somewhere other than where they were asked for.
 	 *
 	 * Read beside `pages` rather than instead of it, because the two hold
@@ -241,6 +252,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		requested,
 		external,
 		imageWeights,
+		render,
 		aliases,
 		scopeNarrowed,
 	} = options;
@@ -2280,6 +2292,41 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 					thresholdBytes: MAX_IMAGE_BYTES,
 					images: offenders.slice(0, 10),
 					listed: Math.min(offenders.length, 10),
+				},
+			});
+		}
+	}
+
+	// ── Rule 28: a page whose own scripts failed while it loaded ──────────────
+	//
+	// FR-015, scoped to the pages a run actually rendered — a console error only
+	// exists once something executes the page, and executing every page is the
+	// cost the PRD rejected under FR-028. The finding therefore describes the
+	// sample, and the view says so.
+	//
+	// **First-party only.** A third-party widget throwing is on the client's page
+	// but is not the client's defect: they did not write it, often cannot fix it,
+	// and an analytics script failing in an ad blocker would otherwise put a
+	// finding on every page of every site we check. The third-party count travels
+	// in the detail so the reader can see what we did not report — silence about
+	// it would be a different dishonesty.
+	if (render.complete) {
+		for (const observation of [...render.observations].sort((a, b) =>
+			a.url.localeCompare(b.url),
+		)) {
+			if (observation.firstPartyErrors === 0) continue;
+
+			findings.push({
+				type: FINDING_TYPES.CONSOLE_ERROR,
+				url: observation.url,
+				detail: {
+					url: observation.url,
+					count: observation.firstPartyErrors,
+					/** Counted and shown, never reported. See the note above. */
+					thirdPartyCount: observation.thirdPartyErrors,
+					messages: observation.samples
+						.filter((sample) => sample.firstParty)
+						.map((sample) => sample.message),
 				},
 			});
 		}

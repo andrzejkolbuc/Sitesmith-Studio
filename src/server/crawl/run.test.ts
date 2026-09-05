@@ -6,6 +6,7 @@ import { createCaller } from "~/server/api/root";
 import * as schema from "~/server/db/schema";
 import {
 	findings,
+	pageObservations,
 	pages,
 	projects,
 	runs,
@@ -90,6 +91,7 @@ describe("run lifecycle", () => {
 		const { runId } = await runToCompletion(db, {
 			tenantId: tenant.id,
 			projectId: project.id,
+			maxRenders: 0,
 		});
 
 		const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
@@ -107,6 +109,7 @@ describe("run lifecycle", () => {
 		const { runId } = await runToCompletion(db, {
 			tenantId: tenant.id,
 			projectId: project.id,
+			maxRenders: 0,
 		});
 
 		const stored = await db.query.pages.findMany({
@@ -127,6 +130,7 @@ describe("run lifecycle", () => {
 		const { runId } = await runToCompletion(db, {
 			tenantId: tenant.id,
 			projectId: project.id,
+			maxRenders: 0,
 		});
 
 		const stored = await db.query.findings.findMany({
@@ -151,6 +155,7 @@ describe("run lifecycle", () => {
 		const { runId } = await runToCompletion(db, {
 			tenantId: tenant.id,
 			projectId: project.id,
+			maxRenders: 0,
 		});
 
 		const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
@@ -177,11 +182,81 @@ describe("run lifecycle", () => {
 		const { runId } = await runToCompletion(db, {
 			tenantId: tenant.id,
 			projectId: project.id,
+			maxRenders: 0,
 		});
 
 		const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
 
 		expect(run?.ruleSet).toEqual([...Object.values(FINDING_TYPES)].sort());
+	});
+
+	/**
+	 * The render pass, wired end to end.
+	 *
+	 * The only case in this file that renders anything. Every other run test
+	 * passes `maxRenders: 0`, because a browser costs seconds per page and twenty
+	 * cases about crawling, comparison and tenancy would each pay for one while
+	 * proving nothing this does not.
+	 *
+	 * What it fixes is the wiring: the sample is chosen from the crawl, the
+	 * observations reach the table, and the run records what the pass covered so
+	 * a reader can be told how much of the site the numbers describe.
+	 */
+	it("stores what the browser saw for the pages it sampled", async () => {
+		const { tenant, project } = await seedProject("omicron");
+
+		const { runId } = await runToCompletion(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+			maxRenders: 2,
+		});
+
+		const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
+		const observed = await db.query.pageObservations.findMany({
+			where: eq(pageObservations.runId, runId),
+		});
+
+		expect(run?.renderSummary?.cap).toBe(2);
+		expect(run?.renderSummary?.complete).toBe(true);
+		expect(observed.length).toBeGreaterThan(0);
+		expect(observed.length).toBeLessThanOrEqual(2);
+		expect(run?.renderSummary?.chosen).toBe(observed.length);
+
+		/** Every stored row belongs to a page this run actually recorded. */
+		const pageIds = new Set(
+			(
+				await db.query.pages.findMany({
+					where: eq(pages.runId, runId),
+					columns: { id: true },
+				})
+			).map((page) => page.id),
+		);
+		expect(observed.every((o) => pageIds.has(o.pageId))).toBe(true);
+	}, 60_000);
+
+	/**
+	 * A run that renders nothing is an ordinary run, not a broken one. The column
+	 * says the pass covered nothing rather than going null, because null means
+	 * *not recorded* and this run recorded an answer.
+	 */
+	it("records a render pass that was asked for nothing", async () => {
+		const { tenant, project } = await seedProject("pi");
+
+		const { runId } = await runToCompletion(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+			maxRenders: 0,
+		});
+
+		const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
+
+		expect(run?.renderSummary).toEqual({
+			chosen: 0,
+			measured: 0,
+			cap: 0,
+			complete: true,
+		});
+		expect(run?.status).toBe(RUN_STATUS.DONE);
 	});
 
 	/**
@@ -201,6 +276,7 @@ describe("run lifecycle", () => {
 		const { runId } = await runToCompletion(db, {
 			tenantId: tenant.id,
 			projectId: project.id,
+			maxRenders: 0,
 		});
 
 		const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
@@ -220,6 +296,7 @@ describe("run lifecycle", () => {
 		const { runId } = await runToCompletion(db, {
 			tenantId: tenant.id,
 			projectId: project.id,
+			maxRenders: 0,
 		});
 
 		const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
@@ -245,6 +322,7 @@ describe("run lifecycle", () => {
 		const { runId } = await runToCompletion(db, {
 			tenantId: tenant.id,
 			projectId: project.id,
+			maxRenders: 0,
 		});
 
 		const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
@@ -316,6 +394,7 @@ describe("run procedures", () => {
 		const { runId } = await runToCompletion(db, {
 			tenantId: a.tenant.id,
 			projectId: a.project.id,
+			maxRenders: 0,
 		});
 
 		const intruder = callerFor(b.owner.id, b.tenant.id);
@@ -402,6 +481,7 @@ describe("crawl scope chosen at creation", () => {
 		await runToCompletion(db, {
 			tenantId: tenant.id,
 			projectId: project.id,
+			maxRenders: 0,
 		});
 
 		/**
@@ -452,6 +532,7 @@ describe("progress while a run is in flight", () => {
 		const { runId } = await startRun(db, {
 			tenantId: tenant.id,
 			projectId: project.id,
+			maxRenders: 0,
 		});
 
 		/**
