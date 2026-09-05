@@ -174,6 +174,10 @@ const CASES: Record<string, Case> = {
 		kind: "foreign-id",
 		input: (victim) => ({ runId: victim.run.id }),
 	},
+	"project.runObservations": {
+		kind: "foreign-id",
+		input: (victim) => ({ runId: victim.run.id }),
+	},
 	"project.trend": {
 		kind: "foreign-id",
 		input: (victim) => ({ projectId: victim.project.id }),

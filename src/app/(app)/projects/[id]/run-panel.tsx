@@ -16,6 +16,7 @@ import {
 import { type CorrelatedProblem, correlate } from "./correlate";
 import { FINDING_LABEL } from "./finding-labels";
 import { buildParity, type Cell } from "./parity";
+import { Performance } from "./performance-table";
 import { RunHistory } from "./run-history";
 import { countPages, summariseList } from "./summarise";
 import { TrendGrid } from "./trend-grid";
@@ -134,6 +135,13 @@ function Listed({ items }: { items: string[] }) {
 }
 
 /** A URL shortened to its path, since every member shares the same host. */
+/** Bytes in the unit a reader thinks in. */
+function kb(bytes: number | null): string {
+	if (bytes === null) return "an unknown size";
+	if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
+	return `${Math.round(bytes / 1000)} kB`;
+}
+
 function pathOf(url: unknown): string {
 	if (typeof url !== "string") return "?";
 	try {
@@ -400,6 +408,13 @@ export function RunPanel({
 			{settled && pages.data && pages.data.length > 0 ? (
 				<ParityGrid expectedLocales={expectedLocales} pages={pages.data} />
 			) : null}
+
+			{/*
+			 * Beside the parity grid rather than among the findings: what a browser
+			 * measured is an observation, not a conclusion, and the findings list is
+			 * where conclusions live.
+			 */}
+			{settled && selectedRunId ? <Performance runId={selectedRunId} /> : null}
 
 			{settled && correlated.problems.length > 0 ? (
 				<Problems problems={correlated.problems} statuses={statuses} />
@@ -1126,6 +1141,114 @@ function Evidence({
 						things
 					</span>
 					<Listed items={lines} />
+				</>
+			);
+		}
+
+		case "image_missing_dimensions":
+		case "image_legacy_format":
+		case "image_oversized": {
+			const images = Array.isArray(detail.images) ? detail.images : [];
+			const count = typeof detail.count === "number" ? detail.count : 0;
+			const of = typeof detail.of === "number" ? detail.of : null;
+			const threshold =
+				typeof detail.thresholdBytes === "number"
+					? detail.thresholdBytes
+					: null;
+
+			const sentence =
+				type === "image_missing_dimensions"
+					? `${count} image${count === 1 ? "" : "s"} declare no width and height, so the page moves as they load`
+					: type === "image_legacy_format"
+						? `${count} image${count === 1 ? "" : "s"} are offered in no format newer than JPEG or PNG`
+						: `${count} image${count === 1 ? "" : "s"} weigh more than ${kb(threshold)}`;
+
+			return (
+				<>
+					<span className="text-ink">
+						{sentence}
+						{of === null ? null : (
+							<span className="text-ink-faint"> of {of} on the page</span>
+						)}
+					</span>
+					<div className="mt-1.5 break-all font-mono text-ink-soft text-xs">
+						{pathOf(str("url"))}
+					</div>
+					<ul className="mt-1.5 space-y-0.5">
+						{images.map((image) => {
+							const url =
+								typeof image === "string"
+									? image
+									: ((image as { url?: string }).url ?? "");
+							const bytes =
+								typeof image === "object" && image !== null
+									? (image as { bytes?: number }).bytes
+									: undefined;
+
+							return (
+								<li
+									className="break-all font-mono text-ink-faint text-xs"
+									key={url}
+								>
+									{pathOf(url)}
+									{typeof bytes === "number" ? ` — ${kb(bytes)}` : null}
+								</li>
+							);
+						})}
+					</ul>
+					{/*
+					 * The threshold is ours, so it is shown. A reader who thinks this
+					 * size is fine for a full-bleed hero can disagree with the number
+					 * rather than only with the verdict.
+					 */}
+					{threshold === null ? null : (
+						<p className="mt-1.5 text-ink-faint text-xs italic">
+							Reported above {kb(threshold)}
+						</p>
+					)}
+				</>
+			);
+		}
+
+		case "console_error": {
+			const messages = Array.isArray(detail.messages)
+				? (detail.messages as string[])
+				: [];
+			const count = typeof detail.count === "number" ? detail.count : 0;
+			const thirdParty =
+				typeof detail.thirdPartyCount === "number" ? detail.thirdPartyCount : 0;
+
+			return (
+				<>
+					<span className="text-ink">
+						{count} error{count === 1 ? "" : "s"} from this page's own scripts
+						while it loaded
+					</span>
+					<div className="mt-1.5 break-all font-mono text-ink-soft text-xs">
+						{pathOf(str("url"))}
+					</div>
+					<ul className="mt-1.5 space-y-0.5">
+						{messages.map((message) => (
+							<li
+								className="break-all font-mono text-ink-faint text-xs"
+								key={message}
+							>
+								{message}
+							</li>
+						))}
+					</ul>
+					{/*
+					 * Said out loud rather than left as a silent omission. A widget
+					 * breaking itself is on the page but is not the client's defect, and
+					 * a reader who saw it in their own console needs to know we saw it
+					 * too and chose not to report it.
+					 */}
+					{thirdParty === 0 ? null : (
+						<p className="mt-1.5 text-ink-faint text-xs italic">
+							{thirdParty} further error{thirdParty === 1 ? "" : "s"} came from
+							scripts loaded from other sites, and are not reported here
+						</p>
+					)}
 				</>
 			);
 		}

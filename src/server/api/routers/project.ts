@@ -9,7 +9,13 @@ import {
 } from "~/server/api/trpc";
 import { comparability, compareFindings } from "~/server/crawl/comparison";
 import { RunAlreadyActiveError, startRun } from "~/server/crawl/run";
-import { findings, pages, projects, runs } from "~/server/db/schema";
+import {
+	findings,
+	pageObservations,
+	pages,
+	projects,
+	runs,
+} from "~/server/db/schema";
 
 /**
  * The reference example every domain router should copy.
@@ -331,6 +337,51 @@ export const projectRouter = createTRPCRouter({
 				.groupBy(findings.runId, findings.type);
 
 			return { runs: ordered, counts };
+		}),
+
+	/**
+	 * What a browser saw during one run, and how much of the site that was.
+	 *
+	 * The summary travels with the observations rather than being inferred from
+	 * how many there are: a reader has to be told the sample was a sample, and a
+	 * pass that could not run at all has zero observations for a reason that is
+	 * not "the site was fine".
+	 */
+	runObservations: tenantProcedure
+		.input(z.object({ runId: z.string() }))
+		.query(async ({ ctx, input }) => {
+			const run = await ctx.db.query.runs.findFirst({
+				where: and(tenantScope(runs, ctx.tenantId), eq(runs.id, input.runId)),
+			});
+			if (!run) throw new TRPCError({ code: "NOT_FOUND" });
+
+			const observed = await ctx.db
+				.select({
+					id: pageObservations.id,
+					url: pages.url,
+					ttfbMs: pageObservations.ttfbMs,
+					lcpMs: pageObservations.lcpMs,
+					cls: pageObservations.cls,
+					firstPartyErrors: pageObservations.firstPartyErrors,
+					thirdPartyErrors: pageObservations.thirdPartyErrors,
+					renderError: pageObservations.renderError,
+				})
+				.from(pageObservations)
+				.innerJoin(pages, eq(pages.id, pageObservations.pageId))
+				.where(
+					and(
+						tenantScope(pageObservations, ctx.tenantId),
+						eq(pageObservations.runId, run.id),
+					),
+				)
+				.orderBy(pages.url);
+
+			return {
+				observations: observed,
+				summary: run.renderSummary,
+				/** How many pages the run recorded, so the sample can be put in proportion. */
+				pagesCrawled: run.pagesCrawled,
+			};
 		}),
 
 	runPages: tenantProcedure
