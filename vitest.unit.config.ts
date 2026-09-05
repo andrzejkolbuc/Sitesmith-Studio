@@ -28,6 +28,7 @@ export default defineConfig({
 			"src/server/crawl/metadata.test.ts",
 			"src/server/crawl/findings.test.ts",
 			"src/server/crawl/identity.test.ts",
+			"src/server/crawl/images.test.ts",
 			"src/server/crawl/comparison.test.ts",
 			"src/server/crawl/site-shapes.test.ts",
 			"src/server/crawl/politeness.test.ts",

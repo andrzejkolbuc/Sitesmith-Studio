@@ -337,6 +337,25 @@ export const pages = createTable(
 		variantGroupKey: d.varchar({ length: 255 }),
 		/** The hreflang targets this page declared, as locale → URL. */
 		hreflangTargets: d.jsonb().$type<Record<string, string>>(),
+		/**
+		 * What this page's markup says about its images, in fixed-size form.
+		 *
+		 * Nullable, and null means *not observed* rather than "no images" — a page
+		 * recorded before this column existed, or a response that was never HTML.
+		 * The rules that read it must stay silent on null for the reason every
+		 * other rule here does: an unobserved page is not a clean one.
+		 *
+		 * Counts are exact; the URL lists behind them are capped at capture, since
+		 * this row is written once per page of a crawl that can reach two thousand.
+		 */
+		images: d.jsonb().$type<{
+			total: number;
+			undimensioned: number;
+			legacy: number;
+			undimensionedUrls: string[];
+			legacyUrls: string[];
+			urls: string[];
+		}>(),
 		fetchError: d.text(),
 		createdAt: d
 			.timestamp({ withTimezone: true })

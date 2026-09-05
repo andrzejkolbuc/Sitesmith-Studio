@@ -161,6 +161,19 @@ export function findingIdentity(finding: {
 			return key(type, text(detail.url));
 
 		/**
+		 * The page, and nothing about how many images were wrong on it.
+		 *
+		 * A template that forgot its dimensions forgot them for every image the
+		 * page carries, so the count is the population — a page that gains a
+		 * gallery is the same defect at a larger size, not a new one. Keying on the
+		 * count would report the problem as resolved and immediately re-broken
+		 * every time an editor added a picture.
+		 */
+		case "image_missing_dimensions":
+		case "image_legacy_format":
+			return key(type, text(detail.url));
+
+		/**
 		 * The duplicated string, in its field and its language. The pages carrying
 		 * it are exactly the population — the whole point of the finding is that
 		 * the set has more than one member, and a set that grows is the same

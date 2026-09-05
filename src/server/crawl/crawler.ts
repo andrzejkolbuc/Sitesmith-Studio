@@ -13,6 +13,7 @@
 
 import { type ContentSummary, emptyContent, extractContent } from "./content";
 import { checkExternalLinks, type ExternalSweep } from "./external";
+import { emptyImages, extractImages, type ImageSummary } from "./images";
 import {
 	emptyMetadata,
 	extractMetadata,
@@ -83,6 +84,13 @@ export type CrawledPage = {
 	 * of the text rather than the text.
 	 */
 	content: ContentSummary;
+	/**
+	 * What the page's images are, in fixed-size form.
+	 *
+	 * Read from the same markup as `content`, for the same reason and at the
+	 * same cost: nothing extra is requested, and nothing unbounded is retained.
+	 */
+	images: ImageSummary;
 	/**
 	 * What the page declares about itself to a search engine.
 	 *
@@ -726,6 +734,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 				hreflangTargets: extractHreflang(html, served),
 				links: extractLinks(html, served),
 				content: extractContent(html, isHtml),
+				images: extractImages(html, served, isHtml),
 				metadata: extractMetadata(html, served),
 				xRobotsTag: xRobotsTag?.slice(0, MAX_METADATA_CHARS) ?? null,
 				redirectChain,
@@ -739,6 +748,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
 				hreflangTargets: {},
 				links: [],
 				content: emptyContent(false),
+				images: emptyImages(),
 				metadata: emptyMetadata(),
 				xRobotsTag: null,
 				redirectChain,

@@ -172,6 +172,7 @@ async function execute(
 				url: page.url,
 				httpStatus: page.httpStatus,
 				hreflangTargets: page.hreflangTargets,
+				images: page.images,
 				fetchError: page.fetchError,
 			});
 

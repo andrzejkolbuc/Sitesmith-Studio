@@ -72,6 +72,10 @@ export const FINDING_TYPES = {
 	LINK_EXTERNAL_BROKEN: "link_external_broken",
 	/** A redirect chain of more than one hop, or one that goes round. */
 	REDIRECT_CHAIN: "redirect_chain",
+	/** Images the page reserves no space for, so the layout shifts as they load. */
+	IMAGE_MISSING_DIMENSIONS: "image_missing_dimensions",
+	/** Images offered in no format newer than JPEG or PNG. */
+	IMAGE_LEGACY_FORMAT: "image_legacy_format",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -2140,5 +2144,78 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 			},
 		});
 	}
+
+	// ── Rule 25: images the page reserves no space for ────────────────────────
+	//
+	// FR-029's cheapest signal and entirely the site's own markup: an `img` that
+	// declares neither a width nor a height gives the browser nothing to reserve,
+	// so everything below it moves when the image arrives. The attributes are the
+	// page's own statement about its layout, so their absence is too.
+	//
+	// Both attributes, never either: a width alone reserves no space, because the
+	// height is what pushes the rest of the document down.
+	//
+	// One finding per page rather than one per image, following rule 9: a
+	// template that forgot the attributes forgot them everywhere, and a page with
+	// forty images would otherwise fill the list on its own.
+	for (const page of [...pages].sort((a, b) => a.url.localeCompare(b.url))) {
+		if (isError(page)) continue;
+		/**
+		 * Null is silence. A page crawled before images were observed, or one that
+		 * never returned HTML, has no answer — and the honest handling of "we did
+		 * not look" is to say nothing rather than to report a clean page.
+		 */
+		if (!page.images) continue;
+		/**
+		 * A PDF or a feed contains no images in this sense and never should.
+		 * Rule 9 declines on the same grounds, and for the same reason: the format
+		 * a URL serves is not something the site got wrong.
+		 */
+		if (!page.content.isHtml) continue;
+		if (page.images.undimensioned === 0) continue;
+
+		findings.push({
+			type: FINDING_TYPES.IMAGE_MISSING_DIMENSIONS,
+			url: page.url,
+			detail: {
+				url: page.url,
+				count: page.images.undimensioned,
+				of: page.images.total,
+				/** Capped at capture; the count above is the exact number. */
+				images: page.images.undimensionedUrls,
+				listed: page.images.undimensionedUrls.length,
+			},
+		});
+	}
+
+	// ── Rule 26: images offered in no modern format ───────────────────────────
+	//
+	// The second half of FR-029 that needs no request. Judged only on URLs whose
+	// extension names a raster format the site chose: an `svg` has no modern
+	// replacement, an extensionless CDN URL may well be negotiating one by
+	// content type, and calling either legacy would be a finding about our guess.
+	//
+	// A `picture` offering a modern `source` exempts its own `img` fallback.
+	// That fallback is the site being careful about old browsers, and reporting it
+	// would punish exactly the markup the rule wants to see.
+	for (const page of [...pages].sort((a, b) => a.url.localeCompare(b.url))) {
+		if (isError(page)) continue;
+		if (!page.images) continue;
+		if (!page.content.isHtml) continue;
+		if (page.images.legacy === 0) continue;
+
+		findings.push({
+			type: FINDING_TYPES.IMAGE_LEGACY_FORMAT,
+			url: page.url,
+			detail: {
+				url: page.url,
+				count: page.images.legacy,
+				of: page.images.total,
+				images: page.images.legacyUrls,
+				listed: page.images.legacyUrls.length,
+			},
+		});
+	}
+
 	return findings;
 }

@@ -162,6 +162,20 @@ const SAMPLES: Record<string, Record<string, unknown>> = {
 		discovery: "robots",
 		urls: ["https://x.test/orphan"],
 	},
+	[FINDING_TYPES.IMAGE_MISSING_DIMENSIONS]: {
+		url: "https://x.test/en/home",
+		count: 4,
+		of: 6,
+		images: ["https://x.test/a.jpg", "https://x.test/b.jpg"],
+		listed: 2,
+	},
+	[FINDING_TYPES.IMAGE_LEGACY_FORMAT]: {
+		url: "https://x.test/en/home",
+		count: 3,
+		of: 6,
+		images: ["https://x.test/a.jpg"],
+		listed: 1,
+	},
 	[FINDING_TYPES.REDIRECT_CHAIN]: {
 		kind: "chain",
 		from: "https://x.test/old",

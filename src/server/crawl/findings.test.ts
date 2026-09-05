@@ -4,6 +4,7 @@ import { type Fixture, startFixtureSite } from "../../../test/fixtures/site";
 import { emptyContent } from "./content";
 import { type CrawledPage, crawl } from "./crawler";
 import { detectMissingVariants, FINDING_TYPES } from "./findings";
+import { emptyImages } from "./images";
 import { emptyMetadata } from "./metadata";
 import { groupVariants, localeFromUrl } from "./variants";
 
@@ -27,6 +28,7 @@ const page = (
 	hreflangTargets,
 	links: [],
 	content: emptyContent(true),
+	images: emptyImages(),
 	/**
 	 * A title and description by default, unique to the URL.
 	 *
@@ -754,6 +756,7 @@ describe("detectMissingVariants edge cases", () => {
 			},
 			links: [],
 			content: emptyContent(true),
+			images: emptyImages(),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
 			redirectChain: [],
@@ -768,6 +771,7 @@ describe("detectMissingVariants edge cases", () => {
 			hreflangTargets: {},
 			links: [],
 			content: emptyContent(true),
+			images: emptyImages(),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
 			redirectChain: [],
@@ -813,6 +817,7 @@ describe("detectMissingVariants edge cases", () => {
 			},
 			links: [],
 			content: emptyContent(true),
+			images: emptyImages(),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
 			redirectChain: [],
@@ -828,6 +833,7 @@ describe("detectMissingVariants edge cases", () => {
 			},
 			links: [],
 			content: emptyContent(true),
+			images: emptyImages(),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
 			redirectChain: [],
@@ -865,6 +871,7 @@ describe("detectMissingVariants edge cases", () => {
 			hreflangTargets: {},
 			links: [],
 			content: emptyContent(true),
+			images: emptyImages(),
 			metadata: emptyMetadata(),
 			xRobotsTag: null,
 			redirectChain: [],

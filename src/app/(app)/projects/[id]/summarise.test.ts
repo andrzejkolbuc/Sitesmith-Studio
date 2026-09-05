@@ -782,6 +782,30 @@ const ROLE_CASES: Record<string, RoleCase> = {
 		subject: ["https://partner.example/gone"],
 		origin: [`${R}/`, `${R}/about`],
 	},
+	image_missing_dimensions: {
+		url: `${R}/en/home`,
+		detail: {
+			url: `${R}/en/home`,
+			count: 4,
+			of: 6,
+			images: [`${R}/a.jpg`],
+			listed: 1,
+		},
+		subject: [`${R}/en/home`],
+		origin: [`${R}/en/home`],
+	},
+	image_legacy_format: {
+		url: `${R}/en/home`,
+		detail: {
+			url: `${R}/en/home`,
+			count: 3,
+			of: 6,
+			images: [`${R}/a.jpg`],
+			listed: 1,
+		},
+		subject: [`${R}/en/home`],
+		origin: [`${R}/en/home`],
+	},
 	redirect_chain: {
 		url: null,
 		detail: {

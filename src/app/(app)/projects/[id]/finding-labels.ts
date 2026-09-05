@@ -32,4 +32,6 @@ export const FINDING_LABEL: Record<string, string> = {
 	page_orphaned: "Pages the sitemap lists that nothing links to",
 	link_external_broken: "Links to other sites that are gone",
 	redirect_chain: "Redirects that go through several hops, or in circles",
+	image_missing_dimensions: "Images that shift the layout as they load",
+	image_legacy_format: "Images served in no modern format",
 };

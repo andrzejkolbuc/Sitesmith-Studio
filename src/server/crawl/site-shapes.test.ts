@@ -4,6 +4,7 @@ import { type ContentSummary, emptyContent } from "./content";
 import type { Alias, CrawledPage, Hop, Reverification } from "./crawler";
 import type { ExternalSweep } from "./external";
 import { detectMissingVariants } from "./findings";
+import { emptyImages, type ImageSummary } from "./images";
 import { emptyMetadata, type PageMetadata } from "./metadata";
 import { parseRobots, type RobotsFile } from "./robots";
 import type { SitemapDocument } from "./sitemap";
@@ -60,6 +61,12 @@ const page = (
 		redirectChain?: Hop[];
 		/** The `X-Robots-Tag` header, verbatim as a site would serve it. */
 		xRobotsTag?: string | null;
+		/**
+		 * Overrides on the image summary, for the reason `content` takes them: a
+		 * case states the counts it means rather than writing markup and depending
+		 * on the extractor as well as the rule.
+		 */
+		images?: Partial<ImageSummary>;
 	} = {},
 ): CrawledPage => ({
 	url: `${BASE}${path}`,
@@ -88,6 +95,7 @@ const page = (
 		description: `Description of ${path}`,
 		...options.metadata,
 	},
+	images: { ...emptyImages(), ...options.images },
 	xRobotsTag: options.xRobotsTag ?? null,
 	redirectChain: options.redirectChain ?? [],
 	securityHeaders: options.securityHeaders ?? {},
@@ -3644,5 +3652,127 @@ describe("redirects that go through several hops, or in circles", () => {
 				],
 			}).filter(chain),
 		).toHaveLength(1);
+	});
+});
+
+/**
+ * The two image rules that cost no request.
+ *
+ * Both read a summary the crawl took from the page's own markup, so every case
+ * here states the counts it means rather than writing HTML — `images.test.ts`
+ * owns the question of whether the markup was read correctly.
+ */
+describe("images the page asked the browser to load", () => {
+	const imageFindings = (options: Parameters<typeof detailedFindingsFor>[0]) =>
+		detailedFindingsFor(options).filter((f) => f.type.startsWith("image_"));
+
+	it("says nothing about a page whose images are all dimensioned and modern", () => {
+		expect(
+			imageFindings({
+				pages: [page("/en/home", { images: { total: 4 } })],
+			}),
+		).toEqual([]);
+	});
+
+	it("says nothing about a page with no images at all", () => {
+		expect(imageFindings({ pages: [page("/en/home")] })).toEqual([]);
+	});
+
+	it("reports a page whose images reserve no space, once", () => {
+		const findings = imageFindings({
+			pages: [
+				page("/en/home", {
+					images: {
+						total: 6,
+						undimensioned: 4,
+						undimensionedUrls: [`${BASE}/a.jpg`, `${BASE}/b.jpg`],
+					},
+				}),
+			],
+		});
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.type).toBe("image_missing_dimensions");
+		expect(findings[0]?.detail.count).toBe(4);
+		expect(findings[0]?.detail.of).toBe(6);
+	});
+
+	it("reports a page serving images in no modern format, once", () => {
+		const findings = imageFindings({
+			pages: [
+				page("/en/home", {
+					images: { total: 3, legacy: 3, legacyUrls: [`${BASE}/a.jpg`] },
+				}),
+			],
+		});
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.type).toBe("image_legacy_format");
+	});
+
+	/**
+	 * The count is exact and the list is evidence. A reader shown two URLs beside
+	 * a count of forty knows they are looking at a sample; one shown two URLs and
+	 * no count would think the page had two.
+	 */
+	it("reports the exact count beside the capped list of URLs", () => {
+		const findings = imageFindings({
+			pages: [
+				page("/en/home", {
+					images: {
+						total: 40,
+						undimensioned: 40,
+						undimensionedUrls: [`${BASE}/a.jpg`, `${BASE}/b.jpg`],
+					},
+				}),
+			],
+		});
+
+		expect(findings[0]?.detail.count).toBe(40);
+		expect(findings[0]?.detail.listed).toBe(2);
+	});
+
+	/**
+	 * A PDF has no images in this sense and never should. Reporting one would be
+	 * a finding about the format the URL serves, which rule 9 already declines to
+	 * make for the same reason.
+	 */
+	it("says nothing about a response that was never HTML", () => {
+		expect(
+			imageFindings({
+				pages: [
+					page("/brochure.pdf", {
+						content: { isHtml: false },
+						images: { total: 5, undimensioned: 5, legacy: 5 },
+					}),
+				],
+			}),
+		).toEqual([]);
+	});
+
+	/**
+	 * An unobserved page is not a clean one. A page recorded before images were
+	 * read has no answer, and the honest handling of "we did not look" is silence.
+	 */
+	it("says nothing about a page whose images were never observed", () => {
+		const unobserved = {
+			...page("/en/home"),
+			images: undefined as unknown as ReturnType<typeof emptyImages>,
+		};
+
+		expect(imageFindings({ pages: [unobserved] })).toEqual([]);
+	});
+
+	it("says nothing about a page that failed to load", () => {
+		expect(
+			imageFindings({
+				pages: [
+					page("/en/gone", {
+						status: 404,
+						images: { total: 5, undimensioned: 5, legacy: 5 },
+					}),
+				],
+			}),
+		).toEqual([]);
 	});
 });

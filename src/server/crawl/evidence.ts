@@ -111,6 +111,14 @@ export function evidenceRoles(finding: {
 			return both(strings(detail.memberUrls));
 
 		case "metadata_missing":
+		/**
+		 * The page is both the thing that is wrong and the page that emits it: the
+		 * images are its own markup. The image URLs are evidence, never origins —
+		 * a logo used site-wide would otherwise be adjacent to every page that
+		 * shows it, which is the bridging `lessons.md` rule 2 was written about.
+		 */
+		case "image_missing_dimensions":
+		case "image_legacy_format":
 			return both(one(detail.url));
 
 		/**
