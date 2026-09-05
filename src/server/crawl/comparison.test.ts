@@ -14,9 +14,12 @@ const scope = (over: Partial<NonNullable<ComparableRun["scope"]>> = {}) => ({
 	...over,
 });
 
+const RULES = ["link_broken", "metadata_missing", "no_hreflang"];
+
 const complete = (over: Partial<ComparableRun> = {}): ComparableRun => ({
 	crawlComplete: true,
 	scope: scope(),
+	ruleSet: RULES,
 	...over,
 });
 
@@ -44,6 +47,11 @@ describe("comparability", () => {
 		).toEqual({ comparable: false, reason: "not_recorded" });
 
 		expect(comparability(complete(), complete({ scope: null }))).toEqual({
+			comparable: false,
+			reason: "not_recorded",
+		});
+
+		expect(comparability(complete({ ruleSet: null }), complete())).toEqual({
 			comparable: false,
 			reason: "not_recorded",
 		});
@@ -99,6 +107,47 @@ describe("comparability", () => {
 				complete({ scope: scope({ locales: ["de", "en"] }) }),
 			),
 		).toEqual({ comparable: true });
+	});
+
+	/**
+	 * The live defect this clause closes. Before it, the first comparison after
+	 * any new rule shipped reported every finding that rule produced as new —
+	 * the site breaking on the day we started checking.
+	 */
+	it("refuses when the rule set changed", () => {
+		expect(
+			comparability(
+				complete(),
+				complete({ ruleSet: [...RULES, "certificate_problem"] }),
+			),
+		).toEqual({ comparable: false, reason: "rules_changed" });
+	});
+
+	it("does not treat a reordered rule set as a change", () => {
+		expect(
+			comparability(
+				complete({ ruleSet: ["a", "b", "c"] }),
+				complete({ ruleSet: ["c", "a", "b"] }),
+			),
+		).toEqual({ comparable: true });
+	});
+
+	/**
+	 * Ordered by what the reader can act on. The scope is their own configuration
+	 * and they can change it back; our rule set is ours, and telling them about
+	 * it while a scope change is also outstanding would hand them the one thing
+	 * they cannot do anything about.
+	 */
+	it("reports the scope change when the rules changed too", () => {
+		expect(
+			comparability(
+				complete(),
+				complete({
+					scope: scope({ includePaths: ["/handbook"] }),
+					ruleSet: [...RULES, "certificate_problem"],
+				}),
+			),
+		).toEqual({ comparable: false, reason: "scope_changed" });
 	});
 
 	/**

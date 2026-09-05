@@ -23,6 +23,8 @@ export type ComparableRun = {
 		excludePaths: string[];
 		locales: string[];
 	} | null;
+	/** The detection rules that could have fired; null on runs from before it. */
+	ruleSet: string[] | null;
 };
 
 export type ComparabilityReason =
@@ -31,7 +33,9 @@ export type ComparabilityReason =
 	/** One of the runs aborted or hit the page ceiling. */
 	| "incomplete_crawl"
 	/** The project was told to crawl something different in between. */
-	| "scope_changed";
+	| "scope_changed"
+	/** We changed what we check for between the two runs. */
+	| "rules_changed";
 
 export type Comparability =
 	| { comparable: true }
@@ -79,7 +83,9 @@ export function comparability(
 		previous.crawlComplete === null ||
 		current.crawlComplete === null ||
 		previous.scope === null ||
-		current.scope === null
+		current.scope === null ||
+		previous.ruleSet === null ||
+		current.ruleSet === null
 	) {
 		return { comparable: false, reason: "not_recorded" };
 	}
@@ -104,6 +110,21 @@ export function comparability(
 		!sameSet(previous.scope.locales, current.scope.locales)
 	) {
 		return { comparable: false, reason: "scope_changed" };
+	}
+
+	/**
+	 * Evaluated last, and deliberately so. Every reason above is either something
+	 * the reader can act on or something about their own site; this one is about
+	 * us. When a run differs in both, the scope is what they can fix, so that is
+	 * the answer they are given.
+	 *
+	 * Without the clause the first comparison after any new rule ships reports
+	 * every finding that rule produces as new — "your site broke" where the truth
+	 * is "we started checking". Set equality again, for the reason the scope uses
+	 * it: the rule set is recorded sorted, but a reordering is still not a change.
+	 */
+	if (!sameSet(previous.ruleSet, current.ruleSet)) {
+		return { comparable: false, reason: "rules_changed" };
 	}
 
 	return { comparable: true };

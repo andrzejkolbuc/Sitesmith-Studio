@@ -15,6 +15,7 @@ const REASONS: ComparabilityReason[] = [
 	"not_recorded",
 	"incomplete_crawl",
 	"scope_changed",
+	"rules_changed",
 ];
 
 describe("refusal wording", () => {

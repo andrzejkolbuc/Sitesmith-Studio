@@ -533,30 +533,30 @@ findings. No stored data changes, and the refusal is the correct answer.
 
 #### Automated
 
-- [x] 1.1 Schema applies cleanly: `npm run db:push`
-- [x] 1.2 Integration tests pass: `npm run test:integration`
-- [x] 1.3 Type checking passes: `npm run typecheck`
-- [x] 1.4 Lint and format pass: `npm run check`
-- [x] 1.5 A completed run's `ruleSet` matches `FINDING_TYPES` exactly
+- [x] 1.1 Schema applies cleanly: `npm run db:push` — 37e7600
+- [x] 1.2 Integration tests pass: `npm run test:integration` — 37e7600
+- [x] 1.3 Type checking passes: `npm run typecheck` — 37e7600
+- [x] 1.4 Lint and format pass: `npm run check` — 37e7600
+- [x] 1.5 A completed run's `ruleSet` matches `FINDING_TYPES` exactly — 37e7600
 
 #### Manual
 
-- [x] 1.6 The project page still renders against a dev database whose older runs have a null `ruleSet`
+- [x] 1.6 The project page still renders against a dev database whose older runs have a null `ruleSet` — 37e7600
 
 ### Phase 2: Rule-set comparability
 
 #### Automated
 
-- [ ] 2.1 Unit tests pass: `npm run test:unit`
-- [ ] 2.2 Integration tests pass: `npm run test:integration`
-- [ ] 2.3 Type checking passes: `npm run typecheck`
-- [ ] 2.4 Lint and format pass: `npm run check`
-- [ ] 2.5 Every `ComparabilityReason` has a heading and a sentence
-- [ ] 2.6 Two runs differing only in rule set report `rules_changed`
+- [x] 2.1 Unit tests pass: `npm run test:unit`
+- [x] 2.2 Integration tests pass: `npm run test:integration`
+- [x] 2.3 Type checking passes: `npm run typecheck`
+- [x] 2.4 Lint and format pass: `npm run check`
+- [x] 2.5 Every `ComparabilityReason` has a heading and a sentence
+- [x] 2.6 Two runs differing only in rule set report `rules_changed`
 
 #### Manual
 
-- [ ] 2.7 An existing project still shows its previous refusal reason, not the new one
+- [x] 2.7 An existing project still shows its previous refusal reason, not the new one
 
 ### Phase 3: The trend model
 

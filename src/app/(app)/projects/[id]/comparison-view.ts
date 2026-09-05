@@ -35,6 +35,13 @@ export const REASON_SENTENCE: Record<ComparabilityReason, string> = {
 		"One of these two runs stopped before it reached the whole site, so anything missing from it might simply never have been visited.",
 	scope_changed:
 		"The crawl scope changed between these two runs. They looked at different parts of the site, so a finding that is absent now was not necessarily fixed.",
+	/**
+	 * The one refusal that is about us rather than about them, and it says so.
+	 * A reader told only that the runs differ would go looking for what they
+	 * changed, and there is nothing on their side to find.
+	 */
+	rules_changed:
+		"We added or changed checks between these two runs, so the two runs were not looking for the same things. There is nothing to fix on your side — the next run will have a matching baseline.",
 };
 
 /** The heading above the refusal, kept beside the sentence it introduces. */
@@ -42,6 +49,7 @@ export const REASON_HEADING: Record<ComparabilityReason, string> = {
 	not_recorded: "No comparison available",
 	incomplete_crawl: "Not compared — a run did not finish",
 	scope_changed: "Not compared — the scope changed",
+	rules_changed: "Not compared — our checks changed",
 };
 
 /**
