@@ -3,7 +3,7 @@ project: "Sitesmith-Studio"
 version: 1
 status: draft
 created: 2026-08-21
-updated: 2026-09-04
+updated: 2026-09-05
 prd_version: 1
 main_goal: market-feedback
 top_blocker: capacity
@@ -63,7 +63,7 @@ works.
 | S-09 | correlated-findings             | see one explained problem per underlying cause instead of many symptoms        | S-02, S-04, S-05 | US-01, FR-040                                                                        | done     |
 | S-10 | roles-invites-and-client-access | invite team members and client viewers, scoped to the right projects           | F-01             | FR-001, FR-003, FR-004, FR-005, FR-010, NFR-2                                        | proposed |
 | S-11 | client-readable-report          | generate a client-readable report from a stored run                            | S-09, S-10       | FR-041                                                                               | proposed |
-| S-12 | quality-trend-history           | see issue counts over time (scores half needs S-06)                            | S-07             | FR-039 (partly)                                                                      | proposed |
+| S-12 | quality-trend-history           | see issue counts over time (scores half needs S-06)                            | S-07             | FR-039 (partly)                                                                      | done     |
 | S-13 | scheduled-and-staging-runs      | schedule recurring runs and check protected or staging environments            | F-02, S-01       | FR-042, FR-043                                                                       | proposed |
 | S-14 | assisted-finding-prioritisation | have findings ranked by which matter most                                      | S-09             | FR-044                                                                               | proposed |
 
@@ -279,7 +279,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Unknowns:**
   - ~~Same retention conflict as S-08.~~ Answered in PRD Open Question 5, and answered generously for this slice: run metadata and findings are rows measured in kilobytes and are kept indefinitely, so the trend this slice draws needs no window at all. Only images expire.
 - **Risk:** Was blocked on the same question as S-08, and resolving that one question did promote both — which is why the roadmap called it the highest-leverage open question. What remains is ordinary sequencing: S-07 must exist before there is run history to trend.
-- **Status:** proposed
+- **Status:** done
 
 ### S-13: Scheduled and staging runs
 
@@ -323,7 +323,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 | S-09       | correlated-findings             | Correlated findings — one explained problem per cause       | done                  | Needs S-02, S-04, S-05. The domain rule        |
 | S-10       | roles-invites-and-client-access | Roles, invites and client access                            | yes                   | Needs F-01. Parallel with all checking work    |
 | S-11       | client-readable-report          | Client-readable report from a stored run                    | no                    | Needs S-09, S-10                               |
-| S-12       | quality-trend-history           | Quality trend history                                       | no                    | Blocked — same retention question as S-08      |
+| S-12       | quality-trend-history           | Quality trend history                                       | done                  | Needs S-07. Counts half; scores need S-06      |
 | S-13       | scheduled-and-staging-runs      | Scheduled runs and staging environments                     | no                    | Needs F-02, S-01                               |
 | S-14       | assisted-finding-prioritisation | Assisted finding prioritisation                             | no                    | Blocked — no spend cap defined                 |
 
@@ -357,6 +357,8 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Observability tooling.** Why parked: no PRD requirement demands it, so no foundation opens for it. Revisit if operating scheduled runs proves opaque.
 
 ## Done
+
+- **S-12: User can see scores and issue counts tracked over time, revealing drift rather than only last-run state.** — Archived 2026-09-05 → `context/archive/2026-09-04-quality-trend-history/`. Delivered the issue-counts half only; FR-039 stays open on S-06 for the scores half. Lesson: —.
 
 - **S-07: User can view a project's run history and compare a run against the previous one, seeing what changed rather than everything that is wrong.** — Archived 2026-09-04 → `context/archive/2026-09-04-run-history-and-comparison/`. Lesson: an assertion that races its data passes on the wrong state.
 

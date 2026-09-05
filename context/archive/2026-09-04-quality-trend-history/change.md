@@ -1,10 +1,10 @@
 ---
 change_id: quality-trend-history
 title: Quality trend history
-status: implemented
+status: archived
 created: 2026-09-04
 updated: 2026-09-05
-archived_at: null
+archived_at: 2026-09-05T17:07:58Z
 ---
 
 ## Notes
