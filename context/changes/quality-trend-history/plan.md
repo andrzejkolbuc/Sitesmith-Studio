@@ -592,13 +592,13 @@ findings. No stored data changes, and the refusal is the correct answer.
 
 #### Automated
 
-- [x] 5.1 Whole suite passes: `npm run test:all`
-- [x] 5.2 Type checking passes: `npm run typecheck`
-- [x] 5.3 Lint and format pass: `npm run check`
-- [x] 5.4 No temporary scripts or harnesses remain in the working tree
+- [x] 5.1 Whole suite passes: `npm run test:all` — 615c832
+- [x] 5.2 Type checking passes: `npm run typecheck` — 615c832
+- [x] 5.3 Lint and format pass: `npm run check` — 615c832
+- [x] 5.4 No temporary scripts or harnesses remain in the working tree — 615c832
 
 #### Manual
 
-- [x] 5.5 Two runs of an unchanged real project produce a grid whose rows are all flat
-- [x] 5.6 Every plotted cell is attributable to the site rather than to our rule set
-- [x] 5.7 The roadmap records FR-039 as partly met, naming S-06
+- [x] 5.5 Two runs of an unchanged real project produce a grid whose rows are all flat — 615c832
+- [x] 5.6 Every plotted cell is attributable to the site rather than to our rule set — 615c832
+- [x] 5.7 The roadmap records FR-039 as partly met, naming S-06 — 615c832
