@@ -230,13 +230,26 @@ Foundations below assume these are present and do NOT re-scaffold them.
 
 - **Outcome:** User can promote a snapshot to be a project's baseline, see which pages differ from it and where, review differences side by side, and mask volatile regions so they stop reporting.
 - **Change ID:** `visual-regression-baselines`
-- **PRD refs:** US-02, FR-031, FR-032, FR-033, FR-034, FR-035
+- **PRD refs:**
+  - **FR-032, FR-033, FR-034, FR-035 — met.** A run's snapshots can be pinned as
+    the project baseline; later runs report which watched pages differ and where,
+    as changed-pixel counts and bounding boxes; baseline and current are
+    reviewable side by side with an overlay generated on demand; per-project CSS
+    selectors are masked by the browser before the picture exists.
+  - **FR-031 — partly met.** Snapshots are captured for a **bounded watched set**
+    — the pages the baseline photographed — rather than for each page in a run.
+    Per-page capture is 1.5–2 hours per run on a 1,200-URL site at the ~3s per
+    page measured, which is the cost the PRD already rejected under FR-028, and
+    at ~2 MB per page it is the storage line item the PRD itself flagged during
+    shaping (`prd.md:274`). This is the same call FR-028 got, for the same reason.
+- **Constrains F-02:** nothing new. `pixelmatch` and `pngjs` are pure JavaScript,
+  so the container still needs only the Chromium S-06 already forced on it.
 - **Prerequisites:** S-06, S-07
 - **Parallel with:** S-09, S-10
 - **Blockers:** —
 - **Unknowns:**
   - ~~How long is a snapshot kept?~~ Answered in PRD Open Question 5: the pinned baseline never expires; beyond it only the three most recent runs keep their images. Retention binds the bytes, not the history.
-  - With per-finding muting ruled out, are masked regions enough to keep visual noise tolerable? (Open Question 2) — Owner: user. Block: no.
+  - ~~With per-finding muting ruled out, are masked regions enough to keep visual noise tolerable?~~ **Partly answered, on a real project.** Renderer noise is not the problem masks were feared for: with pixelmatch's anti-aliasing exclusion, two runs of an *unchanged* site differ by **0.015% of the compared area at worst** (1,831 pixels of 12.3M), invisible to a reader. But that is still non-zero, so the rule as first shipped fires on a site nobody touched. See `proof.md`. What masks cover and what a noise floor covers are different problems, and Open Question 2 stays open for the rest.
 - **Risk:** The most expensive subsystem in the product and the one most likely to be abandoned, which is why it is sequenced late rather than early despite answering the user's most-stated pain. The retention answer removes the reason it was blocked, but not the reason it is last: it still needs S-06 (rendering) and S-07 (run comparison), neither of which is built.
 - **Status:** proposed
 

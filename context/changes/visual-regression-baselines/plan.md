@@ -885,15 +885,15 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Automated
 
-- [x] 5.1 Unit tests pass: `npm run test:unit`
-- [x] 5.2 Integration tests pass: `npm run test:integration`
-- [x] 5.3 Existing e2e journeys pass: `npm run test:e2e`
-- [x] 5.4 Type checking passes: `npm run typecheck`
-- [x] 5.5 Lint and format pass: `npm run check`
-- [x] 5.6 Production build succeeds: `npm run build`
-- [x] 5.7 Every `FINDING_TYPES` entry still has a reader-facing label
-- [x] 5.8 A snapshot route request for another tenant's snapshot answers 404
-- [x] 5.9 No query path selects the `image` column into a list view
+- [x] 5.1 Unit tests pass: `npm run test:unit` — df876c6
+- [x] 5.2 Integration tests pass: `npm run test:integration` — df876c6
+- [x] 5.3 Existing e2e journeys pass: `npm run test:e2e` — df876c6
+- [x] 5.4 Type checking passes: `npm run typecheck` — df876c6
+- [x] 5.5 Lint and format pass: `npm run check` — df876c6
+- [x] 5.6 Production build succeeds: `npm run build` — df876c6
+- [x] 5.7 Every `FINDING_TYPES` entry still has a reader-facing label — df876c6
+- [x] 5.8 A snapshot route request for another tenant's snapshot answers 404 — df876c6
+- [x] 5.9 No query path selects the `image` column into a list view — df876c6
 
 #### Manual
 
@@ -907,10 +907,10 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Automated
 
-- [ ] 6.1 Whole suite passes: `npm run test:all`
-- [ ] 6.2 Type checking passes: `npm run typecheck`
-- [ ] 6.3 Lint and format pass: `npm run check`
-- [ ] 6.4 No temporary scripts or harnesses remain in the working tree
+- [x] 6.1 Whole suite passes: `npm run test:all`
+- [x] 6.2 Type checking passes: `npm run typecheck`
+- [x] 6.3 Lint and format pass: `npm run check`
+- [x] 6.4 No temporary scripts or harnesses remain in the working tree
 
 #### Manual
 
