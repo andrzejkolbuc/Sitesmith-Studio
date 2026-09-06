@@ -822,12 +822,12 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Automated
 
-- [ ] 1.1 Schema applies cleanly: `npm run db:push`
-- [ ] 1.2 Unit tests pass: `npm run test:unit`
-- [ ] 1.3 Integration tests pass: `npm run test:integration`
-- [ ] 1.4 Type checking passes: `npm run typecheck`
-- [ ] 1.5 Lint and format pass: `npm run check`
-- [ ] 1.6 `expireSnapshots` updates rows and deletes none, proven by row count before and after
+- [x] 1.1 Schema applies cleanly: `npm run db:push`
+- [x] 1.2 Unit tests pass: `npm run test:unit`
+- [x] 1.3 Integration tests pass: `npm run test:integration`
+- [x] 1.4 Type checking passes: `npm run typecheck`
+- [x] 1.5 Lint and format pass: `npm run check`
+- [x] 1.6 `expireSnapshots` updates rows and deletes none, proven by row count before and after
 
 #### Manual
 

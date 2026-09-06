@@ -1,11 +1,23 @@
 import { relations } from "drizzle-orm";
 import {
+	customType,
 	index,
 	pgTableCreator,
 	primaryKey,
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type { AdapterAccount } from "next-auth/adapters";
+
+/**
+ * Raw bytes.
+ *
+ * Postgres has `bytea` and drizzle has no built-in column for it, so it is
+ * declared once here rather than in the one table that needs it — the next
+ * binary column should reuse this rather than redeclare it.
+ */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+	dataType: () => "bytea",
+});
 
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
@@ -183,6 +195,39 @@ export const projects = createTable(
 		 */
 		maxConcurrency: d.integer().notNull().default(2),
 		requestDelayMs: d.integer().notNull().default(500),
+		/**
+		 * CSS selectors whose elements are painted over before a snapshot exists.
+		 *
+		 * Per project rather than per page, which is what FR-035 asks for and what
+		 * a carousel or an ad slot actually is — a template's element, not one
+		 * page's. Applied at capture rather than at comparison, so the volatile
+		 * content never enters storage: nothing to leak, and an old snapshot never
+		 * needs re-masking when this list changes.
+		 *
+		 * Stored as given. A selector that is valid CSS but matches nothing is
+		 * indistinguishable here from one that will match, and refusing it would
+		 * be us guessing about their markup.
+		 *
+		 * A database-level default rather than the `$defaultFn` its neighbours use:
+		 * those were present when the table was created, this one arrives on a
+		 * table that already has rows, and an application-side default leaves them
+		 * violating the constraint.
+		 */
+		maskSelectors: d.text().array().notNull().default([]),
+		/**
+		 * The run whose snapshots are what this site is supposed to look like.
+		 *
+		 * Null means no baseline, which is a real and common state rather than an
+		 * error — it is where every project starts and where most of them sit.
+		 *
+		 * Deliberately carries no foreign key. `runs` references `projects`, so a
+		 * declared reference back would be a circular table dependency, and the
+		 * column is read through a tenant-scoped query that establishes the run's
+		 * ownership anyway. The integrity this would buy is integrity the read
+		 * path already has to prove for itself.
+		 */
+		baselineRunId: d.varchar({ length: 255 }),
+		baselinePinnedAt: d.timestamp({ withTimezone: true }),
 		createdAt: d
 			.timestamp({ withTimezone: true })
 			.$defaultFn(() => /* @__PURE__ */ new Date())
@@ -301,6 +346,36 @@ export const runs = createTable(
 			measured: number;
 			/** The cap in force, so the reader can be told what bounded it. */
 			cap: number;
+			/** False when the browser could not be used at all. */
+			complete: boolean;
+		}>(),
+		/**
+		 * What the visual pass covered, and what it was measured against.
+		 *
+		 * The same kind of claim `renderSummary` makes, for the same reason: a
+		 * reader shown two changed pages has to be told how many were watched, and
+		 * a run compared against a *different* baseline than its predecessor is
+		 * not a run whose visual findings may be called new or resolved.
+		 *
+		 * `baselineRunId` is null when the project had no baseline when this run
+		 * closed — a recorded fact, distinct from the column itself being null.
+		 *
+		 * Nullable, meaning *not recorded*: a run from before this shipped, or one
+		 * that died before it could write this. Do not default it — a zero would
+		 * assert that every historical run watched nothing, which is a different
+		 * claim from having no answer.
+		 */
+		visualSummary: d.jsonb().$type<{
+			/** The baseline this run was compared against; null when there was none. */
+			baselineRunId: string | null;
+			/** Pages the baseline put under watch. */
+			watched: number;
+			/** Of those, how many produced an image. */
+			captured: number;
+			/** Of those, how many could be compared against their baseline. */
+			compared: number;
+			/** Of those, how many differed. */
+			differing: number;
 			/** False when the browser could not be used at all. */
 			complete: boolean;
 		}>(),
@@ -465,6 +540,100 @@ export const pageObservations = createTable(
 		uniqueIndex("observation_run_page_uq").on(t.runId, t.pageId),
 	],
 );
+
+/**
+ * One rendering of one page, as a picture.
+ *
+ * A table rather than columns on `pages` for the reason `pageObservations` is
+ * one: only a watched set is captured, so absence of a row *is* "not watched",
+ * and that is a different fact from a page that was photographed and found
+ * unchanged.
+ *
+ * The nullability of `image` is three-state and load-bearing:
+ *
+ *   image present                  — we have it
+ *   image null, captureError set   — the capture failed, and why
+ *   image null, expiredAt set      — we had it, and retention took it
+ *
+ * All three null is a bug rather than a state. Retention **updates** rather than
+ * deletes for exactly this reason: a deleted row makes a snapshot that expired
+ * indistinguishable from one that was never taken, and only one of those is a
+ * statement about our own storage rather than about the site.
+ */
+export const pageSnapshots = createTable(
+	"page_snapshot",
+	(d) => ({
+		id: d
+			.varchar({ length: 255 })
+			.notNull()
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		tenantId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => tenants.id),
+		runId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => runs.id),
+		pageId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => pages.id),
+		/** The PNG. Null when the capture failed, or when retention expired it. */
+		image: bytea(),
+		/**
+		 * Kept beside the bytes so a list view can report storage without ever
+		 * selecting the bytes. Nulled with the image when retention expires it.
+		 */
+		byteSize: d.integer(),
+		/** The PNG's own dimensions. Height varies with the page's own length. */
+		imageWidth: d.integer(),
+		imageHeight: d.integer(),
+		/**
+		 * What the browser was set to. Recorded because it is *our* number rather
+		 * than the site's: a pair of snapshots taken at different viewports refuses
+		 * comparison instead of reporting every page as changed.
+		 */
+		viewportWidth: d.integer().notNull(),
+		viewportHeight: d.integer().notNull(),
+		/**
+		 * The masks in force when this picture was taken.
+		 *
+		 * Snapshotted for the reason `runs.scope` snapshots the project config: the
+		 * project is mutable and this row outlives the configuration that produced
+		 * it. Two images masked differently are not two views of the same thing.
+		 */
+		maskSelectors: d
+			.text()
+			.array()
+			.notNull()
+			.$defaultFn(() => []),
+		/** Why this page has no picture; null when it has one. */
+		captureError: d.text(),
+		/** When retention dropped the bytes; null while they are still held. */
+		expiredAt: d.timestamp({ withTimezone: true }),
+		createdAt: d
+			.timestamp({ withTimezone: true })
+			.$defaultFn(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	}),
+	(t) => [
+		index("snapshot_tenant_id_idx").on(t.tenantId),
+		index("snapshot_run_id_idx").on(t.runId),
+		/** One snapshot per page per run, enforced rather than assumed. */
+		uniqueIndex("snapshot_run_page_uq").on(t.runId, t.pageId),
+	],
+);
+
+export const pageSnapshotsRelations = relations(pageSnapshots, ({ one }) => ({
+	tenant: one(tenants, {
+		fields: [pageSnapshots.tenantId],
+		references: [tenants.id],
+	}),
+	run: one(runs, { fields: [pageSnapshots.runId], references: [runs.id] }),
+	page: one(pages, { fields: [pageSnapshots.pageId], references: [pages.id] }),
+}));
 
 export const pageObservationsRelations = relations(
 	pageObservations,

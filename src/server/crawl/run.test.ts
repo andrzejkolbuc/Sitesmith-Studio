@@ -7,6 +7,7 @@ import * as schema from "~/server/db/schema";
 import {
 	findings,
 	pageObservations,
+	pageSnapshots,
 	pages,
 	projects,
 	runs,
@@ -16,6 +17,7 @@ import {
 import { type Fixture, startFixtureSite } from "../../../test/fixtures/site";
 import { resetDatabase } from "../../../test/reset";
 import { FINDING_TYPES } from "./findings";
+import { expireSnapshots } from "./retention";
 import { RUN_STATUS, runToCompletion, startRun, sweepStaleRuns } from "./run";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
@@ -362,6 +364,154 @@ describe("stale-run sweep", () => {
 		});
 
 		expect(await sweepStaleRuns(db)).toBe(0);
+	});
+});
+
+describe("snapshot retention", () => {
+	/**
+	 * Seeds a project with `count` runs, oldest first, each holding one snapshot
+	 * of one page with bytes in it. Returns the run ids newest first, which is
+	 * the order the rule reads them in.
+	 */
+	async function seedSnapshots(label: string, count: number) {
+		const { tenant, project } = await seedProject(label);
+
+		const created: string[] = [];
+		for (let index = 0; index < count; index += 1) {
+			const [run] = await db
+				.insert(runs)
+				.values({
+					tenantId: tenant.id,
+					projectId: project.id,
+					status: RUN_STATUS.DONE,
+					/** Explicit and increasing, so "newest" is not a race on clock ticks. */
+					createdAt: new Date(2026, 0, index + 1),
+				})
+				.returning();
+			if (!run) throw new Error("run insert returned nothing");
+
+			const [page] = await db
+				.insert(pages)
+				.values({
+					tenantId: tenant.id,
+					runId: run.id,
+					url: `${site.baseUrl}/page-${index}`,
+					httpStatus: 200,
+				})
+				.returning();
+			if (!page) throw new Error("page insert returned nothing");
+
+			await db.insert(pageSnapshots).values({
+				tenantId: tenant.id,
+				runId: run.id,
+				pageId: page.id,
+				image: Buffer.from(`png-${index}`),
+				byteSize: 7,
+				imageWidth: 1280,
+				imageHeight: 900,
+				viewportWidth: 1280,
+				viewportHeight: 800,
+				maskSelectors: [],
+			});
+
+			created.push(run.id);
+		}
+
+		return { tenant, project, newestFirst: [...created].reverse() };
+	}
+
+	const held = async (tenantId: string) =>
+		(await db.query.pageSnapshots.findMany()).filter(
+			(row) => row.tenantId === tenantId && row.image !== null,
+		);
+
+	it("drops the bytes of runs outside the window and keeps the rows", async () => {
+		const { tenant, project } = await seedSnapshots("eta", 5);
+
+		const before = await db.query.pageSnapshots.findMany();
+		const { expiredRuns } = await expireSnapshots(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+		});
+		const after = await db.query.pageSnapshots.findMany();
+
+		expect(expiredRuns).toHaveLength(2);
+		/**
+		 * The property this whole design turns on: nothing is deleted. A missing
+		 * row would make an expired snapshot indistinguishable from one that was
+		 * never taken.
+		 */
+		expect(after).toHaveLength(before.length);
+		expect(await held(tenant.id)).toHaveLength(3);
+
+		const expired = after.filter((row) => expiredRuns.includes(row.runId));
+		expect(expired.every((row) => row.image === null)).toBe(true);
+		expect(expired.every((row) => row.byteSize === null)).toBe(true);
+		expect(expired.every((row) => row.expiredAt !== null)).toBe(true);
+		/** Everything else about the row survives, including how it was taken. */
+		expect(expired.every((row) => row.viewportWidth === 1280)).toBe(true);
+	});
+
+	it("never expires the pinned baseline, even outside the window", async () => {
+		const { tenant, project, newestFirst } = await seedSnapshots("theta", 5);
+		const oldest = newestFirst[newestFirst.length - 1];
+
+		await db
+			.update(projects)
+			.set({ baselineRunId: oldest, baselinePinnedAt: new Date() })
+			.where(eq(projects.id, project.id));
+
+		const { expiredRuns } = await expireSnapshots(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+		});
+
+		expect(expiredRuns).not.toContain(oldest);
+		/** The baseline does not consume a slot, so three recent runs still hold. */
+		expect(await held(tenant.id)).toHaveLength(4);
+	});
+
+	it("is a no-op on a second call", async () => {
+		const { tenant, project } = await seedSnapshots("iota", 5);
+
+		await expireSnapshots(db, { tenantId: tenant.id, projectId: project.id });
+		const first = await db.query.pageSnapshots.findMany();
+
+		await expireSnapshots(db, { tenantId: tenant.id, projectId: project.id });
+		const second = await db.query.pageSnapshots.findMany();
+
+		expect(second).toHaveLength(first.length);
+		/** `expiredAt` records when it happened, so a re-run must not move it. */
+		const stamps = (rows: typeof first) =>
+			rows
+				.map((row) => `${row.id}:${row.expiredAt?.toISOString() ?? ""}`)
+				.sort();
+		expect(stamps(second)).toEqual(stamps(first));
+	});
+
+	it("leaves another tenant's snapshots untouched", async () => {
+		const mine = await seedSnapshots("kappa", 5);
+		const theirs = await seedSnapshots("lambda", 5);
+
+		await expireSnapshots(db, {
+			tenantId: mine.tenant.id,
+			projectId: mine.project.id,
+		});
+
+		expect(await held(mine.tenant.id)).toHaveLength(3);
+		expect(await held(theirs.tenant.id)).toHaveLength(5);
+	});
+
+	it("expires nothing for a project with fewer runs than the window", async () => {
+		const { tenant, project } = await seedSnapshots("mu", 2);
+
+		const { expiredRuns } = await expireSnapshots(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+		});
+
+		expect(expiredRuns).toEqual([]);
+		expect(await held(tenant.id)).toHaveLength(2);
 	});
 });
 
