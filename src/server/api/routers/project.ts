@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, count, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, lt } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -12,6 +12,7 @@ import { RunAlreadyActiveError, startRun } from "~/server/crawl/run";
 import {
 	findings,
 	pageObservations,
+	pageSnapshots,
 	pages,
 	projects,
 	runs,
@@ -116,6 +117,111 @@ export const projectRouter = createTRPCRouter({
 				}
 				throw caught;
 			}
+		}),
+
+	/**
+	 * "This is what the site is supposed to look like."
+	 *
+	 * Pinning does more than name a comparison target: it fixes the set of pages
+	 * later runs will render. The sample `chooseRenderSample` picks is stable only
+	 * across runs where nothing changed, because it ranks by inbound links — and
+	 * navigation changing is one of the deploys most likely to break a page
+	 * visually. A set that reshuffled under exactly the condition being hunted
+	 * would drop pages out of comparison silently.
+	 */
+	pinBaseline: tenantProcedure
+		.input(z.object({ projectId: z.string(), runId: z.string() }))
+		.mutation(async ({ ctx, input }) => {
+			const project = await ctx.db.query.projects.findFirst({
+				where: and(
+					tenantScope(projects, ctx.tenantId),
+					eq(projects.id, input.projectId),
+				),
+			});
+			if (!project) throw new TRPCError({ code: "NOT_FOUND" });
+
+			/**
+			 * The run must be this project's and this tenant's. An id is not a
+			 * permission, and a baseline pointing at another project's run would
+			 * compare a site against a different site.
+			 */
+			const run = await ctx.db.query.runs.findFirst({
+				where: and(
+					tenantScope(runs, ctx.tenantId),
+					eq(runs.id, input.runId),
+					eq(runs.projectId, input.projectId),
+				),
+			});
+			if (!run) throw new TRPCError({ code: "NOT_FOUND" });
+
+			/**
+			 * A run with no picture left cannot be a baseline. Pinning one would
+			 * produce a project that looks configured and compares nothing — the
+			 * silent-empty-state failure this codebase keeps refusing.
+			 */
+			const [usable] = await ctx.db
+				.select({ total: count() })
+				.from(pageSnapshots)
+				.where(
+					and(
+						tenantScope(pageSnapshots, ctx.tenantId),
+						eq(pageSnapshots.runId, run.id),
+						isNotNull(pageSnapshots.image),
+					),
+				);
+
+			if (!usable || usable.total === 0) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message:
+						"That run holds no snapshots to compare against — either it captured none, or they have since expired.",
+				});
+			}
+
+			const [updated] = await ctx.db
+				.update(projects)
+				.set({ baselineRunId: run.id, baselinePinnedAt: new Date() })
+				.where(
+					and(
+						tenantScope(projects, ctx.tenantId),
+						eq(projects.id, input.projectId),
+					),
+				)
+				.returning();
+
+			if (!updated) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+			return { baselineRunId: updated.baselineRunId, watched: usable.total };
+		}),
+
+	/**
+	 * Which regions never count as changed.
+	 *
+	 * Validated for shape only. A selector that is valid CSS but matches nothing
+	 * is indistinguishable here from one that will match — that depends on their
+	 * markup, which we do not have at this point — so a selector the browser
+	 * cannot parse is caught at capture and recorded there instead.
+	 */
+	setMasks: tenantProcedure
+		.input(
+			z.object({
+				projectId: z.string(),
+				selectors: z.array(z.string().min(1).max(255)).max(50),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const [updated] = await ctx.db
+				.update(projects)
+				.set({ maskSelectors: input.selectors })
+				.where(
+					and(
+						tenantScope(projects, ctx.tenantId),
+						eq(projects.id, input.projectId),
+					),
+				)
+				.returning();
+
+			if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+			return { maskSelectors: updated.maskSelectors };
 		}),
 
 	latestRun: tenantProcedure

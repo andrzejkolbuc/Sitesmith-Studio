@@ -837,12 +837,12 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Automated
 
-- [x] 2.1 Unit tests pass: `npm run test:unit`
-- [x] 2.2 Integration tests pass: `npm run test:integration`
-- [x] 2.3 Type checking passes: `npm run typecheck`
-- [x] 2.4 Lint and format pass: `npm run check`
-- [x] 2.5 A failing screenshot records `snapshotError` and the run still reaches `done`
-- [x] 2.6 A run without the snapshot option writes no `pageSnapshots` rows
+- [x] 2.1 Unit tests pass: `npm run test:unit` — 59927ff
+- [x] 2.2 Integration tests pass: `npm run test:integration` — 59927ff
+- [x] 2.3 Type checking passes: `npm run typecheck` — 59927ff
+- [x] 2.4 Lint and format pass: `npm run check` — 59927ff
+- [x] 2.5 A failing screenshot records `snapshotError` and the run still reaches `done` — 59927ff
+- [x] 2.6 A run without the snapshot option writes no `pageSnapshots` rows — 59927ff
 
 #### Manual
 
@@ -854,12 +854,12 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Automated
 
-- [ ] 3.1 Unit tests pass: `npm run test:unit`
-- [ ] 3.2 Integration tests pass: `npm run test:integration`
-- [ ] 3.3 Type checking passes: `npm run typecheck`
-- [ ] 3.4 Lint and format pass: `npm run check`
-- [ ] 3.5 A run after pinning renders the baseline's URLs, not a re-derived sample
-- [ ] 3.6 `pinBaseline` on another tenant's run answers not-found, not forbidden
+- [x] 3.1 Unit tests pass: `npm run test:unit`
+- [x] 3.2 Integration tests pass: `npm run test:integration`
+- [x] 3.3 Type checking passes: `npm run typecheck`
+- [x] 3.4 Lint and format pass: `npm run check`
+- [x] 3.5 A run after pinning renders the baseline's URLs, not a re-derived sample
+- [x] 3.6 `pinBaseline` on another tenant's run answers not-found, not forbidden
 
 #### Manual
 

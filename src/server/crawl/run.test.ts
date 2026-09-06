@@ -467,6 +467,193 @@ describe("snapshot capture", () => {
 	}, 120_000);
 });
 
+describe("pinning a baseline", () => {
+	/** Gives a run one usable snapshot, so it is pinnable. */
+	async function snapshotOneRun(
+		tenantId: string,
+		projectId: string,
+		url: string,
+	) {
+		const [run] = await db
+			.insert(runs)
+			.values({ tenantId, projectId, status: RUN_STATUS.DONE })
+			.returning();
+		if (!run) throw new Error("run insert returned nothing");
+
+		const [page] = await db
+			.insert(pages)
+			.values({ tenantId, runId: run.id, url, httpStatus: 200 })
+			.returning();
+		if (!page) throw new Error("page insert returned nothing");
+
+		await db.insert(pageSnapshots).values({
+			tenantId,
+			runId: run.id,
+			pageId: page.id,
+			image: Buffer.from("png"),
+			byteSize: 3,
+			imageWidth: 1280,
+			imageHeight: 900,
+			viewportWidth: 1280,
+			viewportHeight: 800,
+			maskSelectors: [],
+		});
+
+		return run;
+	}
+
+	it("pins a run that has snapshots", async () => {
+		const { tenant, owner, project } = await seedProject("sigma");
+		const run = await snapshotOneRun(
+			tenant.id,
+			project.id,
+			`${site.baseUrl}/handbook`,
+		);
+
+		const result = await callerFor(owner.id, tenant.id).project.pinBaseline({
+			projectId: project.id,
+			runId: run.id,
+		});
+
+		expect(result).toEqual({ baselineRunId: run.id, watched: 1 });
+
+		const stored = await db.query.projects.findFirst({
+			where: eq(projects.id, project.id),
+		});
+		expect(stored?.baselineRunId).toBe(run.id);
+		expect(stored?.baselinePinnedAt).not.toBeNull();
+	});
+
+	/**
+	 * A baseline with nothing to compare against would leave the project looking
+	 * configured while comparing nothing — the silent empty state this codebase
+	 * keeps refusing to ship.
+	 */
+	it("refuses a run holding no usable snapshot", async () => {
+		const { tenant, owner, project } = await seedProject("tau");
+		const [run] = await db
+			.insert(runs)
+			.values({
+				tenantId: tenant.id,
+				projectId: project.id,
+				status: RUN_STATUS.DONE,
+			})
+			.returning();
+		if (!run) throw new Error("run insert returned nothing");
+
+		await expect(
+			callerFor(owner.id, tenant.id).project.pinBaseline({
+				projectId: project.id,
+				runId: run.id,
+			}),
+		).rejects.toMatchObject({ code: "BAD_REQUEST" });
+	});
+
+	it("refuses a run belonging to a different project", async () => {
+		const { tenant, owner, project } = await seedProject("upsilon");
+		const [other] = await db
+			.insert(projects)
+			.values({
+				tenantId: tenant.id,
+				name: "second site",
+				startUrl: site.baseUrl,
+			})
+			.returning();
+		if (!other) throw new Error("project insert returned nothing");
+
+		const run = await snapshotOneRun(
+			tenant.id,
+			other.id,
+			`${site.baseUrl}/handbook`,
+		);
+
+		await expect(
+			callerFor(owner.id, tenant.id).project.pinBaseline({
+				projectId: project.id,
+				runId: run.id,
+			}),
+		).rejects.toMatchObject({ code: "NOT_FOUND" });
+	});
+
+	/** Not-found rather than forbidden: an id is not a permission, and telling a
+	 * caller that a run exists is itself a leak. */
+	it("answers not-found for another tenant's run", async () => {
+		const mine = await seedProject("phi");
+		const theirs = await seedProject("chi");
+		const run = await snapshotOneRun(
+			theirs.tenant.id,
+			theirs.project.id,
+			`${site.baseUrl}/handbook`,
+		);
+
+		await expect(
+			callerFor(mine.owner.id, mine.tenant.id).project.pinBaseline({
+				projectId: mine.project.id,
+				runId: run.id,
+			}),
+		).rejects.toMatchObject({ code: "NOT_FOUND" });
+	});
+
+	it("round-trips mask selectors and refuses another tenant's project", async () => {
+		const mine = await seedProject("psi");
+		const theirs = await seedProject("omega2");
+
+		const result = await callerFor(
+			mine.owner.id,
+			mine.tenant.id,
+		).project.setMasks({
+			projectId: mine.project.id,
+			selectors: [".carousel", "#ad-slot"],
+		});
+		expect(result.maskSelectors).toEqual([".carousel", "#ad-slot"]);
+
+		await expect(
+			callerFor(mine.owner.id, mine.tenant.id).project.setMasks({
+				projectId: theirs.project.id,
+				selectors: [".anything"],
+			}),
+		).rejects.toMatchObject({ code: "NOT_FOUND" });
+	});
+
+	/**
+	 * The property the whole phase exists for.
+	 *
+	 * The baseline watches exactly one page, and the later run is given a budget
+	 * of four. A sample chosen by inbound-link ranking would fill that budget with
+	 * the site's most-linked pages; what actually renders is the one page the
+	 * baseline recorded. That is the difference between a set read from rows and
+	 * a set re-derived, and it is what lets a comparison compare the same pages.
+	 */
+	it("renders the baseline's pages rather than a re-derived sample", async () => {
+		const { tenant, project } = await seedProject("alpha2");
+
+		const watchedUrl = `${site.baseUrl}/library/guide-archived`;
+		const baseline = await snapshotOneRun(tenant.id, project.id, watchedUrl);
+		await db
+			.update(projects)
+			.set({ baselineRunId: baseline.id, baselinePinnedAt: new Date() })
+			.where(eq(projects.id, project.id));
+
+		const { runId } = await runToCompletion(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+			maxRenders: 4,
+		});
+
+		const observed = await db
+			.select({ url: pages.url })
+			.from(pageObservations)
+			.innerJoin(pages, eq(pages.id, pageObservations.pageId))
+			.where(eq(pageObservations.runId, runId));
+
+		expect(observed.map((row) => row.url)).toEqual([watchedUrl]);
+
+		const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
+		/** The coverage claim follows the watched set, not the abandoned sample. */
+		expect(run?.renderSummary?.chosen).toBe(1);
+	}, 120_000);
+});
+
 describe("snapshot retention", () => {
 	/**
 	 * Seeds a project with `count` runs, oldest first, each holding one snapshot

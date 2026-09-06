@@ -182,6 +182,25 @@ const CASES: Record<string, Case> = {
 		kind: "foreign-id",
 		input: (victim) => ({ projectId: victim.project.id }),
 	},
+	/**
+	 * Both identifiers are the victim's, which is the sharpest form of the attack
+	 * this table exists for: a caller who has somehow learned another tenant's
+	 * project and run must not be able to point one at the other.
+	 */
+	"project.pinBaseline": {
+		kind: "foreign-id",
+		input: (victim) => ({
+			projectId: victim.project.id,
+			runId: victim.run.id,
+		}),
+	},
+	"project.setMasks": {
+		kind: "foreign-id",
+		input: (victim) => ({
+			projectId: victim.project.id,
+			selectors: [".intruder"],
+		}),
+	},
 };
 
 /** Walks `caller.project.byId` from the string "project.byId". */

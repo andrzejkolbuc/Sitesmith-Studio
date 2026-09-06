@@ -26,6 +26,16 @@
  * What it is not is template coverage, and it must never be described as such.
  * The view names what was sampled; this function records the rule it applied so
  * the view can.
+ *
+ * **A pinned baseline supersedes all of this.** Once a project has one, the run
+ * renders the pages that baseline captured, read from rows rather than chosen
+ * here — see `run.ts`. The reason is the tie-break note below: this ranking is
+ * stable across two runs of an *unchanged* site, and a visual comparison is
+ * asked its question precisely when the site changed. Navigation moving is one
+ * of the commonest ways a page breaks visually, and it is also exactly what
+ * moves inbound-link counts, so a set chosen here would reshuffle under the one
+ * condition it most needs to hold still. This function still decides the sample
+ * for every project that has not pinned anything, which is most of them.
  */
 
 export type SamplePage = {

@@ -316,6 +316,36 @@ async function execute(
 	);
 
 	/**
+	 * The pages the baseline put under watch, if there is one.
+	 *
+	 * Read from rows rather than re-derived, and that is the whole point. A visual
+	 * comparison needs the *same page* in both runs, and `chooseRenderSample`
+	 * ranks by inbound links — stable across runs where nothing changed, which is
+	 * precisely not the case being hunted. Once a baseline exists it supersedes
+	 * the sample: pinning fixes what gets rendered, which as a side effect stops
+	 * the vitals wandering too.
+	 *
+	 * Capped by the same budget, so a baseline pinned when the cap was larger
+	 * cannot quietly make later runs more expensive than the operator agreed to.
+	 */
+	const watched =
+		project.baselineRunId === null
+			? []
+			: (
+					await db
+						.select({ url: pages.url })
+						.from(pageSnapshots)
+						.innerJoin(pages, eq(pages.id, pageSnapshots.pageId))
+						.where(eq(pageSnapshots.runId, project.baselineRunId))
+						.orderBy(pages.url)
+				)
+					.map((row) => row.url)
+					.slice(0, sample.cap);
+
+	/** What this run will actually render. */
+	const renderUrls = watched.length > 0 ? watched : sample.urls;
+
+	/**
 	 * The page rows this run has already written, keyed by URL.
 	 *
 	 * Built once and read three times below — by the snapshot sink, by the
@@ -341,7 +371,7 @@ async function execute(
 		maxRenders === 0
 			? { observations: [], complete: true }
 			: await renderSample({
-					urls: sample.urls,
+					urls: renderUrls,
 					origin: new URL(project.startUrl).origin,
 					snapshot: captureSnapshots
 						? {
@@ -487,7 +517,7 @@ async function execute(
 			 * infer from how many observation rows happen to exist.
 			 */
 			renderSummary: {
-				chosen: sample.urls.length,
+				chosen: renderUrls.length,
 				measured: render.observations.filter((o) => o.renderError === null)
 					.length,
 				cap: sample.cap,
