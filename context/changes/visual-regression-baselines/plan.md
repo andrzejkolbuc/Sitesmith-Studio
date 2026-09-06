@@ -907,10 +907,10 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Automated
 
-- [x] 6.1 Whole suite passes: `npm run test:all`
-- [x] 6.2 Type checking passes: `npm run typecheck`
-- [x] 6.3 Lint and format pass: `npm run check`
-- [x] 6.4 No temporary scripts or harnesses remain in the working tree
+- [x] 6.1 Whole suite passes: `npm run test:all` — 568017c
+- [x] 6.2 Type checking passes: `npm run typecheck` — 568017c
+- [x] 6.3 Lint and format pass: `npm run check` — 568017c
+- [x] 6.4 No temporary scripts or harnesses remain in the working tree — 568017c
 
 #### Manual
 
