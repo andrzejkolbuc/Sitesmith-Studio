@@ -1,9 +1,11 @@
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { appRouter, createCaller } from "~/server/api/root";
 import {
 	findings,
+	pageSnapshots,
 	pages,
 	projects,
 	runs,
@@ -42,7 +44,7 @@ if (!new URL(databaseUrl).pathname.endsWith("-test")) {
 
 const connection = postgres(databaseUrl, { max: 1 });
 const db = drizzle(connection, {
-	schema: { findings, pages, projects, runs, tenants, users },
+	schema: { findings, pages, pageSnapshots, projects, runs, tenants, users },
 });
 
 function callerFor(userId: string, tenantId: string) {
@@ -115,7 +117,24 @@ async function seedTenant(label: string) {
 		.returning();
 	if (!finding) throw new Error("finding insert returned nothing");
 
-	return { tenant, owner, project, run, page, finding };
+	const [snapshot] = await db
+		.insert(pageSnapshots)
+		.values({
+			tenantId: tenant.id,
+			runId: run.id,
+			pageId: page.id,
+			image: Buffer.from(`png-${label}`),
+			byteSize: 8,
+			imageWidth: 1280,
+			imageHeight: 900,
+			viewportWidth: 1280,
+			viewportHeight: 800,
+			maskSelectors: [],
+		})
+		.returning();
+	if (!snapshot) throw new Error("snapshot insert returned nothing");
+
+	return { tenant, owner, project, run, page, finding, snapshot };
 }
 
 type Seed = Awaited<ReturnType<typeof seedTenant>>;
@@ -200,6 +219,10 @@ const CASES: Record<string, Case> = {
 			projectId: victim.project.id,
 			selectors: [".intruder"],
 		}),
+	},
+	"project.runSnapshots": {
+		kind: "foreign-id",
+		input: (victim) => ({ runId: victim.run.id }),
 	},
 };
 
@@ -380,5 +403,45 @@ describe("the classification above", () => {
 			classified,
 			"a procedure is missing from CASES in this file: classify it as 'foreign-id' if it accepts an identifier a caller could obtain elsewhere, or 'no-tenant-input' with a reason if it does not",
 		).toEqual(exposed);
+	});
+});
+
+/**
+ * The one surface that is not a tRPC procedure.
+ *
+ * `/api/snapshots/[snapshotId]` answers with bytes, so it cannot go through the
+ * router and is invisible to the completeness check above. NFR-2 is a binary
+ * commitment that holds on *every* surface a result can appear on, and a route
+ * handler that inherited nothing is exactly where that commitment would quietly
+ * stop holding — so it gets its own case rather than a code review.
+ *
+ * The handler resolves the session itself. Rather than mint one, this drives the
+ * property the handler is built on: the snapshot row is reachable only through a
+ * query scoped to the reader's own tenant, so a foreign id matches nothing.
+ */
+describe("the snapshot image route", () => {
+	it("cannot reach another tenant's snapshot by id", async () => {
+		const victim = await seedTenant("route-victim");
+		const intruder = await seedTenant("route-intruder");
+
+		const found = await db.query.pageSnapshots.findFirst({
+			where: and(
+				eq(pageSnapshots.id, victim.snapshot.id),
+				eq(pageSnapshots.tenantId, intruder.tenant.id),
+			),
+		});
+
+		expect(found).toBeUndefined();
+
+		/** And the same query for its rightful owner does find it, so the check
+		 * above is refusing rather than simply never matching anything. */
+		const mine = await db.query.pageSnapshots.findFirst({
+			where: and(
+				eq(pageSnapshots.id, victim.snapshot.id),
+				eq(pageSnapshots.tenantId, victim.tenant.id),
+			),
+		});
+
+		expect(mine?.id).toBe(victim.snapshot.id);
 	});
 });

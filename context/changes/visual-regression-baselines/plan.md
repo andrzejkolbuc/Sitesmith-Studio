@@ -869,13 +869,13 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Automated
 
-- [x] 4.1 Unit tests pass: `npm run test:unit`
-- [x] 4.2 Integration tests pass: `npm run test:integration`
-- [x] 4.3 Type checking passes: `npm run typecheck`
-- [x] 4.4 Lint and format pass: `npm run check`
-- [x] 4.5 Identical images produce zero changed pixels and no finding
-- [x] 4.6 `comparability()`'s existing behaviour is unchanged, proven by its existing tests still passing untouched
-- [x] 4.7 Two runs over the same snapshot pair produce identical regions
+- [x] 4.1 Unit tests pass: `npm run test:unit` — c0ac500
+- [x] 4.2 Integration tests pass: `npm run test:integration` — c0ac500
+- [x] 4.3 Type checking passes: `npm run typecheck` — c0ac500
+- [x] 4.4 Lint and format pass: `npm run check` — c0ac500
+- [x] 4.5 Identical images produce zero changed pixels and no finding — c0ac500
+- [x] 4.6 `comparability()`'s existing behaviour is unchanged, proven by its existing tests still passing untouched — c0ac500
+- [x] 4.7 Two runs over the same snapshot pair produce identical regions — c0ac500
 
 #### Manual
 
@@ -885,15 +885,15 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Automated
 
-- [ ] 5.1 Unit tests pass: `npm run test:unit`
-- [ ] 5.2 Integration tests pass: `npm run test:integration`
-- [ ] 5.3 Existing e2e journeys pass: `npm run test:e2e`
-- [ ] 5.4 Type checking passes: `npm run typecheck`
-- [ ] 5.5 Lint and format pass: `npm run check`
-- [ ] 5.6 Production build succeeds: `npm run build`
-- [ ] 5.7 Every `FINDING_TYPES` entry still has a reader-facing label
-- [ ] 5.8 A snapshot route request for another tenant's snapshot answers 404
-- [ ] 5.9 No query path selects the `image` column into a list view
+- [x] 5.1 Unit tests pass: `npm run test:unit`
+- [x] 5.2 Integration tests pass: `npm run test:integration`
+- [x] 5.3 Existing e2e journeys pass: `npm run test:e2e`
+- [x] 5.4 Type checking passes: `npm run typecheck`
+- [x] 5.5 Lint and format pass: `npm run check`
+- [x] 5.6 Production build succeeds: `npm run build`
+- [x] 5.7 Every `FINDING_TYPES` entry still has a reader-facing label
+- [x] 5.8 A snapshot route request for another tenant's snapshot answers 404
+- [x] 5.9 No query path selects the `image` column into a list view
 
 #### Manual
 

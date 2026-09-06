@@ -1,5 +1,5 @@
 import { EXPECTED } from "../fixture-server";
-import { expect, test } from "../fixtures";
+import { expect, RUN_TIMEOUT_MS, test } from "../fixtures";
 
 /**
  * The journey the product exists for.
@@ -32,7 +32,7 @@ test("an owner crawls a multilingual site and reads a real finding", async ({
 
 	// Completion, on the same page, still without a reload.
 	await expect(signedIn.getByText("Complete", { exact: true })).toBeVisible({
-		timeout: 60_000,
+		timeout: RUN_TIMEOUT_MS,
 	});
 
 	/**
@@ -93,7 +93,7 @@ test("a finding says which locale is missing, not just that something is wrong",
 
 	await signedIn.getByRole("button", { name: "Run a check" }).click();
 	await expect(signedIn.getByText("Complete", { exact: true })).toBeVisible({
-		timeout: 60_000,
+		timeout: RUN_TIMEOUT_MS,
 	});
 
 	/**
@@ -140,7 +140,7 @@ test("a family whose language links disagree is reported once, naming the pages"
 
 	await signedIn.getByRole("button", { name: "Run a check" }).click();
 	await expect(signedIn.getByText("Complete", { exact: true })).toBeVisible({
-		timeout: 60_000,
+		timeout: RUN_TIMEOUT_MS,
 	});
 
 	await expect(
@@ -186,7 +186,7 @@ test("a variant failing while its siblings work is stated as one comparison", as
 
 	await signedIn.getByRole("button", { name: "Run a check" }).click();
 	await expect(signedIn.getByText("Complete", { exact: true })).toBeVisible({
-		timeout: 60_000,
+		timeout: RUN_TIMEOUT_MS,
 	});
 
 	await expect(
@@ -212,7 +212,7 @@ test("no finding renders as a raw payload", async ({
 
 	await signedIn.getByRole("button", { name: "Run a check" }).click();
 	await expect(signedIn.getByText("Complete", { exact: true })).toBeVisible({
-		timeout: 60_000,
+		timeout: RUN_TIMEOUT_MS,
 	});
 
 	await expect(signedIn.getByText(/^\{"/)).toHaveCount(0);

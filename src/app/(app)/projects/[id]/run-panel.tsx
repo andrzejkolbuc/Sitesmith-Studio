@@ -20,6 +20,7 @@ import { Performance } from "./performance-table";
 import { RunHistory } from "./run-history";
 import { countPages, summariseList } from "./summarise";
 import { TrendGrid } from "./trend-grid";
+import { VisualPanel } from "./visual-panel";
 
 /**
  * Triggering a run and reading what it found.
@@ -415,6 +416,16 @@ export function RunPanel({
 			 * where conclusions live.
 			 */}
 			{settled && selectedRunId ? <Performance runId={selectedRunId} /> : null}
+
+			{/*
+			 * Below performance, for the same reason performance sits below the
+			 * grid: both describe a handful of pages a browser visited, and the
+			 * appearance section is the one that also needs the reader to act — it
+			 * is where a project without a baseline learns it needs one.
+			 */}
+			{settled && selectedRunId ? (
+				<VisualPanel projectId={projectId} runId={selectedRunId} />
+			) : null}
 
 			{settled && correlated.problems.length > 0 ? (
 				<Problems problems={correlated.problems} statuses={statuses} />

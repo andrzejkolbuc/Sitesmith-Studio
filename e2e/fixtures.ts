@@ -84,3 +84,17 @@ export const test = base.extend<Fixtures>({
 });
 
 export { expect };
+
+/**
+ * How long a run may take before a journey gives up on it.
+ *
+ * A crawl of the fixture site is seconds. What dominates now is the render pass:
+ * up to twelve pages, each costing a browser launch, a settle window, a scroll
+ * sweep and a full-page encode. That ceiling is bounded and stateable in advance
+ * — which is exactly why the sample is capped absolutely — so the budget here is
+ * that ceiling rather than a number raised until the suite stopped failing.
+ *
+ * Waits still key on state; this is only the point at which a run that is not
+ * going to finish stops holding the suite up.
+ */
+export const RUN_TIMEOUT_MS = 180_000;

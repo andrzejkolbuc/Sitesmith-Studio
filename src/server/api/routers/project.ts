@@ -490,6 +490,77 @@ export const projectRouter = createTRPCRouter({
 			};
 		}),
 
+	/**
+	 * The watched pages of one run, and how much of the site that was.
+	 *
+	 * **Never selects `image`.** The bytes reach the browser through
+	 * `/api/snapshots/[snapshotId]`, one picture per request; pulling a dozen
+	 * full-page PNGs through a JSON response would be tens of megabytes of
+	 * base64 for a list nobody has scrolled to yet. The columns here are what the
+	 * list needs in order to say what it holds.
+	 *
+	 * The summary travels alongside for the reason `runObservations` carries
+	 * `renderSummary`: a reader has to be told the watched set was a set, and a
+	 * run with no baseline has zero comparisons for a reason that is not "the
+	 * site was fine".
+	 */
+	runSnapshots: tenantProcedure
+		.input(z.object({ runId: z.string() }))
+		.query(async ({ ctx, input }) => {
+			const run = await ctx.db.query.runs.findFirst({
+				where: and(tenantScope(runs, ctx.tenantId), eq(runs.id, input.runId)),
+			});
+			if (!run) throw new TRPCError({ code: "NOT_FOUND" });
+
+			const rows = await ctx.db
+				.select({
+					id: pageSnapshots.id,
+					url: pages.url,
+					byteSize: pageSnapshots.byteSize,
+					captureError: pageSnapshots.captureError,
+					expiredAt: pageSnapshots.expiredAt,
+					imageWidth: pageSnapshots.imageWidth,
+					imageHeight: pageSnapshots.imageHeight,
+					/**
+					 * As the run concluded it, not recomputed here. Recomputing would
+					 * let the view disagree with the finding beside it, and would make
+					 * an old run's numbers change whenever this code did.
+					 */
+					comparison: pageSnapshots.comparison,
+				})
+				.from(pageSnapshots)
+				.innerJoin(pages, eq(pages.id, pageSnapshots.pageId))
+				.where(
+					and(
+						tenantScope(pageSnapshots, ctx.tenantId),
+						eq(pageSnapshots.runId, run.id),
+					),
+				)
+				.orderBy(pages.url);
+
+			/**
+			 * The project's baseline *now*, alongside what this run compared
+			 * against. They differ whenever a baseline was pinned or re-pinned after
+			 * the run, and the difference is what stops the view telling a reader to
+			 * pin something they have already pinned.
+			 */
+			const project = await ctx.db.query.projects.findFirst({
+				columns: { baselineRunId: true },
+				where: and(
+					tenantScope(projects, ctx.tenantId),
+					eq(projects.id, run.projectId),
+				),
+			});
+
+			return {
+				snapshots: rows,
+				summary: run.visualSummary,
+				projectBaselineRunId: project?.baselineRunId ?? null,
+				/** How many pages the run recorded, so the watched set has a proportion. */
+				pagesCrawled: run.pagesCrawled,
+			};
+		}),
+
 	runPages: tenantProcedure
 		.input(z.object({ runId: z.string() }))
 		.query(async ({ ctx, input }) => {

@@ -454,11 +454,45 @@ async function execute(
 			(await load(runId)).map((row) => [row.url, asImage(row)]),
 		);
 
+		const currentIdByUrl = new Map(
+			(
+				await db
+					.select({ id: pageSnapshots.id, url: pages.url })
+					.from(pageSnapshots)
+					.innerJoin(pages, eq(pages.id, pageSnapshots.pageId))
+					.where(eq(pageSnapshots.runId, runId))
+			).map((row) => [row.url, row.id]),
+		);
+
 		for (const url of watched) {
-			visual.set(
-				url,
-				compareSnapshots(before.get(url) ?? null, after.get(url) ?? null),
+			const comparison = compareSnapshots(
+				before.get(url) ?? null,
+				after.get(url) ?? null,
 			);
+			visual.set(url, comparison);
+
+			/**
+			 * Recorded on the row, including when nothing changed. The findings
+			 * table holds only pages that *differed*, so without this a reader
+			 * cannot tell a page that was compared and matched from one that was
+			 * never looked at — and only the second is a gap in what we checked.
+			 */
+			const snapshotId = currentIdByUrl.get(url);
+			if (!snapshotId) continue;
+
+			await db
+				.update(pageSnapshots)
+				.set({
+					comparison: comparison.comparable
+						? {
+								comparable: true,
+								changedPixels: comparison.changedPixels,
+								comparedPixels: comparison.comparedPixels,
+								heightDelta: comparison.heightDelta,
+							}
+						: { comparable: false, reason: comparison.reason },
+				})
+				.where(eq(pageSnapshots.id, snapshotId));
 		}
 	}
 

@@ -1,5 +1,5 @@
 import { EXPECTED } from "../fixture-server";
-import { expect, test } from "../fixtures";
+import { expect, RUN_TIMEOUT_MS, test } from "../fixtures";
 
 /**
  * A clean result is an outcome, not an absence.
@@ -31,7 +31,7 @@ test("a site with nothing wrong says so, rather than showing an empty list", asy
 
 	await signedIn.getByRole("button", { name: "Run a check" }).click();
 	await expect(signedIn.getByText("Complete", { exact: true })).toBeVisible({
-		timeout: 60_000,
+		timeout: RUN_TIMEOUT_MS,
 	});
 
 	// Stated as an outcome...

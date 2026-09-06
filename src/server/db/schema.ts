@@ -611,6 +611,28 @@ export const pageSnapshots = createTable(
 			.$defaultFn(() => []),
 		/** Why this page has no picture; null when it has one. */
 		captureError: d.text(),
+		/**
+		 * How this picture compared against the baseline, as the run concluded it.
+		 *
+		 * Recorded rather than derived, and recorded even when nothing changed —
+		 * because "compared, and identical" and "never compared" are different
+		 * facts and the findings table cannot tell them apart. A finding exists
+		 * only for a page that *differed*, so a view reading findings alone would
+		 * report every unchanged page as unexamined.
+		 *
+		 * Null means this page was not compared at all: no baseline, or the run
+		 * predates the visual pass. `{comparable: false}` means it was reached and
+		 * refused, and the reason says which of our own changes caused that.
+		 */
+		comparison: d.jsonb().$type<
+			| {
+					comparable: true;
+					changedPixels: number;
+					comparedPixels: number;
+					heightDelta: number;
+			  }
+			| { comparable: false; reason: string }
+		>(),
 		/** When retention dropped the bytes; null while they are still held. */
 		expiredAt: d.timestamp({ withTimezone: true }),
 		createdAt: d
