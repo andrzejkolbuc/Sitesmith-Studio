@@ -1,10 +1,10 @@
 ---
 change_id: browser-observed-checks
 title: Browser-observed checks
-status: implemented
+status: archived
 created: 2026-09-05
 updated: 2026-09-06
-archived_at: null
+archived_at: 2026-09-06T06:56:33Z
 ---
 
 ## Notes

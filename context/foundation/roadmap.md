@@ -57,7 +57,7 @@ works.
 | S-03 | cross-variant-content-drift     | see content drift between language variants                                    | S-02             | FR-027                                                                               | done     |
 | S-04 | crawl-technical-checks          | see broken links, sitemap and robots problems, orphans, duplicates, TLS issues | S-01             | FR-016, FR-017, FR-018, FR-019, FR-020, FR-030                                       | done     |
 | S-05 | seo-metadata-checks             | see title, meta, canonical and noindex problems                                | S-01             | FR-021, FR-022, FR-023                                                               | done     |
-| S-06 | browser-observed-checks         | see console errors, sampled Core Web Vitals, and image weight problems         | S-01             | FR-029; FR-015, FR-028 (partly)                                                      | proposed |
+| S-06 | browser-observed-checks         | see console errors, sampled Core Web Vitals, and image weight problems         | S-01             | FR-029; FR-015, FR-028 (partly)                                                      | done     |
 | S-07 | run-history-and-comparison      | compare a run against the previous one and see only what changed               | S-01             | US-02, FR-037, FR-038                                                                | done     |
 | S-08 | visual-regression-baselines     | set a baseline and see which pages changed visually, ignoring volatile regions | S-06, S-07       | US-02, FR-031, FR-032, FR-033, FR-034, FR-035                                        | proposed |
 | S-09 | correlated-findings             | see one explained problem per underlying cause instead of many symptoms        | S-02, S-04, S-05 | US-01, FR-040                                                                        | done     |
@@ -210,9 +210,9 @@ Foundations below assume these are present and do NOT re-scaffold them.
   onward, so any container must ship Chromium and its system libraries. F-02 was
   proposed before this was true.
 - **Unknowns:**
-  - ~~Does adding page rendering to a run break the run-duration property S-01 measured?~~ **Answered, on a real project.** About 4-6s per rendered page, and the sample is capped at twelve — bounded and stateable in advance. It breaks the property at any sample defined by a *formula*: the naive reading of FR-028 measured at 143 renders on a 533-page client site. See `context/changes/browser-observed-checks/proof.md`.
+  - ~~Does adding page rendering to a run break the run-duration property S-01 measured?~~ **Answered, on a real project.** About 4-6s per rendered page, and the sample is capped at twelve — bounded and stateable in advance. It breaks the property at any sample defined by a *formula*: the naive reading of FR-028 measured at 143 renders on a 533-page client site. See `context/archive/2026-09-05-browser-observed-checks/proof.md`.
 - **Risk:** This is where rendering pages in a real browser enters the product, and it is introduced here rather than in a foundation because this is the first slice that needs it. Performance is sampled rather than per-page by explicit PRD decision - measuring every URL would take hours and destroy the primary success criterion. The rendering capability this slice establishes is what makes S-08 possible at all.
-- **Status:** proposed
+- **Status:** done
 
 ### S-07: Run history and comparison
 
@@ -332,7 +332,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 | S-03       | cross-variant-content-drift     | Content drift between language variants                     | done                  | Blocked — define drift vs honest translation   |
 | S-04       | crawl-technical-checks          | Crawl-level technical checks                                | done                  | Needs S-01. Highly parallelisable              |
 | S-05       | seo-metadata-checks             | SEO metadata checks                                         | done                  | Needs S-01. Best effort-to-value ratio         |
-| S-06       | browser-observed-checks         | Console errors, sampled performance, image weight           | yes                   | Needs S-01. Introduces page rendering          |
+| S-06       | browser-observed-checks         | Console errors, sampled performance, image weight           | done                  | Needs S-01. Introduces page rendering          |
 | S-07       | run-history-and-comparison      | Run history and run-over-run comparison                     | done                  | Needs S-01                                     |
 | S-08       | visual-regression-baselines     | Visual regression with baselines and masked regions         | no                    | Blocked — snapshot retention window            |
 | S-09       | correlated-findings             | Correlated findings — one explained problem per cause       | done                  | Needs S-02, S-04, S-05. The domain rule        |
@@ -372,6 +372,8 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Observability tooling.** Why parked: no PRD requirement demands it, so no foundation opens for it. Revisit if operating scheduled runs proves opaque.
 
 ## Done
+
+- **S-06: User can see JavaScript console errors, Core Web Vitals and performance scores for a representative sample of pages, and image weight problems.** — Archived 2026-09-06 → `context/archive/2026-09-05-browser-observed-checks/`. FR-029 met; FR-015 and FR-028 partly met (rendered sample only, no composite score); FR-039's scores half now deliverable. Lesson: rendering is affordable at an absolute cap and only at an absolute cap — a sample defined by a formula measured 143 renders on a 533-page site.
 
 - **S-12: User can see scores and issue counts tracked over time, revealing drift rather than only last-run state.** — Archived 2026-09-05 → `context/archive/2026-09-04-quality-trend-history/`. Delivered the issue-counts half only; FR-039 stays open on S-06 for the scores half. Lesson: —.
 
