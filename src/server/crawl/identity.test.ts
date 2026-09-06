@@ -189,6 +189,14 @@ const SAMPLES: Record<string, Record<string, unknown>> = {
 		thirdPartyCount: 1,
 		messages: ["TypeError: undefined is not a function"],
 	},
+	[FINDING_TYPES.VISUAL_CHANGED]: {
+		url: "https://x.test/en/home",
+		changedPixels: 4_200,
+		comparedPixels: 1_000_000,
+		regions: [{ x: 0, y: 0, width: 16, height: 16 }],
+		regionsCapped: false,
+		heightDelta: 0,
+	},
 	[FINDING_TYPES.REDIRECT_CHAIN]: {
 		kind: "chain",
 		from: "https://x.test/old",

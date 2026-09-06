@@ -854,12 +854,12 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Automated
 
-- [x] 3.1 Unit tests pass: `npm run test:unit`
-- [x] 3.2 Integration tests pass: `npm run test:integration`
-- [x] 3.3 Type checking passes: `npm run typecheck`
-- [x] 3.4 Lint and format pass: `npm run check`
-- [x] 3.5 A run after pinning renders the baseline's URLs, not a re-derived sample
-- [x] 3.6 `pinBaseline` on another tenant's run answers not-found, not forbidden
+- [x] 3.1 Unit tests pass: `npm run test:unit` — e8708ac
+- [x] 3.2 Integration tests pass: `npm run test:integration` — e8708ac
+- [x] 3.3 Type checking passes: `npm run typecheck` — e8708ac
+- [x] 3.4 Lint and format pass: `npm run check` — e8708ac
+- [x] 3.5 A run after pinning renders the baseline's URLs, not a re-derived sample — e8708ac
+- [x] 3.6 `pinBaseline` on another tenant's run answers not-found, not forbidden — e8708ac
 
 #### Manual
 
@@ -869,13 +869,13 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Automated
 
-- [ ] 4.1 Unit tests pass: `npm run test:unit`
-- [ ] 4.2 Integration tests pass: `npm run test:integration`
-- [ ] 4.3 Type checking passes: `npm run typecheck`
-- [ ] 4.4 Lint and format pass: `npm run check`
-- [ ] 4.5 Identical images produce zero changed pixels and no finding
-- [ ] 4.6 `comparability()`'s existing behaviour is unchanged, proven by its existing tests still passing untouched
-- [ ] 4.7 Two runs over the same snapshot pair produce identical regions
+- [x] 4.1 Unit tests pass: `npm run test:unit`
+- [x] 4.2 Integration tests pass: `npm run test:integration`
+- [x] 4.3 Type checking passes: `npm run typecheck`
+- [x] 4.4 Lint and format pass: `npm run check`
+- [x] 4.5 Identical images produce zero changed pixels and no finding
+- [x] 4.6 `comparability()`'s existing behaviour is unchanged, proven by its existing tests still passing untouched
+- [x] 4.7 Two runs over the same snapshot pair produce identical regions
 
 #### Manual
 

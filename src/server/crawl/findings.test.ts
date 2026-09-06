@@ -7,6 +7,7 @@ import { detectMissingVariants, FINDING_TYPES } from "./findings";
 import { emptyImages } from "./images";
 import { emptyMetadata } from "./metadata";
 import { groupVariants, localeFromUrl } from "./variants";
+import type { SnapshotComparison } from "./visual";
 
 let site: Fixture;
 
@@ -145,6 +146,7 @@ describe("detectMissingVariants against the fixture site", () => {
 				entryUrl: result.entryUrl,
 				requested: result.requested,
 				render: { observations: [], complete: true },
+				visual: new Map(),
 				imageWeights: { weighed: [], complete: true },
 				external: result.external,
 				aliases: result.aliases,
@@ -733,6 +735,7 @@ describe("detectMissingVariants edge cases", () => {
 			entryUrl: null,
 			requested: [],
 			render: { observations: [], complete: true },
+			visual: new Map(),
 			imageWeights: { weighed: [], complete: true },
 			external: { checked: [], complete: false },
 			aliases: [],
@@ -794,6 +797,7 @@ describe("detectMissingVariants edge cases", () => {
 			entryUrl: null,
 			requested: [],
 			render: { observations: [], complete: true },
+			visual: new Map(),
 			imageWeights: { weighed: [], complete: true },
 			external: { checked: [], complete: false },
 			aliases: [],
@@ -858,6 +862,7 @@ describe("detectMissingVariants edge cases", () => {
 			entryUrl: null,
 			requested: [],
 			render: { observations: [], complete: true },
+			visual: new Map(),
 			imageWeights: { weighed: [], complete: true },
 			external: { checked: [], complete: false },
 			aliases: [],
@@ -898,6 +903,7 @@ describe("detectMissingVariants edge cases", () => {
 			entryUrl: null,
 			requested: [],
 			render: { observations: [], complete: true },
+			visual: new Map(),
 			imageWeights: { weighed: [], complete: true },
 			external: { checked: [], complete: false },
 			aliases: [],
@@ -908,5 +914,115 @@ describe("detectMissingVariants edge cases", () => {
 		expect(
 			findings.filter((f) => f.type === FINDING_TYPES.MISSING_LOCALE),
 		).toHaveLength(0);
+	});
+});
+
+/**
+ * Rule 29 — a page that no longer looks like its baseline.
+ *
+ * The rule with the least to say, on purpose. Its evidence is partly our own
+ * rendering, so every case here is about it staying quiet on a fact that is
+ * about us rather than about the client's site.
+ */
+describe("visual change", () => {
+	const URL_A = "https://site.test/a";
+
+	function detectWith(visual: Map<string, SnapshotComparison>) {
+		return detectMissingVariants({
+			pages: [],
+			expectedLocales: [],
+			crawlComplete: true,
+			reverified: [],
+			certificate: null,
+			robots: null,
+			sitemap: null,
+			entryUrl: null,
+			requested: [],
+			render: { observations: [], complete: true },
+			visual,
+			imageWeights: { weighed: [], complete: true },
+			external: { checked: [], complete: false },
+			aliases: [],
+			inScope: () => true,
+			scopeNarrowed: false,
+		}).filter((f) => f.type === FINDING_TYPES.VISUAL_CHANGED);
+	}
+
+	const changed = (
+		changedPixels: number,
+		over: Partial<Record<string, unknown>> = {},
+	) =>
+		({
+			comparable: true as const,
+			changedPixels,
+			comparedPixels: 1_000_000,
+			regions: [{ x: 0, y: 0, width: 16, height: 16 }],
+			regionsCapped: false,
+			heightDelta: 0,
+			...over,
+		}) as SnapshotComparison;
+
+	it("reports a page that differs, citing the count and where", () => {
+		const findings = detectWith(new Map([[URL_A, changed(4_200)]]));
+
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.url).toBe(URL_A);
+		expect(findings[0]?.detail).toMatchObject({
+			url: URL_A,
+			changedPixels: 4_200,
+			comparedPixels: 1_000_000,
+			regionsCapped: false,
+		});
+	});
+
+	/** The answer for a page nobody touched, which is most pages on most
+	 * deploys — and the answer the whole slice exists to be able to give. */
+	it("says nothing about a page that did not change", () => {
+		expect(detectWith(new Map([[URL_A, changed(0)]]))).toHaveLength(0);
+	});
+
+	it("says nothing when there is no baseline to compare against", () => {
+		expect(detectWith(new Map())).toHaveLength(0);
+	});
+
+	/**
+	 * Every refusal is a fact about *us* — a page we could not photograph, a
+	 * viewport we changed, a mask list we edited. None is a defect on the
+	 * client's site, so none becomes a finding. The visual section reports them.
+	 */
+	it("says nothing about a pair that refused", () => {
+		for (const reason of [
+			"missing",
+			"viewport_differs",
+			"masks_differ",
+			"width_differs",
+			"unreadable",
+		] as const) {
+			expect(
+				detectWith(new Map([[URL_A, { comparable: false, reason }]])),
+			).toHaveLength(0);
+		}
+	});
+
+	/** A page that only grew has nothing different in what both pictures cover;
+	 * reporting length alone would fire on every added paragraph. */
+	it("says nothing about a page that only got longer", () => {
+		expect(
+			detectWith(new Map([[URL_A, changed(0, { heightDelta: 900 })]])),
+		).toHaveLength(0);
+	});
+
+	it("orders its findings by URL so two runs read the same", () => {
+		const findings = detectWith(
+			new Map([
+				["https://site.test/z", changed(10)],
+				["https://site.test/a", changed(10)],
+			]),
+		);
+
+		expect(findings.map((f) => f.url)).toEqual([
+			"https://site.test/a",
+			"https://site.test/z",
+		]);
 	});
 });

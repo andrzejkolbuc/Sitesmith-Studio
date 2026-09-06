@@ -14,6 +14,7 @@ import {
 	localeFromUrl,
 	type PageVariant,
 } from "./variants";
+import type { SnapshotComparison } from "./visual";
 
 /**
  * Turning what the crawl observed into what the product concluded.
@@ -82,6 +83,8 @@ export const FINDING_TYPES = {
 	IMAGE_OVERSIZED: "image_oversized",
 	/** A page whose own scripts failed while it loaded. */
 	CONSOLE_ERROR: "console_error",
+	/** A page that no longer looks like the baseline it is watched against. */
+	VISUAL_CHANGED: "visual_changed",
 } as const;
 
 export type FindingType = (typeof FINDING_TYPES)[keyof typeof FINDING_TYPES];
@@ -179,6 +182,15 @@ export type DetectOptions = {
 	 */
 	render: RenderResult;
 	/**
+	 * How each watched page compares against the project's baseline.
+	 *
+	 * Keyed by URL, and absent for every page the baseline does not watch — which
+	 * is nearly all of them. A project with no baseline hands an empty map, and
+	 * the rule then reports nothing, which is correct: there is no claim to make
+	 * about a site nobody has said what it should look like.
+	 */
+	visual: Map<string, SnapshotComparison>;
+	/**
 	 * Routes that led somewhere other than where they were asked for.
 	 *
 	 * Read beside `pages` rather than instead of it, because the two hold
@@ -253,6 +265,7 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		external,
 		imageWeights,
 		render,
+		visual,
 		aliases,
 		scopeNarrowed,
 	} = options;
@@ -2330,6 +2343,48 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 				},
 			});
 		}
+	}
+
+	// ── Rule 29: a page that no longer looks like its baseline ────────────────
+	//
+	// FR-033. The only rule here whose evidence is partly our own rendering, so
+	// it is the most conservative one in the file about what it will say.
+	//
+	// It stays silent on every fact about *us* rather than about the site: no
+	// baseline pinned, no picture on one side or the other, a pair that refused
+	// because the viewport or the mask list moved. Each of those is a real thing
+	// a reader may need to know, and none of them is a defect on the client's
+	// site — the visual section reports them, this rule does not.
+	//
+	// Zero changed pixels is not a finding either. That is the answer for a page
+	// nobody touched, which is most pages on most deploys, and it is the answer
+	// the whole slice exists to be able to give.
+	for (const [url, comparison] of [...visual.entries()].sort((a, b) =>
+		a[0].localeCompare(b[0]),
+	)) {
+		if (!comparison.comparable) continue;
+		if (comparison.changedPixels === 0) continue;
+
+		findings.push({
+			type: FINDING_TYPES.VISUAL_CHANGED,
+			url,
+			detail: {
+				url,
+				changedPixels: comparison.changedPixels,
+				/** The denominator, so the count is readable without guessing. */
+				comparedPixels: comparison.comparedPixels,
+				regions: comparison.regions,
+				regionsCapped: comparison.regionsCapped,
+				/**
+				 * How much the page's own length moved, as context for the change.
+				 *
+				 * Not a finding on its own: a page that only grew below the compared
+				 * overlap has nothing different in what both pictures actually cover,
+				 * and reporting length alone would fire on every added paragraph.
+				 */
+				heightDelta: comparison.heightDelta,
+			},
+		});
 	}
 
 	return findings;

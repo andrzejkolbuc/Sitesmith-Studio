@@ -16,6 +16,7 @@ import { expireSnapshots } from "./retention";
 import { chooseRenderSample, countInboundLinks } from "./sample";
 import { inScopePath } from "./scope";
 import { groupVariants } from "./variants";
+import { compareSnapshots, type SnapshotComparison } from "./visual";
 
 /**
  * The run lifecycle.
@@ -345,6 +346,9 @@ async function execute(
 	/** What this run will actually render. */
 	const renderUrls = watched.length > 0 ? watched : sample.urls;
 
+	/** Counted at the sink rather than re-queried, so it counts what was written. */
+	let capturedCount = 0;
+
 	/**
 	 * The page rows this run has already written, keyed by URL.
 	 *
@@ -398,13 +402,69 @@ async function execute(
 										viewportHeight: SNAPSHOT_VIEWPORT.height,
 										maskSelectors: project.maskSelectors,
 									});
+									capturedCount += 1;
 								},
 							}
 						: undefined,
 				}).catch(() => ({ observations: [], complete: false }));
 
+	/**
+	 * How each watched page now compares against the baseline.
+	 *
+	 * Done here, at run close, because that is where every other rule is
+	 * evaluated: findings are rows recording what was concluded *then*, not a
+	 * view recomputed later against today's code. A comparison derived at read
+	 * time would silently change its answer whenever this module did.
+	 *
+	 * Both sides are read after the capture pass, so the current run's own
+	 * pictures are already in the table.
+	 */
+	const visual = new Map<string, SnapshotComparison>();
+
+	if (project.baselineRunId !== null && watched.length > 0) {
+		const columns = {
+			url: pages.url,
+			image: pageSnapshots.image,
+			viewportWidth: pageSnapshots.viewportWidth,
+			viewportHeight: pageSnapshots.viewportHeight,
+			maskSelectors: pageSnapshots.maskSelectors,
+		};
+
+		const load = async (id: string) =>
+			db
+				.select(columns)
+				.from(pageSnapshots)
+				.innerJoin(pages, eq(pages.id, pageSnapshots.pageId))
+				.where(eq(pageSnapshots.runId, id));
+
+		const asImage = (row: Awaited<ReturnType<typeof load>>[number]) =>
+			row.image === null
+				? null
+				: {
+						image: row.image,
+						viewportWidth: row.viewportWidth,
+						viewportHeight: row.viewportHeight,
+						maskSelectors: row.maskSelectors,
+					};
+
+		const before = new Map(
+			(await load(project.baselineRunId)).map((row) => [row.url, asImage(row)]),
+		);
+		const after = new Map(
+			(await load(runId)).map((row) => [row.url, asImage(row)]),
+		);
+
+		for (const url of watched) {
+			visual.set(
+				url,
+				compareSnapshots(before.get(url) ?? null, after.get(url) ?? null),
+			);
+		}
+	}
+
 	const detected = detectMissingVariants({
 		pages: result.pages,
+		visual,
 		crawlComplete,
 		expectedLocales: project.locales,
 		inScope,
@@ -521,6 +581,23 @@ async function execute(
 				measured: render.observations.filter((o) => o.renderError === null)
 					.length,
 				cap: sample.cap,
+				complete: render.complete,
+			},
+			/**
+			 * What the visual pass covered and what it measured against.
+			 *
+			 * Recorded even when there is no baseline:  is the
+			 * fact that this run had nothing to compare with, which is different
+			 * from the column being null and meaning nobody recorded anything.
+			 */
+			visualSummary: {
+				baselineRunId: project.baselineRunId,
+				watched: watched.length,
+				captured: capturedCount,
+				compared: [...visual.values()].filter((v) => v.comparable).length,
+				differing: [...visual.values()].filter(
+					(v) => v.comparable && v.changedPixels > 0,
+				).length,
 				complete: render.complete,
 			},
 		})

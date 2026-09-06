@@ -15,6 +15,7 @@ import { parseRobots, type RobotsFile } from "./robots";
 import type { SitemapDocument } from "./sitemap";
 import type { CertificateObservation } from "./tls";
 import { localeFromUrl } from "./variants";
+import type { SnapshotComparison } from "./visual";
 
 /**
  * The rules, against site shapes they were not written for.
@@ -141,6 +142,8 @@ function findingsFor(options: {
 	imageWeights?: ImageWeightSweep;
 	/** Defaults to a complete pass with nothing observed: most cases render nothing. */
 	render?: RenderResult;
+	/** Defaults to none watched: a case without a baseline compares nothing. */
+	visual?: Map<string, SnapshotComparison>;
 	/** Defaults to a whole-site crawl: most cases describe an unscoped project. */
 	scopeNarrowed?: boolean;
 }): Summary[] {
@@ -156,6 +159,7 @@ function findingsFor(options: {
 		entryUrl: options.entryUrl ?? null,
 		requested: options.requested ?? options.pages.map((p) => p.url),
 		render: options.render ?? { observations: [], complete: true },
+		visual: options.visual ?? new Map(),
 		imageWeights: options.imageWeights ?? { weighed: [], complete: true },
 		external: options.external ?? { checked: [], complete: false },
 		/** Not exposed here: the alias cases are all detail cases. */
@@ -204,6 +208,8 @@ function detailedFindingsFor(options: {
 	imageWeights?: ImageWeightSweep;
 	/** Defaults to a complete pass with nothing observed: most cases render nothing. */
 	render?: RenderResult;
+	/** Defaults to none watched: a case without a baseline compares nothing. */
+	visual?: Map<string, SnapshotComparison>;
 	/** Defaults to a whole-site crawl: most cases describe an unscoped project. */
 	scopeNarrowed?: boolean;
 	/** Defaults to none: most cases describe routes that went where they were asked. */
@@ -221,6 +227,7 @@ function detailedFindingsFor(options: {
 		entryUrl: options.entryUrl ?? null,
 		requested: options.requested ?? options.pages.map((p) => p.url),
 		render: { observations: [], complete: true },
+		visual: options.visual ?? new Map(),
 		imageWeights: options.imageWeights ?? { weighed: [], complete: true },
 		external: options.external ?? { checked: [], complete: false },
 		aliases: options.aliases ?? [],
@@ -3404,6 +3411,7 @@ describe("links that leave the site", () => {
 		const findings = detailedFindingsFor({
 			pages: [linking("/", ["https://elsewhere.test/gone"])],
 			render: { observations: [], complete: true },
+			visual: new Map(),
 			imageWeights: { weighed: [], complete: true },
 			external: sweep([
 				{ url: "https://elsewhere.test/gone", httpStatus: 404 },
@@ -3431,6 +3439,7 @@ describe("links that leave the site", () => {
 			detailedFindingsFor({
 				pages: [linking("/", ["https://elsewhere.test/closed"])],
 				render: { observations: [], complete: true },
+				visual: new Map(),
 				imageWeights: { weighed: [], complete: true },
 				external: sweep([
 					{ url: "https://elsewhere.test/closed", httpStatus: 403 },
@@ -3444,6 +3453,7 @@ describe("links that leave the site", () => {
 			detailedFindingsFor({
 				pages: [linking("/", ["https://elsewhere.test/down"])],
 				render: { observations: [], complete: true },
+				visual: new Map(),
 				imageWeights: { weighed: [], complete: true },
 				external: sweep([
 					{ url: "https://elsewhere.test/down", httpStatus: 503 },
@@ -3459,6 +3469,7 @@ describe("links that leave the site", () => {
 			detailedFindingsFor({
 				pages,
 				render: { observations: [], complete: true },
+				visual: new Map(),
 				imageWeights: { weighed: [], complete: true },
 				external: sweep([
 					{
@@ -3475,6 +3486,7 @@ describe("links that leave the site", () => {
 			detailedFindingsFor({
 				pages,
 				render: { observations: [], complete: true },
+				visual: new Map(),
 				imageWeights: { weighed: [], complete: true },
 				external: sweep([
 					{
@@ -3499,6 +3511,7 @@ describe("links that leave the site", () => {
 			detailedFindingsFor({
 				pages: [linking("/", ["https://elsewhere.test/gone"])],
 				render: { observations: [], complete: true },
+				visual: new Map(),
 				imageWeights: { weighed: [], complete: true },
 				external: sweep(
 					[{ url: "https://elsewhere.test/gone", httpStatus: 404 }],
@@ -3828,6 +3841,7 @@ describe("images heavy enough to be worth a look", () => {
 		const findings = heavyFindings({
 			pages: [carrying([`${BASE}/hero.jpg`])],
 			render: { observations: [], complete: true },
+			visual: new Map(),
 			imageWeights: {
 				weighed: [{ url: `${BASE}/hero.jpg`, bytes: 1_400_000 }],
 				complete: true,
@@ -3847,6 +3861,7 @@ describe("images heavy enough to be worth a look", () => {
 		const findings = heavyFindings({
 			pages: [carrying([`${BASE}/hero.jpg`])],
 			render: { observations: [], complete: true },
+			visual: new Map(),
 			imageWeights: {
 				weighed: [{ url: `${BASE}/hero.jpg`, bytes: 1_400_000 }],
 				complete: true,
@@ -3864,6 +3879,7 @@ describe("images heavy enough to be worth a look", () => {
 			heavyFindings({
 				pages: [carrying([`${BASE}/small.jpg`])],
 				render: { observations: [], complete: true },
+				visual: new Map(),
 				imageWeights: {
 					weighed: [{ url: `${BASE}/small.jpg`, bytes: 12_000 }],
 					complete: true,
@@ -3882,6 +3898,7 @@ describe("images heavy enough to be worth a look", () => {
 			heavyFindings({
 				pages: [carrying([`${BASE}/hero.jpg`])],
 				render: { observations: [], complete: true },
+				visual: new Map(),
 				imageWeights: {
 					weighed: [{ url: `${BASE}/hero.jpg`, bytes: 1_400_000 }],
 					complete: false,
@@ -3899,6 +3916,7 @@ describe("images heavy enough to be worth a look", () => {
 			heavyFindings({
 				pages: [carrying([`${BASE}/hero.jpg`])],
 				render: { observations: [], complete: true },
+				visual: new Map(),
 				imageWeights: {
 					weighed: [{ url: `${BASE}/hero.jpg`, bytes: null }],
 					complete: true,
@@ -3911,6 +3929,7 @@ describe("images heavy enough to be worth a look", () => {
 		const findings = heavyFindings({
 			pages: [carrying([`${BASE}/a.jpg`, `${BASE}/b.jpg`, `${BASE}/c.jpg`])],
 			render: { observations: [], complete: true },
+			visual: new Map(),
 			imageWeights: {
 				weighed: [
 					{ url: `${BASE}/a.jpg`, bytes: 900_000 },

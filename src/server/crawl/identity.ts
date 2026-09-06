@@ -181,6 +181,13 @@ export function findingIdentity(finding: {
 		 * number.
 		 */
 		case "console_error":
+		/**
+		 * The page, and nothing about how much of it moved. A page that differed
+		 * by four thousand pixels yesterday and forty thousand today is the same
+		 * unfixed problem — keying on the count would report it resolved and
+		 * re-appearing on every run while nobody touched it.
+		 */
+		case "visual_changed":
 			return key(type, text(detail.url));
 
 		/**

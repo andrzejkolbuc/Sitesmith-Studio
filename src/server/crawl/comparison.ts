@@ -130,6 +130,67 @@ export function comparability(
 	return { comparable: true };
 }
 
+/** The visual half of a run, in the shape its own comparability check needs. */
+export type ComparableVisual = {
+	visualSummary: { baselineRunId: string | null } | null;
+};
+
+export type VisualComparabilityReason =
+	/** One of the runs predates the visual pass, or died before recording it. */
+	| "not_recorded"
+	/** The two runs were measured against different baselines. */
+	| "baseline_changed";
+
+export type VisualComparability =
+	| { comparable: true }
+	| { comparable: false; reason: VisualComparabilityReason };
+
+/**
+ * Whether two runs' *visual* findings may be called new or resolved.
+ *
+ * Separate from {@link comparability}, and deliberately so. A baseline moving
+ * says nothing whatever about the hreflang graph, so folding it into the
+ * whole-run check would suppress every other comparison over a fact that
+ * concerns one rule. The narrower question gets a narrower answer.
+ *
+ * What it is guarding is the fourth entry in `context/foundation/lessons.md`
+ * wearing a different coat. That rule says a rule shipping is not the site
+ * changing; **a re-baseline is not the site changing either**. Re-pin a project
+ * and every page that differed from the old baseline stops differing from the
+ * new one, which without this reads as a deploy that fixed the whole site.
+ *
+ * A run compared against *no* baseline and a run compared against one are also
+ * not comparable, and fall out of the same equality: `null` is a baseline id
+ * like any other here.
+ */
+export function visualComparability(
+	previous: ComparableVisual,
+	current: ComparableVisual,
+): VisualComparability {
+	if (
+		previous.visualSummary === null ||
+		current.visualSummary === null ||
+		/**
+		 * A run that recorded a summary but no baseline had nothing to compare
+		 * against, so there is no earlier visual state for this one to be measured
+		 * against either. Reported as not-recorded rather than as a changed
+		 * baseline, because nothing changed — there was never one.
+		 */
+		(previous.visualSummary.baselineRunId === null &&
+			current.visualSummary.baselineRunId === null)
+	) {
+		return { comparable: false, reason: "not_recorded" };
+	}
+
+	if (
+		previous.visualSummary.baselineRunId !== current.visualSummary.baselineRunId
+	) {
+		return { comparable: false, reason: "baseline_changed" };
+	}
+
+	return { comparable: true };
+}
+
 /**
  * Annotates the current run's findings against the previous run's.
  *

@@ -5,6 +5,7 @@ import {
 	comparability,
 	compareFindings,
 	type StoredFinding,
+	visualComparability,
 } from "./comparison";
 
 const scope = (over: Partial<NonNullable<ComparableRun["scope"]>> = {}) => ({
@@ -264,5 +265,62 @@ describe("compareFindings", () => {
 		const result = compareFindings([link("a", "https://x.test/gone")], []);
 
 		expect(result.map((f) => f.status)).toEqual(["resolved"]);
+	});
+});
+
+/**
+ * The narrower question: may this run's *visual* findings be called new or
+ * resolved against the last one's?
+ *
+ * Separate from `comparability` because a baseline moving says nothing about the
+ * hreflang graph — folding it in would suppress every other comparison over a
+ * fact that concerns one rule.
+ */
+describe("visualComparability", () => {
+	const against = (baselineRunId: string | null) => ({
+		visualSummary: { baselineRunId },
+	});
+
+	it("compares two runs measured against the same baseline", () => {
+		expect(visualComparability(against("b1"), against("b1"))).toEqual({
+			comparable: true,
+		});
+	});
+
+	/**
+	 * `lessons.md` rule 4 in a different coat. Re-pin a project and every page
+	 * that differed from the old baseline stops differing from the new one, which
+	 * without this reads as a deploy that fixed the whole site.
+	 */
+	it("refuses when the baseline moved between the two runs", () => {
+		expect(visualComparability(against("b1"), against("b2"))).toEqual({
+			comparable: false,
+			reason: "baseline_changed",
+		});
+	});
+
+	it("refuses a run that recorded no visual pass at all", () => {
+		expect(visualComparability({ visualSummary: null }, against("b1"))).toEqual(
+			{ comparable: false, reason: "not_recorded" },
+		);
+		expect(visualComparability(against("b1"), { visualSummary: null })).toEqual(
+			{ comparable: false, reason: "not_recorded" },
+		);
+	});
+
+	/** Neither run had anything to compare against, so there is no earlier visual
+	 * state — not-recorded rather than a changed baseline, because nothing moved. */
+	it("refuses two runs that both had no baseline", () => {
+		expect(visualComparability(against(null), against(null))).toEqual({
+			comparable: false,
+			reason: "not_recorded",
+		});
+	});
+
+	it("refuses when a baseline was pinned between the two runs", () => {
+		expect(visualComparability(against(null), against("b1"))).toEqual({
+			comparable: false,
+			reason: "baseline_changed",
+		});
 	});
 });

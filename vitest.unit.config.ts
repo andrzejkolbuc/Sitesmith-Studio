@@ -32,6 +32,7 @@ export default defineConfig({
 			"src/server/crawl/sample.test.ts",
 			"src/server/crawl/comparison.test.ts",
 			"src/server/crawl/retention.test.ts",
+			"src/server/crawl/visual.test.ts",
 			"src/server/crawl/site-shapes.test.ts",
 			"src/server/crawl/politeness.test.ts",
 			"src/server/crawl/external.test.ts",

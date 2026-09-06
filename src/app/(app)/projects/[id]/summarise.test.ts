@@ -805,6 +805,19 @@ const ROLE_CASES: Record<string, RoleCase> = {
 		subject: [`${R}/en/home`],
 		origin: [`${R}/en/home`],
 	},
+	visual_changed: {
+		url: `${R}/en/home`,
+		detail: {
+			url: `${R}/en/home`,
+			changedPixels: 4_200,
+			comparedPixels: 1_000_000,
+			regions: [{ x: 0, y: 0, width: 16, height: 16 }],
+			regionsCapped: false,
+			heightDelta: 0,
+		},
+		subject: [`${R}/en/home`],
+		origin: [`${R}/en/home`],
+	},
 	image_oversized: {
 		url: `${R}/en/home`,
 		detail: {

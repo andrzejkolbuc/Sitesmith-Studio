@@ -122,6 +122,8 @@ export function evidenceRoles(finding: {
 		case "image_oversized":
 		/** The page runs the script, so it is both what is wrong and what emits it. */
 		case "console_error":
+		/** Likewise: the page is what changed and the page is where it shows. */
+		case "visual_changed":
 			return both(one(detail.url));
 
 		/**
