@@ -367,6 +367,106 @@ describe("stale-run sweep", () => {
 	});
 });
 
+describe("snapshot capture", () => {
+	/**
+	 * The wiring, end to end and once. Like the render case above, this is the
+	 * only run-level test here that launches a browser: what it fixes is that the
+	 * bytes reach the table with the geometry that lets a later comparison decide
+	 * whether two pictures are of the same thing.
+	 */
+	it("stores a picture of each page it rendered", async () => {
+		const { tenant, project } = await seedProject("nu");
+
+		const { runId } = await runToCompletion(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+			maxRenders: 2,
+		});
+
+		const stored = await db.query.pageSnapshots.findMany({
+			where: eq(pageSnapshots.runId, runId),
+		});
+
+		expect(stored.length).toBeGreaterThan(0);
+		expect(stored.every((row) => row.image !== null)).toBe(true);
+		expect(stored.every((row) => (row.byteSize ?? 0) > 0)).toBe(true);
+		expect(stored.every((row) => row.viewportWidth === 1280)).toBe(true);
+		expect(stored.every((row) => row.imageWidth === 1280)).toBe(true);
+		expect(stored.every((row) => row.expiredAt === null)).toBe(true);
+		expect(stored.every((row) => row.tenantId === tenant.id)).toBe(true);
+
+		/** Every picture belongs to a page this run actually recorded. */
+		const pageIds = new Set(
+			(
+				await db.query.pages.findMany({
+					where: eq(pages.runId, runId),
+					columns: { id: true },
+				})
+			).map((page) => page.id),
+		);
+		expect(stored.every((row) => pageIds.has(row.pageId))).toBe(true);
+	}, 120_000);
+
+	it("stores no picture when the run was told not to capture", async () => {
+		const { tenant, project } = await seedProject("omega");
+
+		const { runId } = await runToCompletion(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+			maxRenders: 2,
+			captureSnapshots: false,
+		});
+
+		const stored = await db.query.pageSnapshots.findMany({
+			where: eq(pageSnapshots.runId, runId),
+		});
+		const observed = await db.query.pageObservations.findMany({
+			where: eq(pageObservations.runId, runId),
+		});
+
+		expect(stored).toHaveLength(0);
+		/** The measurement still happened; only the picture was declined. */
+		expect(observed.length).toBeGreaterThan(0);
+	}, 120_000);
+
+	/**
+	 * A capture that cannot happen is our problem, not the site's.
+	 *
+	 * The project's mask is unparseable, so every screenshot fails. The run must
+	 * still close as `done`, still record what it found, and simply hold no
+	 * pictures — a run marked failed because our screenshot was would be the
+	 * fourth `lessons.md` entry written a fifth time.
+	 */
+	it("finishes the run when every capture fails", async () => {
+		const { tenant, project } = await seedProject("rho");
+		await db
+			.update(projects)
+			.set({ maskSelectors: ["<<<not a selector>>>"] })
+			.where(eq(projects.id, project.id));
+
+		const { runId } = await runToCompletion(db, {
+			tenantId: tenant.id,
+			projectId: project.id,
+			maxRenders: 2,
+		});
+
+		const run = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
+		const stored = await db.query.pageSnapshots.findMany({
+			where: eq(pageSnapshots.runId, runId),
+		});
+		const observed = await db.query.pageObservations.findMany({
+			where: eq(pageObservations.runId, runId),
+		});
+
+		expect(run?.status).toBe(RUN_STATUS.DONE);
+		expect(run?.error).toBeNull();
+		expect(stored).toHaveLength(0);
+		/** The vitals survive a failed picture; they are separate facts. */
+		expect(observed.length).toBeGreaterThan(0);
+		expect(observed.every((row) => row.renderError === null)).toBe(true);
+	}, 120_000);
+});
+
 describe("snapshot retention", () => {
 	/**
 	 * Seeds a project with `count` runs, oldest first, each holding one snapshot

@@ -923,6 +923,45 @@ export async function startFixtureSite(
 				return;
 			}
 
+			/**
+			 * A page whose content below the fold only loads once it is scrolled to.
+			 *
+			 * Served here for the same reason the two above are: it exists to be
+			 * visited by a browser, not crawled. It is the fixture for the one
+			 * gotcha a full-page screenshot has — Playwright resizes to capture
+			 * rather than scrolling, so anything behind an `IntersectionObserver`
+			 * would never load and would read as changed the first time it did.
+			 *
+			 * The observer requests `/scrolled` when the marker comes into view, and
+			 * `requests` records it, so a test can prove the sweep walked the page
+			 * without needing to decode a PNG.
+			 */
+			if (pathname === "/lazy-below-fold") {
+				res.writeHead(200, { "content-type": "text/html" });
+				res.end(
+					`<html><head><title>lazy</title></head><body>
+					<div style="height:4000px">above</div>
+					<div id="marker">below the fold</div>
+					<script>
+						new IntersectionObserver((entries, observer) => {
+							for (const entry of entries) {
+								if (!entry.isIntersecting) continue;
+								observer.disconnect();
+								fetch('/scrolled');
+							}
+						}).observe(document.getElementById('marker'));
+					</script>
+					</body></html>`,
+				);
+				return;
+			}
+
+			if (pathname === "/scrolled") {
+				res.writeHead(204);
+				res.end();
+				return;
+			}
+
 			if (pathname?.startsWith("/img/")) {
 				const bytes = pathname.includes("heavy") ? 1_400_000 : 8_000;
 

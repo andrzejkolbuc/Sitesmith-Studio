@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { type Fixture, startFixtureSite } from "../../../test/fixtures/site";
-import { renderSample } from "./render";
+import { renderSample, type Size, SNAPSHOT_VIEWPORT } from "./render";
 
 /**
  * Longer than vitest's default, because every case here launches a browser and
@@ -173,6 +173,167 @@ describe("what the browser sees", () => {
 
 			expect(result.observations).toHaveLength(1);
 			expect(result.observations[0]?.url).toContain("/nothing-here-at-all");
+		},
+		RENDER_TEST_TIMEOUT_MS,
+	);
+});
+
+/**
+ * Taking the picture.
+ *
+ * The cases that matter are the failures and the mask, for the same reason they
+ * are in the block above: a capture that silently produced nothing, or a mask
+ * that silently applied to nothing, would leave a comparison confidently
+ * reporting a difference that is ours rather than the site's.
+ */
+describe("what the browser photographs", () => {
+	/** Collects whatever the sink is handed, so a case can assert on it. */
+	function collector() {
+		const taken: Array<{ url: string; png: Buffer; size: Size }> = [];
+		return {
+			taken,
+			onCapture: async (url: string, png: Buffer, size: Size) => {
+				taken.push({ url, png, size });
+			},
+		};
+	}
+
+	it(
+		"photographs the page at the pinned viewport",
+		async () => {
+			const sink = collector();
+
+			const result = await renderSample({
+				urls: [`${site.baseUrl}/handbook`],
+				origin: origin(),
+				snapshot: { masks: [], onCapture: sink.onCapture },
+			});
+
+			expect(result.observations[0]?.snapshotError).toBeNull();
+			expect(sink.taken).toHaveLength(1);
+
+			const [shot] = sink.taken;
+			/** A PNG, by its own signature rather than by our say-so. */
+			expect(shot?.png.subarray(1, 4).toString("ascii")).toBe("PNG");
+			expect(shot?.size.width).toBe(SNAPSHOT_VIEWPORT.width);
+			/** Full page, so the height is the page's rather than the viewport's. */
+			expect(shot?.size.height).toBeGreaterThan(0);
+		},
+		RENDER_TEST_TIMEOUT_MS,
+	);
+
+	it(
+		"takes no picture when it was not asked for one",
+		async () => {
+			const result = await renderSample({
+				urls: [`${site.baseUrl}/handbook`],
+				origin: origin(),
+			});
+
+			expect(result.observations[0]?.snapshotError).toBeNull();
+			expect(result.observations[0]?.vitals.cls).not.toBeNull();
+		},
+		RENDER_TEST_TIMEOUT_MS,
+	);
+
+	/**
+	 * The gotcha this whole sweep exists for. `fullPage: true` resizes to capture
+	 * rather than scrolling, so without the sweep the observer never fires and
+	 * everything below the fold is absent from the picture.
+	 */
+	it(
+		"walks the page so content below the fold loads",
+		async () => {
+			site.reset();
+			const sink = collector();
+
+			await renderSample({
+				urls: [`${site.baseUrl}/lazy-below-fold`],
+				origin: origin(),
+				snapshot: { masks: [], onCapture: sink.onCapture },
+			});
+
+			expect(site.requests).toContain("/scrolled");
+			expect(sink.taken).toHaveLength(1);
+		},
+		RENDER_TEST_TIMEOUT_MS,
+	);
+
+	it(
+		"paints a masked region out before the picture exists",
+		async () => {
+			const bare = collector();
+			const masked = collector();
+
+			await renderSample({
+				urls: [`${site.baseUrl}/handbook`],
+				origin: origin(),
+				snapshot: { masks: [], onCapture: bare.onCapture },
+			});
+			await renderSample({
+				urls: [`${site.baseUrl}/handbook`],
+				origin: origin(),
+				snapshot: { masks: ["body"], onCapture: masked.onCapture },
+			});
+
+			/**
+			 * The same page photographed twice, once with everything masked. If the
+			 * mask did nothing the two would be the same bytes, which is the failure
+			 * this asserts against — a mask silently applying to nothing is how a
+			 * project's carousel keeps reporting forever.
+			 */
+			expect(
+				masked.taken[0]?.png.equals(bare.taken[0]?.png ?? Buffer.alloc(0)),
+			).toBe(false);
+		},
+		RENDER_TEST_TIMEOUT_MS,
+	);
+
+	it(
+		"still photographs when a mask selector matches nothing",
+		async () => {
+			const sink = collector();
+
+			const result = await renderSample({
+				urls: [`${site.baseUrl}/handbook`],
+				origin: origin(),
+				snapshot: {
+					masks: [".no-such-element-anywhere"],
+					onCapture: sink.onCapture,
+				},
+			});
+
+			expect(result.observations[0]?.snapshotError).toBeNull();
+			expect(sink.taken).toHaveLength(1);
+		},
+		RENDER_TEST_TIMEOUT_MS,
+	);
+
+	/**
+	 * A selector the browser will not parse is *our* problem — the user typed it,
+	 * but the failure is in our capture, not in their site. It is recorded and the
+	 * measurement survives, because a page that photographed badly still measured
+	 * fine and losing the vitals over it would be the wrong trade.
+	 */
+	it(
+		"records an unusable mask selector without losing the measurement",
+		async () => {
+			const sink = collector();
+
+			const result = await renderSample({
+				urls: [`${site.baseUrl}/handbook`],
+				origin: origin(),
+				snapshot: {
+					masks: ["<<<not a selector>>>"],
+					onCapture: sink.onCapture,
+				},
+			});
+
+			const [observation] = result.observations;
+			expect(observation?.snapshotError).not.toBeNull();
+			expect(observation?.renderError).toBeNull();
+			expect(observation?.vitals.cls).not.toBeNull();
+			expect(sink.taken).toHaveLength(0);
 		},
 		RENDER_TEST_TIMEOUT_MS,
 	);

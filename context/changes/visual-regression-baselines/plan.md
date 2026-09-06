@@ -822,12 +822,12 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Automated
 
-- [x] 1.1 Schema applies cleanly: `npm run db:push`
-- [x] 1.2 Unit tests pass: `npm run test:unit`
-- [x] 1.3 Integration tests pass: `npm run test:integration`
-- [x] 1.4 Type checking passes: `npm run typecheck`
-- [x] 1.5 Lint and format pass: `npm run check`
-- [x] 1.6 `expireSnapshots` updates rows and deletes none, proven by row count before and after
+- [x] 1.1 Schema applies cleanly: `npm run db:push` — 0bce206
+- [x] 1.2 Unit tests pass: `npm run test:unit` — 0bce206
+- [x] 1.3 Integration tests pass: `npm run test:integration` — 0bce206
+- [x] 1.4 Type checking passes: `npm run typecheck` — 0bce206
+- [x] 1.5 Lint and format pass: `npm run check` — 0bce206
+- [x] 1.6 `expireSnapshots` updates rows and deletes none, proven by row count before and after — 0bce206
 
 #### Manual
 
@@ -837,12 +837,12 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Automated
 
-- [ ] 2.1 Unit tests pass: `npm run test:unit`
-- [ ] 2.2 Integration tests pass: `npm run test:integration`
-- [ ] 2.3 Type checking passes: `npm run typecheck`
-- [ ] 2.4 Lint and format pass: `npm run check`
-- [ ] 2.5 A failing screenshot records `snapshotError` and the run still reaches `done`
-- [ ] 2.6 A run without the snapshot option writes no `pageSnapshots` rows
+- [x] 2.1 Unit tests pass: `npm run test:unit`
+- [x] 2.2 Integration tests pass: `npm run test:integration`
+- [x] 2.3 Type checking passes: `npm run typecheck`
+- [x] 2.4 Lint and format pass: `npm run check`
+- [x] 2.5 A failing screenshot records `snapshotError` and the run still reaches `done`
+- [x] 2.6 A run without the snapshot option writes no `pageSnapshots` rows
 
 #### Manual
 

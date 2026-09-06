@@ -1,4 +1,4 @@
-import { chromium } from "playwright";
+import { chromium, type Page } from "playwright";
 
 /**
  * What a page does when a browser actually runs it.
@@ -47,6 +47,29 @@ export type ConsoleSample = {
 	firstParty: boolean;
 };
 
+export type Size = { width: number; height: number };
+
+/**
+ * Where a captured picture goes.
+ *
+ * A callback rather than a field on the result, because the result is small
+ * structured data and a full-page PNG is not. Twelve of them held until the loop
+ * ends is tens of megabytes, and the crawl's habit throughout this directory is
+ * to write as it goes so memory stays flat. This also keeps the module free of
+ * any database import: it hands over bytes and forgets them.
+ */
+export type SnapshotSink = (
+	url: string,
+	png: Buffer,
+	size: Size,
+) => Promise<void>;
+
+export type SnapshotOptions = {
+	/** CSS selectors painted over before the PNG exists. */
+	masks: string[];
+	onCapture: SnapshotSink;
+};
+
 export type PageObservation = {
 	url: string;
 	vitals: Vitals;
@@ -58,6 +81,13 @@ export type PageObservation = {
 	samples: ConsoleSample[];
 	/** Why this page has no measurement, or null when it has one. */
 	renderError: string | null;
+	/**
+	 * Why this page has no picture, or null when it was not asked for or was
+	 * taken. Separate from `renderError` because a page can measure perfectly and
+	 * still fail to photograph — an unparseable mask selector, a page too long to
+	 * encode — and reporting the second as the first would lose the vitals.
+	 */
+	snapshotError: string | null;
 };
 
 export type RenderResult = {
@@ -80,7 +110,24 @@ export type RenderOptions = {
 	origin: string;
 	/** Hard ceiling per page, so one page that never settles cannot stall a run. */
 	perRenderTimeoutMs?: number;
+	/** Absent means measure only, and no picture is taken. */
+	snapshot?: SnapshotOptions;
 };
+
+/**
+ * The size every snapshot is taken at.
+ *
+ * This number is **ours**, not the site's — the one place in the visual half
+ * where the product picks something rather than reading it. That is exactly why
+ * it is recorded on every snapshot row: a pair of pictures taken at different
+ * viewports refuses comparison, rather than reporting every page on the site as
+ * having changed the day we changed our mind about a width.
+ *
+ * A common desktop width, because a client site's desktop layout is the one the
+ * agency looks at when deciding whether a deploy broke something. Mobile is a
+ * second capture and a second set of bytes; it is deliberately out of scope.
+ */
+export const SNAPSHOT_VIEWPORT: Size = { width: 1280, height: 800 };
 
 /**
  * How many console messages are kept per page.
@@ -142,6 +189,65 @@ const COLLECT_VITALS = `(() => new Promise((resolve) => {
 	}, ${SETTLE_MS});
 }))()`;
 
+/**
+ * How many viewport-heights the sweep will walk before giving up.
+ *
+ * A bound rather than a trust in `scrollHeight`: a page whose height grows as it
+ * is scrolled — an infinite feed — would otherwise walk forever inside a
+ * function whose whole job is to finish. Forty screens of 800px is 32,000px,
+ * past the length of any page this product is meant to photograph.
+ */
+const MAX_SCROLL_STEPS = 40;
+
+/** How long to pause on each screen, for whatever the scroll triggered. */
+const SCROLL_DWELL_MS = 100;
+
+/**
+ * Walk the page to the bottom and back, so lazy content is actually there.
+ *
+ * `fullPage: true` does not do this. Playwright resizes to capture rather than
+ * scrolling, so anything behind an `IntersectionObserver` — which on a modern
+ * client site is most of the images — never loads, and every such region reads
+ * as changed the moment one of them happens to load on a later run. The sweep is
+ * what makes the picture a picture of the page rather than of its skeleton.
+ *
+ * An immediately-invoked expression for the reason `COLLECT_VITALS` is one:
+ * `page.evaluate` given a string evaluates it as an expression, so a string
+ * beginning `() =>` produces the function and never calls it.
+ */
+const SCROLL_SWEEP = `(() => new Promise((resolve) => {
+	const step = window.innerHeight || 800;
+	let screens = 0;
+
+	/**
+	 * The last screen is dwelt on before returning to the top.
+	 *
+	 * Scrolling to the bottom and back inside one synchronous block never renders
+	 * the bottom at all, so the observer that was supposed to fire there never
+	 * does — which silently defeats the entire sweep for whatever sits on the
+	 * final screen. Every position, including the last, gets a frame to react in.
+	 */
+	const finish = () => {
+		setTimeout(() => {
+			window.scrollTo(0, 0);
+			setTimeout(resolve, ${SCROLL_DWELL_MS * 3});
+		}, ${SCROLL_DWELL_MS * 3});
+	};
+
+	const tick = () => {
+		window.scrollTo(0, screens * step);
+		screens += 1;
+
+		const done =
+			screens > ${MAX_SCROLL_STEPS} ||
+			screens * step >= document.body.scrollHeight;
+
+		setTimeout(done ? finish : tick, ${SCROLL_DWELL_MS});
+	};
+
+	tick();
+}))()`;
+
 const originOf = (url: string): string | null => {
 	try {
 		return new URL(url).origin;
@@ -150,6 +256,22 @@ const originOf = (url: string): string | null => {
 	}
 };
 
+/**
+ * A PNG's own dimensions, read from its header.
+ *
+ * The IHDR chunk sits at a fixed offset — eight bytes of signature, four of
+ * length, four of type, then width and height as big-endian 32-bit integers — so
+ * this needs no decoder and no dependency. Width and height are stored beside
+ * the image because a full-page capture's height is a property of the page, and
+ * a comparison has to know the two pictures are the same shape before it starts.
+ */
+function pngSize(png: Buffer): Size | null {
+	if (png.length < 24) return null;
+	if (png.toString("ascii", 12, 16) !== "IHDR") return null;
+
+	return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+}
+
 export async function renderSample(
 	options: RenderOptions,
 ): Promise<RenderResult> {
@@ -157,6 +279,7 @@ export async function renderSample(
 		urls,
 		origin,
 		perRenderTimeoutMs = DEFAULT_RENDER_TIMEOUT_MS,
+		snapshot,
 	} = options;
 
 	if (urls.length === 0) return { observations: [], complete: true };
@@ -178,7 +301,7 @@ export async function renderSample(
 	try {
 		for (const url of urls) {
 			observations.push(
-				await measure(browser, url, origin, perRenderTimeoutMs),
+				await measure(browser, url, origin, perRenderTimeoutMs, snapshot),
 			);
 		}
 	} finally {
@@ -193,6 +316,7 @@ async function measure(
 	url: string,
 	origin: string,
 	timeoutMs: number,
+	snapshot?: SnapshotOptions,
 ): Promise<PageObservation> {
 	const empty: PageObservation = {
 		url,
@@ -201,14 +325,19 @@ async function measure(
 		thirdPartyErrors: 0,
 		samples: [],
 		renderError: null,
+		snapshotError: null,
 	};
 
 	/**
 	 * A fresh context per page: no cookies, no cache and no service worker
 	 * carried from the last one. A second page measured against a warm cache
 	 * would report a speed no first-time visitor will ever see.
+	 *
+	 * The viewport is pinned rather than left to Playwright's default, because a
+	 * picture is a claim about a rendering at a size and the size has to be one
+	 * we chose on purpose and recorded.
 	 */
-	const context = await browser.newContext();
+	const context = await browser.newContext({ viewport: SNAPSHOT_VIEWPORT });
 	const page = await context.newPage();
 
 	let firstPartyErrors = 0;
@@ -250,7 +379,25 @@ async function measure(
 
 		const vitals = (await page.evaluate(COLLECT_VITALS)) as Vitals;
 
-		return { ...empty, vitals, firstPartyErrors, thirdPartyErrors, samples };
+		/**
+		 * The picture, and only after the vitals are in hand.
+		 *
+		 * Ordering is load-bearing: the sweep below scrolls the page, and layout
+		 * shift caused by our own scrolling would land in the CLS reading that
+		 * `SETTLE_MS` exists to protect. Measure first, then disturb.
+		 */
+		const snapshotError = snapshot
+			? await capture(page, url, timeoutMs, snapshot)
+			: null;
+
+		return {
+			...empty,
+			vitals,
+			firstPartyErrors,
+			thirdPartyErrors,
+			samples,
+			snapshotError,
+		};
 	} catch (caught) {
 		/**
 		 * Recorded, not thrown. The page still gets a row saying why it has no
@@ -272,5 +419,54 @@ async function measure(
 		};
 	} finally {
 		await context.close().catch(() => {});
+	}
+}
+
+/**
+ * Takes the picture, and returns why it could not rather than throwing.
+ *
+ * Every failure mode here is ours: a mask selector the browser will not parse, a
+ * page too long to encode, a sink that could not write. None of them are
+ * statements about the client's site, and a run that failed because our
+ * screenshot did would be reporting our infrastructure as their defect — which
+ * is the argument the whole render half already rests on.
+ */
+async function capture(
+	page: Page,
+	url: string,
+	timeoutMs: number,
+	options: SnapshotOptions,
+): Promise<string | null> {
+	try {
+		/** Bounded by construction — see MAX_SCROLL_STEPS — so it cannot hang. */
+		await page.evaluate(SCROLL_SWEEP);
+
+		const png = await page.screenshot({
+			fullPage: true,
+			/**
+			 * Stops CSS animation and transitions at their first frame. Without it
+			 * a spinner or a fading hero reports a difference on every run while
+			 * nothing about the page has changed.
+			 */
+			animations: "disabled",
+			caret: "hide",
+			/**
+			 * Painted over before the PNG exists, so the volatile region never
+			 * enters storage. Nothing to leak, and an old snapshot never needs
+			 * re-masking when the project's list changes.
+			 */
+			mask: options.masks.map((selector) => page.locator(selector)),
+			timeout: timeoutMs,
+		});
+
+		const size = pngSize(png);
+		if (!size) return "The capture did not produce a readable PNG.";
+
+		await options.onCapture(url, png, size);
+		return null;
+	} catch (caught) {
+		return caught instanceof Error
+			? caught.message.slice(0, MAX_MESSAGE_CHARS)
+			: String(caught).slice(0, MAX_MESSAGE_CHARS);
 	}
 }

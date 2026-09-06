@@ -4,13 +4,15 @@ import type { db as database } from "~/server/db";
 import {
 	findings,
 	pageObservations,
+	pageSnapshots,
 	pages,
 	projects,
 	runs,
 } from "~/server/db/schema";
 import { crawl } from "./crawler";
 import { detectMissingVariants, FINDING_TYPES } from "./findings";
-import { renderSample } from "./render";
+import { renderSample, SNAPSHOT_VIEWPORT } from "./render";
+import { expireSnapshots } from "./retention";
 import { chooseRenderSample, countInboundLinks } from "./sample";
 import { inScopePath } from "./scope";
 import { groupVariants } from "./variants";
@@ -75,6 +77,16 @@ export async function startRun(
 		projectId: string;
 		/** See {@link runToCompletion}. Zero skips the render pass. */
 		maxRenders?: number;
+		/**
+		 * Whether the render pass also photographs the pages it visits.
+		 *
+		 * Defaults to on: capture is what the visual half is for, and a run that
+		 * quietly stopped taking pictures would leave a project's baseline slowly
+		 * ageing out with nothing saying why. The flag exists so the test suite can
+		 * exercise the render pass without paying for a full-page encode, and so a
+		 * case can prove that no picture means no row.
+		 */
+		captureSnapshots?: boolean;
 	},
 ): Promise<{ runId: string }> {
 	const { tenantId, projectId } = input;
@@ -100,7 +112,7 @@ export async function startRun(
 	if (!run) throw new Error("Failed to create the run.");
 
 	// Deliberately not awaited: the caller gets the id immediately.
-	void execute(db, run.id, project, input.maxRenders).catch(async (caught) => {
+	void execute(db, run.id, project, input).catch(async (caught) => {
 		await db
 			.update(runs)
 			.set({
@@ -133,6 +145,16 @@ export async function runToCompletion(
 		 * would be a switch nobody can flip.
 		 */
 		maxRenders?: number;
+		/**
+		 * Whether the render pass also photographs the pages it visits.
+		 *
+		 * Defaults to on: capture is what the visual half is for, and a run that
+		 * quietly stopped taking pictures would leave a project's baseline slowly
+		 * ageing out with nothing saying why. The flag exists so the test suite can
+		 * exercise the render pass without paying for a full-page encode, and so a
+		 * case can prove that no picture means no row.
+		 */
+		captureSnapshots?: boolean;
 	},
 ): Promise<{ runId: string }> {
 	const { tenantId, projectId } = input;
@@ -148,7 +170,7 @@ export async function runToCompletion(
 		.returning();
 	if (!run) throw new Error("Failed to create the run.");
 
-	await execute(db, run.id, project, input.maxRenders);
+	await execute(db, run.id, project, input);
 	return { runId: run.id };
 }
 
@@ -158,8 +180,9 @@ async function execute(
 	db: Database,
 	runId: string,
 	project: ProjectRow,
-	maxRenders?: number,
+	options: { maxRenders?: number; captureSnapshots?: boolean } = {},
 ): Promise<void> {
+	const { maxRenders, captureSnapshots = true } = options;
 	await db
 		.update(runs)
 		.set({ status: RUN_STATUS.RUNNING, startedAt: new Date() })
@@ -293,6 +316,23 @@ async function execute(
 	);
 
 	/**
+	 * The page rows this run has already written, keyed by URL.
+	 *
+	 * Built once and read three times below — by the snapshot sink, by the
+	 * findings insert and by the observations insert. The crawl writes a page row
+	 * as each page arrives, so every one of them is already here; three separate
+	 * queries for the same map was three chances for them to disagree.
+	 */
+	const pageIdByUrl = new Map(
+		(
+			await db.query.pages.findMany({
+				where: eq(pages.runId, runId),
+				columns: { id: true, url: true },
+			})
+		).map((page) => [page.url, page.id]),
+	);
+
+	/**
 	 * A budget of zero means "do not render", and the pass is skipped rather than
 	 * called with nothing — a browser launched to render an empty list would be
 	 * seconds spent to learn what the caller already said.
@@ -303,6 +343,34 @@ async function execute(
 			: await renderSample({
 					urls: sample.urls,
 					origin: new URL(project.startUrl).origin,
+					snapshot: captureSnapshots
+						? {
+								masks: project.maskSelectors,
+								/**
+								 * Written as each picture is taken rather than collected and
+								 * inserted at the end, so a dozen full-page PNGs never sit in
+								 * memory at once. Same reason the crawl writes page rows as it
+								 * goes.
+								 */
+								onCapture: async (url, png, size) => {
+									const pageId = pageIdByUrl.get(url);
+									if (!pageId) return;
+
+									await db.insert(pageSnapshots).values({
+										tenantId: project.tenantId,
+										runId,
+										pageId,
+										image: png,
+										byteSize: png.byteLength,
+										imageWidth: size.width,
+										imageHeight: size.height,
+										viewportWidth: SNAPSHOT_VIEWPORT.width,
+										viewportHeight: SNAPSHOT_VIEWPORT.height,
+										maskSelectors: project.maskSelectors,
+									});
+								},
+							}
+						: undefined,
 				}).catch(() => ({ observations: [], complete: false }));
 
 	const detected = detectMissingVariants({
@@ -329,15 +397,6 @@ async function execute(
 	});
 
 	if (detected.length > 0) {
-		const pageIdByUrl = new Map(
-			(
-				await db.query.pages.findMany({
-					where: eq(pages.runId, runId),
-					columns: { id: true, url: true },
-				})
-			).map((p) => [p.url, p.id]),
-		);
-
 		await db.insert(findings).values(
 			detected.map((finding) => ({
 				tenantId: project.tenantId,
@@ -359,17 +418,8 @@ async function execute(
 	 * reader shown neither would assume the second.
 	 */
 	if (render.observations.length > 0) {
-		const observedIdByUrl = new Map(
-			(
-				await db.query.pages.findMany({
-					where: eq(pages.runId, runId),
-					columns: { id: true, url: true },
-				})
-			).map((page) => [page.url, page.id]),
-		);
-
 		const rows = render.observations.flatMap((observation) => {
-			const pageId = observedIdByUrl.get(observation.url);
+			const pageId = pageIdByUrl.get(observation.url);
 			if (!pageId) return [];
 
 			return [
@@ -445,6 +495,20 @@ async function execute(
 			},
 		})
 		.where(eq(runs.id, runId));
+
+	/**
+	 * Retention, after the run has closed and its own pictures are safely stored.
+	 *
+	 * Here rather than on a timer because this is the moment the project gained a
+	 * run, which is the only moment the window can have moved. Wrapped so that a
+	 * failure to expire old bytes cannot fail a run that has already succeeded —
+	 * carrying too much storage is a problem we can fix later, and a run marked
+	 * failed for it is a lie about the site.
+	 */
+	await expireSnapshots(db, {
+		tenantId: project.tenantId,
+		projectId: project.id,
+	}).catch(() => ({ expiredRuns: [] }));
 }
 
 /**
