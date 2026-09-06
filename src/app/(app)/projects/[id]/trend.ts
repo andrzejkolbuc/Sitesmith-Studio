@@ -81,7 +81,16 @@ export function trendGap(
 	return { kind: "one_run" };
 }
 
-/** The two gaps that are not a refusal, in the reader's words. */
+/**
+ * The gaps, in the reader's words.
+ *
+ * `excluded` deliberately does **not** reuse `REASON_SENTENCE`. It did, and on a
+ * real project the result was the comparison's refusal and the trend's
+ * explanation printing the same paragraph twice, one directly above the other —
+ * which reads as a bug in the page rather than as two sections agreeing. The
+ * reason is named; the explanation of what it means belongs to the refusal,
+ * which is already on screen saying it.
+ */
 export const GAP_SENTENCE: Record<"no_runs" | "one_run", string> = {
 	no_runs:
 		"Nothing has been checked yet. A trend appears once this project has been checked twice under the same settings.",

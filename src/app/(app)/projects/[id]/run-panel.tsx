@@ -1156,21 +1156,26 @@ function Evidence({
 					? detail.thresholdBytes
 					: null;
 
+			/**
+			 * The proportion sits with the count, not after the clause. Appended at
+			 * the end it produced "39 images declare no width and height, so the page
+			 * moves as they load of 57 on the page" — read on a real site, which is
+			 * where it was caught.
+			 */
+			const many = count === 1 ? "image" : "images";
+			const scale =
+				of === null ? `${count} ${many}` : `${count} of ${of} ${many}`;
+
 			const sentence =
 				type === "image_missing_dimensions"
-					? `${count} image${count === 1 ? "" : "s"} declare no width and height, so the page moves as they load`
+					? `${scale} declare no width and height, so the page moves as they load`
 					: type === "image_legacy_format"
-						? `${count} image${count === 1 ? "" : "s"} are offered in no format newer than JPEG or PNG`
-						: `${count} image${count === 1 ? "" : "s"} weigh more than ${kb(threshold)}`;
+						? `${scale} are offered in no format newer than JPEG or PNG`
+						: `${scale} weigh more than ${kb(threshold)}`;
 
 			return (
 				<>
-					<span className="text-ink">
-						{sentence}
-						{of === null ? null : (
-							<span className="text-ink-faint"> of {of} on the page</span>
-						)}
-					</span>
+					<span className="text-ink">{sentence}</span>
 					<div className="mt-1.5 break-all font-mono text-ink-soft text-xs">
 						{pathOf(str("url"))}
 					</div>

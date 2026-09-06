@@ -2,7 +2,7 @@
 
 import type { ComparableRun } from "~/server/crawl/comparison";
 import { api } from "~/trpc/react";
-import { REASON_SENTENCE } from "./comparison-view";
+import { REASON_HEADING } from "./comparison-view";
 import { FINDING_LABEL } from "./finding-labels";
 import { buildTrend, GAP_SENTENCE, type TrendCell, trendGap } from "./trend";
 
@@ -94,7 +94,7 @@ function Explanation({
 }) {
 	const sentence =
 		gap.kind === "excluded"
-			? REASON_SENTENCE[gap.reason]
+			? `Nothing to plot yet: ${REASON_HEADING[gap.reason].replace(/^Not compared — /, "")}. Earlier checks are not on the same footing as this one.`
 			: GAP_SENTENCE[gap.kind];
 
 	return (

@@ -3,7 +3,7 @@ project: "Sitesmith-Studio"
 version: 1
 status: draft
 created: 2026-08-21
-updated: 2026-09-05
+updated: 2026-09-06
 prd_version: 1
 main_goal: market-feedback
 top_blocker: capacity
@@ -57,7 +57,7 @@ works.
 | S-03 | cross-variant-content-drift     | see content drift between language variants                                    | S-02             | FR-027                                                                               | done     |
 | S-04 | crawl-technical-checks          | see broken links, sitemap and robots problems, orphans, duplicates, TLS issues | S-01             | FR-016, FR-017, FR-018, FR-019, FR-020, FR-030                                       | done     |
 | S-05 | seo-metadata-checks             | see title, meta, canonical and noindex problems                                | S-01             | FR-021, FR-022, FR-023                                                               | done     |
-| S-06 | browser-observed-checks         | see console errors, sampled performance scores, and image weight problems      | S-01             | FR-015, FR-028, FR-029                                                               | proposed |
+| S-06 | browser-observed-checks         | see console errors, sampled Core Web Vitals, and image weight problems         | S-01             | FR-029; FR-015, FR-028 (partly)                                                      | proposed |
 | S-07 | run-history-and-comparison      | compare a run against the previous one and see only what changed               | S-01             | US-02, FR-037, FR-038                                                                | done     |
 | S-08 | visual-regression-baselines     | set a baseline and see which pages changed visually, ignoring volatile regions | S-06, S-07       | US-02, FR-031, FR-032, FR-033, FR-034, FR-035                                        | proposed |
 | S-09 | correlated-findings             | see one explained problem per underlying cause instead of many symptoms        | S-02, S-04, S-05 | US-01, FR-040                                                                        | done     |
@@ -190,12 +190,27 @@ Foundations below assume these are present and do NOT re-scaffold them.
 
 - **Outcome:** User can see JavaScript console errors, Core Web Vitals and performance scores for a representative sample of pages, and image weight problems.
 - **Change ID:** `browser-observed-checks`
-- **PRD refs:** FR-015, FR-028, FR-029
+- **PRD refs:**
+  - **FR-029 — met.** Image weight, missing dimensions and legacy formats, for
+    every page, from the site's own markup and `Content-Length`.
+  - **FR-015 — partly met.** Console errors are captured for the *rendered
+    sample* only. As written the requirement says each page, and rendering every
+    page is the cost the PRD already rejected under FR-028.
+  - **FR-028 — partly met.** Core Web Vitals are delivered. The "standard page
+    performance scores" clause is not: a 0-100 composite is an index this product
+    would assert, which is what S-12 refused to invent and what `lessons.md`
+    rule 1 forbids.
+  - **Unblocks the rest of FR-039.** S-12 closed with its scores half open,
+    naming S-06 as the prerequisite; the vitals recorded here are that half's
+    input. Not delivered by S-06 — it wants a follow-on trending them.
 - **Prerequisites:** S-01
 - **Parallel with:** S-02, S-03, S-04, S-05, S-07, S-10
 - **Blockers:** —
+- **Constrains F-02:** `playwright` is a runtime dependency from this slice
+  onward, so any container must ship Chromium and its system libraries. F-02 was
+  proposed before this was true.
 - **Unknowns:**
-  - Does adding page rendering to a run break the run-duration property S-01 measured? — Owner: user. Block: no.
+  - ~~Does adding page rendering to a run break the run-duration property S-01 measured?~~ **Answered, on a real project.** About 4-6s per rendered page, and the sample is capped at twelve — bounded and stateable in advance. It breaks the property at any sample defined by a *formula*: the naive reading of FR-028 measured at 143 renders on a 533-page client site. See `context/changes/browser-observed-checks/proof.md`.
 - **Risk:** This is where rendering pages in a real browser enters the product, and it is introduced here rather than in a foundation because this is the first slice that needs it. Performance is sampled rather than per-page by explicit PRD decision - measuring every URL would take hours and destroy the primary success criterion. The rendering capability this slice establishes is what makes S-08 possible at all.
 - **Status:** proposed
 

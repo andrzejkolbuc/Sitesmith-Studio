@@ -709,13 +709,13 @@ is unbuilt.
 
 #### Automated
 
-- [x] 5.1 Unit tests pass: `npm run test:unit`
-- [x] 5.2 Integration tests pass: `npm run test:integration`
-- [x] 5.3 Existing e2e journeys pass: `npm run test:e2e`
-- [x] 5.4 Type checking passes: `npm run typecheck`
-- [x] 5.5 Lint and format pass: `npm run check`
-- [x] 5.6 Production build succeeds: `npm run build`
-- [x] 5.7 Every `FINDING_TYPES` entry has a reader-facing label
+- [x] 5.1 Unit tests pass: `npm run test:unit` — 8510750
+- [x] 5.2 Integration tests pass: `npm run test:integration` — 8510750
+- [x] 5.3 Existing e2e journeys pass: `npm run test:e2e` — 8510750
+- [x] 5.4 Type checking passes: `npm run typecheck` — 8510750
+- [x] 5.5 Lint and format pass: `npm run check` — 8510750
+- [x] 5.6 Production build succeeds: `npm run build` — 8510750
+- [x] 5.7 Every `FINDING_TYPES` entry has a reader-facing label — 8510750
 
 #### Manual
 
@@ -728,10 +728,10 @@ is unbuilt.
 
 #### Automated
 
-- [ ] 6.1 Whole suite passes: `npm run test:all`
-- [ ] 6.2 Type checking passes: `npm run typecheck`
-- [ ] 6.3 Lint and format pass: `npm run check`
-- [ ] 6.4 No temporary scripts or harnesses remain in the working tree
+- [x] 6.1 Whole suite passes: `npm run test:all`
+- [x] 6.2 Type checking passes: `npm run typecheck`
+- [x] 6.3 Lint and format pass: `npm run check`
+- [x] 6.4 No temporary scripts or harnesses remain in the working tree
 
 #### Manual
 
