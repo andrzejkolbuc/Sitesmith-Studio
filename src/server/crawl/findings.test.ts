@@ -8,6 +8,7 @@ import { emptyImages } from "./images";
 import { emptyMetadata } from "./metadata";
 import { groupVariants, localeFromUrl } from "./variants";
 import type { SnapshotComparison } from "./visual";
+import { MIN_CHANGED_SHARE } from "./visual-noise";
 
 let site: Fixture;
 
@@ -981,6 +982,41 @@ describe("visual change", () => {
 		expect(detectWith(new Map([[URL_A, changed(0)]]))).toHaveLength(0);
 	});
 
+	/**
+	 * The floor, measured rather than chosen. Two runs of a real site with
+	 * nothing deployed between them still differed by up to 0.015% of the
+	 * compared area — invisible to a reader, and ours rather than theirs. See
+	 *  and the slice's proof.
+	 */
+	it("says nothing about a difference below the noise floor", () => {
+		const justUnder = Math.floor(1_000_000 * MIN_CHANGED_SHARE) - 1;
+		expect(detectWith(new Map([[URL_A, changed(justUnder)]]))).toHaveLength(0);
+	});
+
+	it("reports a difference at the floor, and says what the floor was", () => {
+		const atFloor = Math.ceil(1_000_000 * MIN_CHANGED_SHARE);
+		const findings = detectWith(new Map([[URL_A, changed(atFloor)]]));
+
+		expect(findings).toHaveLength(1);
+		/** Carried so a reader can disagree with it, as image_oversized does. */
+		expect(findings[0]?.detail).toMatchObject({
+			thresholdShare: MIN_CHANGED_SHARE,
+		});
+	});
+
+	/** The real measurement, as a regression guard: this is the exact shape the
+	 * proof recorded on tecalliance, and it must stay silent. */
+	it("stays silent on the noise a real unchanged site produced", () => {
+		expect(
+			detectWith(
+				new Map([
+					[URL_A, changed(1_831, { comparedPixels: 12_322_560 })],
+					["https://site.test/b", changed(10, { comparedPixels: 9_008_640 })],
+				]),
+			),
+		).toHaveLength(0);
+	});
+
 	it("says nothing when there is no baseline to compare against", () => {
 		expect(detectWith(new Map())).toHaveLength(0);
 	});
@@ -1013,10 +1049,11 @@ describe("visual change", () => {
 	});
 
 	it("orders its findings by URL so two runs read the same", () => {
+		/** Comfortably over the noise floor, so ordering is what is under test. */
 		const findings = detectWith(
 			new Map([
-				["https://site.test/z", changed(10)],
-				["https://site.test/a", changed(10)],
+				["https://site.test/z", changed(50_000)],
+				["https://site.test/a", changed(50_000)],
 			]),
 		);
 

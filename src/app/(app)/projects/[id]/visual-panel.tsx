@@ -5,6 +5,7 @@ import { useState } from "react";
 import { api } from "~/trpc/react";
 import {
 	changeShare,
+	differsMeaningfully,
 	orderSnapshots,
 	type SnapshotRow,
 	uncomparedReason,
@@ -176,7 +177,8 @@ function Row({ row }: { row: SnapshotRow }) {
 
 	const reason = uncomparedReason(row);
 	const share = changeShare(row);
-	const changed = share !== null && share > 0;
+	/** The rule's own decision, not a second one: see MIN_CHANGED_SHARE. */
+	const changed = differsMeaningfully(row);
 
 	return (
 		<li className="py-3">
@@ -200,7 +202,7 @@ function Row({ row }: { row: SnapshotRow }) {
 					<span className="text-ink-faint text-xs italic">{reason}</span>
 				) : changed ? (
 					<span className="tnum font-medium text-mark text-sm">
-						{percent(share)} of the page differs
+						{percent(share ?? 0)} of the page differs
 					</span>
 				) : (
 					<span className="text-ink-faint text-xs">matches the baseline</span>

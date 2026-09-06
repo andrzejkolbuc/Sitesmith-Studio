@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { MIN_CHANGED_SHARE } from "~/server/crawl/visual-noise";
+
 import {
 	changeShare,
+	differsMeaningfully,
 	orderSnapshots,
 	type SnapshotRow,
 	uncomparedReason,
@@ -310,5 +313,74 @@ describe("orderSnapshots", () => {
 		const rows = [row({ id: "z", url: `${R}/z` }), row({ id: "a" })];
 		orderSnapshots(rows);
 		expect(rows.map((r) => r.id)).toEqual(["z", "a"]);
+	});
+});
+
+/**
+ * The section and the rule must agree about every page.
+ *
+ * They read the same `MIN_CHANGED_SHARE` from the same module, and these cases
+ * exist because the alternative — a page the findings list calls changed and
+ * this section calls unchanged — reads as a bug in the product rather than as a
+ * fact about the site.
+ */
+describe("differsMeaningfully", () => {
+	const withChange = (changedPixels: number, comparedPixels = 1_000_000) =>
+		row({ comparison: { comparable: true, changedPixels, comparedPixels } });
+
+	it("is false below the measured noise floor", () => {
+		const justUnder = Math.floor(1_000_000 * MIN_CHANGED_SHARE) - 1;
+		expect(differsMeaningfully(withChange(justUnder))).toBe(false);
+	});
+
+	it("is true at the floor", () => {
+		const atFloor = Math.ceil(1_000_000 * MIN_CHANGED_SHARE);
+		expect(differsMeaningfully(withChange(atFloor))).toBe(true);
+	});
+
+	/** The exact noise a real unchanged site produced. The section must call
+	 * both of these pages a match, as the rule does. */
+	it("calls the noise a real unchanged site produced a match", () => {
+		expect(differsMeaningfully(withChange(1_831, 12_322_560))).toBe(false);
+		expect(differsMeaningfully(withChange(10, 9_008_640))).toBe(false);
+	});
+
+	it("is false where there was no comparison", () => {
+		expect(differsMeaningfully(row({ comparison: null }))).toBe(false);
+		expect(
+			differsMeaningfully(
+				row({ comparison: { comparable: false, reason: "missing" } }),
+			),
+		).toBe(false);
+	});
+
+	/** Ordering follows the same decision, so a sub-floor page never sorts
+	 * above a page that genuinely matched. */
+	it("keeps sub-floor pages out of the changed group when ordering", () => {
+		const noise = row({
+			id: "noise",
+			url: "https://client.test/noise",
+			comparison: {
+				comparable: true,
+				changedPixels: 1_831,
+				comparedPixels: 12_322_560,
+			},
+		});
+		const real = row({
+			id: "real",
+			url: "https://client.test/real",
+			comparison: {
+				comparable: true,
+				changedPixels: 500_000,
+				comparedPixels: 1_000_000,
+			},
+		});
+		const clean = row({ id: "clean", url: "https://client.test/clean" });
+
+		expect(orderSnapshots([noise, clean, real]).map((r) => r.id)).toEqual([
+			"real",
+			"clean",
+			"noise",
+		]);
 	});
 });

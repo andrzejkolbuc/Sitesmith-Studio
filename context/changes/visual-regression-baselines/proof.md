@@ -97,11 +97,39 @@ So the honest reading is two-sided:
   surviving defence. A check that reports two problems every time an untouched
   site is checked is the shape of thing people stop reading.
 
-**This is the measurement the plan deferred the floor decision to**, and it is
-now taken rather than guessed: *"any floor is then derived from that measurement
-and stated, never guessed in advance."* The observed ceiling of our own noise is
-**0.015% of the compared area**. A floor is needed, it belongs above that number,
-and choosing it is a product decision recorded separately from this proof.
+**This is the measurement the plan deferred the floor decision to**, and it was
+taken from it rather than guessed: *"any floor is then derived from that
+measurement and stated, never guessed in advance."*
+
+### The floor, and the same site re-measured
+
+`MIN_CHANGED_SHARE = 0.0005` — **0.05% of the compared area**, roughly three
+times the observed noise ceiling, carried in every finding's detail as
+`thresholdShare` so a reader can disagree with it. One number, in
+`src/server/crawl/visual-noise.ts`, read by both the rule that decides whether to
+report a page and the section that decides whether to say a page differs —
+because a findings list and a panel contradicting each other about one page reads
+as a bug in the product.
+
+Run `820c901c`, again with nothing deployed in between:
+
+| Page | Changed pixels | Share | Reported |
+| --- | --- | --- | --- |
+| `/` | **1,742** | 0.0141% | no |
+| `/company` | **8** | 0.0001% | no |
+
+**Zero visual findings.** Both rows read *"matches the baseline"*, and the
+Problems section is back to the one image finding the site genuinely has.
+
+The second measurement is also the useful one: 1,742 against the first run's
+1,831, and 8 against 10. **The noise is stable at around 0.014–0.015%**, not a
+number that happened to be small once — which is what makes a floor at 0.05%
+defensible rather than lucky.
+
+What it costs is stated in `visual-noise.ts` and worth repeating: on a very tall
+page 0.05% is several thousand pixels, so a small genuine change can fall under
+it. That is the direction of error this product prefers — silence about a small
+real change, never a confident report of a change that did not happen.
 
 ## What worked, read by hand
 
@@ -149,6 +177,5 @@ difference would have been ours. The duration and storage costs are real,
 bounded, and now measured rather than assumed — and the storage figure is
 materially larger than the plan estimated.
 
-**The one thing it does not yet do is stay quiet on a site that has not
-changed.** The measurement needed to fix that is in this document; the fix is a
-decision, not a discovery.
+And after the floor, it stays quiet on a site that has not changed — measured
+twice, on the same real project, with nothing deployed in between.

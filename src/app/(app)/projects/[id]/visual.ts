@@ -1,3 +1,5 @@
+import { MIN_CHANGED_SHARE } from "~/server/crawl/visual-noise";
+
 /**
  * Presenting what the pictures showed, and how little of the site they cover.
  *
@@ -167,6 +169,20 @@ export function changeShare(row: SnapshotRow): number | null {
 }
 
 /**
+ * Whether this page differs by enough to say so.
+ *
+ * Reads the same {@link MIN_CHANGED_SHARE} the rule does, from the same module,
+ * because the alternative is a page the findings list calls changed and this
+ * section calls unchanged. Two parts of one screen contradicting each other
+ * about one page reads as a bug in the product, and the only way they cannot is
+ * if there is one number.
+ */
+export function differsMeaningfully(row: SnapshotRow): boolean {
+	const share = changeShare(row);
+	return share !== null && share >= MIN_CHANGED_SHARE;
+}
+
+/**
  * The order the reader should meet these in.
  *
  * A page that could not be compared comes first — it is the one fact here that
@@ -181,7 +197,10 @@ export function orderSnapshots(rows: SnapshotRow[]): SnapshotRow[] {
 			Number(uncomparedReason(a) !== null);
 		if (uncomparable !== 0) return uncomparable;
 
-		const changed = (changeShare(b) ?? -1) - (changeShare(a) ?? -1);
+		/** Sub-floor differences are not differences, so they do not sort as ones. */
+		const changed =
+			(differsMeaningfully(b) ? (changeShare(b) ?? 0) : -1) -
+			(differsMeaningfully(a) ? (changeShare(a) ?? 0) : -1);
 		if (changed !== 0) return changed;
 
 		return a.url.localeCompare(b.url);

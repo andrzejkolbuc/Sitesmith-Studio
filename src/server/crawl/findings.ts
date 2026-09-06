@@ -15,6 +15,7 @@ import {
 	type PageVariant,
 } from "./variants";
 import type { SnapshotComparison } from "./visual";
+import { MIN_CHANGED_SHARE } from "./visual-noise";
 
 /**
  * Turning what the crawl observed into what the product concluded.
@@ -2363,7 +2364,21 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		a[0].localeCompare(b[0]),
 	)) {
 		if (!comparison.comparable) continue;
-		if (comparison.changedPixels === 0) continue;
+
+		/**
+		 * Below the floor we cannot attribute the difference to the site rather
+		 * than to our own rendering, so we do not. Measured on a real project: two
+		 * runs with nothing deployed between them still differ by up to 0.015% of
+		 * the compared area, invisible to a reader. See .
+		 *
+		 * Zero is the ordinary case this also covers — most pages on most deploys
+		 * are untouched, and saying so is what the whole slice is for.
+		 */
+		const share =
+			comparison.comparedPixels === 0
+				? 0
+				: comparison.changedPixels / comparison.comparedPixels;
+		if (share < MIN_CHANGED_SHARE) continue;
 
 		findings.push({
 			type: FINDING_TYPES.VISUAL_CHANGED,
@@ -2375,6 +2390,8 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 				comparedPixels: comparison.comparedPixels,
 				regions: comparison.regions,
 				regionsCapped: comparison.regionsCapped,
+				/** The number that made us say so, so it can be argued with. */
+				thresholdShare: MIN_CHANGED_SHARE,
 				/**
 				 * How much the page's own length moved, as context for the change.
 				 *
