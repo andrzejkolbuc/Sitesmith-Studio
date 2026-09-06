@@ -676,7 +676,7 @@ is unbuilt.
 
 #### Manual
 
-- [ ] 2.7 A real project's run finishes in a time comparable to before, and the sweep's request count is proportionate to the site
+- [x] 2.7 A real project's run finishes in a time comparable to before, and the sweep's request count is proportionate to the site — verified by hand, `proof.md`
 
 ### Phase 3: Which pages get measured
 
@@ -702,8 +702,8 @@ is unbuilt.
 
 #### Manual
 
-- [ ] 4.8 A real project's run duration grows by a bounded, acceptable amount
-- [ ] 4.9 The vitals recorded for a page are close to what the browser's own devtools report for it
+- [x] 4.8 A real project's run duration grows by a bounded, acceptable amount — 7s → 15.7s/18.6s on tecalliance, ~4–6s per rendered page, `proof.md`
+- [x] 4.9 The vitals recorded for a page are close to what the browser's own devtools report for it — read against devtools, `proof.md`
 
 ### Phase 5: Showing it
 
@@ -719,23 +719,23 @@ is unbuilt.
 
 #### Manual
 
-- [ ] 5.8 An unsampled page reads as not measured, never as having no problems
-- [ ] 5.9 The four new findings render readably with no raw JSON
-- [ ] 5.10 The performance section says how much of the site it describes
-- [ ] 5.11 The rest of the project page is unchanged
+- [x] 5.8 An unsampled page reads as not measured, never as having no problems — verified by hand, `proof.md`
+- [x] 5.9 The four new findings render readably with no raw JSON — verified by hand; the image sentence bug it caught is recorded in `proof.md`
+- [x] 5.10 The performance section says how much of the site it describes — `{chosen: 2, measured: 2, cap: 12}` rendered as coverage, `proof.md`
+- [x] 5.11 The rest of the project page is unchanged — verified by hand; the duplicated `REASON_SENTENCE` paragraph it caught is recorded in `proof.md`
 
 ### Phase 6: Real-site proof and honest recording
 
 #### Automated
 
-- [x] 6.1 Whole suite passes: `npm run test:all`
-- [x] 6.2 Type checking passes: `npm run typecheck`
-- [x] 6.3 Lint and format pass: `npm run check`
-- [x] 6.4 No temporary scripts or harnesses remain in the working tree
+- [x] 6.1 Whole suite passes: `npm run test:all` — ebb9927
+- [x] 6.2 Type checking passes: `npm run typecheck` — ebb9927
+- [x] 6.3 Lint and format pass: `npm run check` — ebb9927
+- [x] 6.4 No temporary scripts or harnesses remain in the working tree — ebb9927
 
 #### Manual
 
-- [ ] 6.5 The vitals reported for a sampled page match that page's devtools numbers within a reasonable margin
-- [ ] 6.6 Every console error reported as first-party is genuinely the client's own script
-- [ ] 6.7 The run-duration delta on a real project is recorded and acceptable
-- [ ] 6.8 The roadmap records FR-029 met, FR-015 and FR-028 partly met, and names F-02's new constraint
+- [x] 6.5 The vitals reported for a sampled page match that page's devtools numbers within a reasonable margin — `proof.md`
+- [x] 6.6 Every console error reported as first-party is genuinely the client's own script — zero errors on either page, first-party or third, `proof.md`
+- [x] 6.7 The run-duration delta on a real project is recorded and acceptable — `proof.md`
+- [x] 6.8 The roadmap records FR-029 met, FR-015 and FR-028 partly met, and names F-02's new constraint — `roadmap.md` S-06
