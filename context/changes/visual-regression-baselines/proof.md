@@ -179,3 +179,107 @@ materially larger than the plan estimated.
 
 And after the floor, it stays quiet on a site that has not changed — measured
 twice, on the same real project, with nothing deployed in between.
+
+---
+
+# The other half of the proof — a page we changed on purpose
+
+Added 2026-09-06, later the same evening, closing the two gaps the handoff named
+as genuinely unproven: **a deliberately changed page**, and **masks against a
+real page**.
+
+## Why a fixture site, and not the client's
+
+The unchanged-site question needed a site nobody controls, and got one. The
+changed-site question needs the opposite — a page we can edit between two runs
+and know exactly what we edited — so this half was measured against a two-page
+site served from disk on `127.0.0.1:4318`, with the same crawl, the same render
+pass and the same comparison. Masks were then confirmed a second time on
+`tecalliance.net`, where the markup is somebody else's.
+
+Project `c6491800-c096-4a5b-a67d-0610f042d758` ("S-08 fixture (local)"), two
+pages, `en`.
+
+## A change we made, found and located
+
+Baseline pinned on the site as it stood. One block on the home page was then
+rewritten — new copy, new background colour — and the page re-checked.
+
+| | Reported |
+| --- | --- |
+| `/` | **209,286 of 2,595,840 compared pixels differ, in 8 regions** — 8.1% |
+| `/about.html` | matches the baseline |
+
+The overlay marks the rewritten block solid red, and the largest region,
+`832 × 176 at 224, 192`, is that block's own rectangle. The finding also read
+*"The page is 32px shorter than the baseline"*, which is the honest explanation
+for the seven smaller regions below it: the edit reflowed the page, so every
+paragraph under it moved. **A pixel comparison cannot tell a moved paragraph
+from a rewritten one**, and saying the page's length changed is what makes that
+legible instead of alarming.
+
+The second change was height-neutral — a 320px banner, recoloured and
+relabelled — and it produced the cleanest possible answer:
+
+> **256,077 of 2,595,840 compared pixels differ, in 1 region**
+> `832 × 336 at 224, 624`
+
+One region, and it is the banner. That is FR-033 answered as written: not that
+the page changed, but where.
+
+## Masks, on both sites
+
+The banner above is exactly the kind of block a client would call volatile, so
+it was masked — `project.setMasks(["#volatile"])`, called as the signed-in user
+against the running app.
+
+1. **The next run refused rather than reported.** Both pages read *"was
+   photographed under different masks than the baseline"*, the coverage sentence
+   read *"0 pages compared against the baseline of 2 pages crawled; 2 could not
+   be compared"*, and no finding was raised. Our mask list changing is a fact
+   about us, and `lessons.md` rule 4 says a fact about us is not a finding.
+2. **After re-pinning under the new mask list**, the banner was changed a third
+   time — a different colour and a longer label, the same class of change that
+   had just reported 256,077 differing pixels. **Both pages read "matches the
+   baseline", and nothing was reported.**
+3. **The picture proves why.** Side by side, the masked block is painted out in
+   both the baseline and the current capture. The volatile content never entered
+   storage, which is the property the design chose masks-at-capture for.
+
+Repeated on `tecalliance.net` with `header` as the selector, on a fresh project
+scoped to `/` and `/company`: the real site's header is painted out in both
+stored pictures, the rest of the page renders in full, and both pages compare
+clean. A selector written against somebody else's markup does what it does
+against ours.
+
+## Two defects this reading found
+
+Neither was visible from the test suite, and both are what reading by hand is
+for.
+
+**1. The finding printed raw JSON at the reader.** `visual_changed` had a label
+in `finding-labels.ts` — which is what Phase 5's automated check verified — but
+no case in the findings list's evidence switch, so it fell through to the
+default branch and rendered its detail object:
+
+> `{"url":"http://127.0.0.1:4318/","regions":[{"x":224,"y":192,"width":832,…`
+
+It never showed during the first real-site session because the noise floor had
+by then removed every visual finding that site produced. Fixed by
+`describeVisualChange` in `visual.ts`, tested there, and deliberately worded to
+say something the appearance section does not: the section gives the share, the
+finding gives the count, its denominator, the regions and the length change.
+
+**2. A baseline could be pinned exactly once.** The pin control renders only in
+the `no_baseline` state, so once a project had a baseline there was no way to
+move it. Every intended redesign would have reported forever, and **masks were
+unusable** — editing them refuses every later comparison until a run is pinned
+under the new list, which the interface offered no way to do. Fixed by offering
+"Make this run the new baseline" on a compared run, worded as a replacement.
+
+## Still not built: a mask control
+
+`project.setMasks` is reachable only through the API. Everything above called it
+by hand. The mechanism is proven on two sites, but **a reader cannot mask
+anything from the interface**, which is worth weighing against FR-035's wording
+before this slice is called done.

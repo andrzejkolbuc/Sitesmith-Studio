@@ -32,38 +32,54 @@ confirming** — they are the human's verification, not the agent's.
 | Row | What was observed on the real run |
 | --- | --- |
 | 1.7 A project with no baseline reads as having none | ✅ Seen. Section reads *"No baseline is pinned, so there is nothing to compare this run against"* with a pin control. |
-| 2.7 A captured PNG looks like the page, full length, masks blanked | ✅ Partly. Full-length capture confirmed (9,627px and 7,038px tall). **Masked-region blanking was not exercised on the real site** — only in the fixture test. See gap (a) below. |
+| 2.7 A captured PNG looks like the page, full length, masks blanked | ✅ **Now whole.** Full-length capture confirmed (9,627px and 7,038px tall); masked-region blanking then read by hand in the stored pictures of both a local fixture page and `tecalliance.net`. |
 | 2.8 Lazy content below the fold is in the capture | ✅ Seen; the scroll sweep is covered by a dedicated fixture route (`/lazy-below-fold`) and the capture shows the site's lazy imagery. |
 | 2.9 Run-duration delta measured and acceptable | ✅ Measured: +~3s per page for capture. See `proof.md`. |
 | 3.7 Pinning a baseline and re-running visits the same pages | ✅ Seen; also covered by an integration test. |
 | 4.8 An unchanged page reports no visual difference | ✅ **Now true**, after the noise floor. Measured twice: zero findings. |
 | 5.10 No-baseline reads as needing one, not as clean | ✅ Seen. |
-| 5.11 Side by side renders, overlay marks the difference | ✅ Seen; all three views returned 200. **The overlay was only viewed on a page with sub-visible differences**, so "marks the *real* difference" is unproven. See gap (b). |
+| 5.11 Side by side renders, overlay marks the difference | ✅ **Now whole.** Seen against a change we made on purpose: the overlay paints the rewritten block solid red and leaves the rest of the page dimmed. |
 | 5.12 The section says how much of the site it describes | ✅ Seen: *"2 pages compared against the baseline of 2 pages crawled"*. |
-| 5.13 Finding and panel do not print the same sentence | ✅ Seen; deliberately different wording. |
+| 5.13 Finding and panel do not print the same sentence | ⚠ **Was true only because the finding printed no sentence at all** — raw JSON. Fixed this session; now the section gives the share and the finding gives the count, regions and length change. |
 | 5.14 The rest of the project page is unchanged | ✅ Seen. |
 | 6.5 Two runs of an unchanged real site report no differing pages | ✅ **Now true.** Was the headline failure; fixed by the floor. |
-| 6.6 A deliberately changed page is caught, regions point at it | ❌ **Not done.** See gap (b) — this is the main outstanding verification. |
-| 6.7 A masked region suppresses a difference | ❌ **Not done on a real site.** See gap (a). |
+| 6.6 A deliberately changed page is caught, regions point at it | ✅ **Done.** Two changes on a fixture site. The height-neutral one reported one region, `832 × 336 at 224, 624`, which is the changed banner exactly. See `proof.md`, second half. |
+| 6.7 A masked region suppresses a difference | ✅ **Done.** The same banner change that reported 256,077 differing pixels unmasked reported nothing once masked; the region is painted out in storage. Repeated on `tecalliance.net` with `header`. |
 | 6.8 Duration and storage deltas recorded and acceptable | ✅ Both in `proof.md`. Storage came out 4–10× the plan's estimate — read that section. |
 | 6.9 Roadmap records the requirement outcomes | ✅ Done; check `roadmap.md` under S-08 and confirm you agree with the wording. |
 
-### 2. Close the two real verification gaps
+### 2. The two verification gaps are closed
 
-These are the only things genuinely unproven on a real site.
+Both were closed on 2026-09-06 in a second session; `proof.md` carries the
+measurements under **"The other half of the proof"**. In short:
 
-**(a) Masks against a real page (rows 2.7, 6.7).** `setMasks` exists as a tRPC
-procedure but **has no UI** — the panel only exposes pinning. To verify: call
-`project.setMasks` directly (e.g. from a scratch script against the dev DB, or
-add the control), point a selector at something on `tecalliance.net`, re-run, and
-confirm the region is painted out in the stored PNG and stops reporting.
-Note that changing masks makes the next comparison refuse with `masks_differ`
-until a new baseline is pinned — that is by design, and worth seeing.
+- **A deliberately changed page** was checked on a two-page fixture site served
+  from disk, edited between runs. A height-neutral change reported **one region,
+  `832 × 336 at 224, 624`** — the changed banner exactly. A reflowing change
+  reported eight, which is correct and now explained in the finding by a
+  "32px shorter than the baseline" line.
+- **Masks** were set through `project.setMasks` on both the fixture and a fresh
+  `tecalliance.net` project. The refusal (`masks_differ`) was seen, the re-pin
+  was seen, the suppression was seen — the same change that reported 256,077
+  pixels unmasked reported nothing masked — and the masked block is painted out
+  in the stored pictures on both sites.
 
-**(b) A deliberately changed page (row 6.6).** The unchanged-site case is proven;
-the changed-site case is not, on a real page. The cheapest honest test is a local
-fixture page you can edit between two runs, or a project pointed at a page you
-control. Confirm the reported regions land on what you changed.
+That reading found two defects, both fixed in the commit that follows this
+handoff:
+
+1. **`visual_changed` rendered as raw JSON** in the findings list. It had a
+   label but no case in the evidence switch, so it hit the default branch. Now
+   `describeVisualChange` in `visual.ts`, with unit tests.
+2. **A baseline could be pinned exactly once.** The pin control renders only in
+   the `no_baseline` state, so a project that had one could never move it — and
+   masks were unusable, because editing them refuses every comparison until a
+   run is pinned under the new list. The compared state now offers **"Make this
+   run the new baseline"**.
+
+**What is still not built: a mask control.** `project.setMasks` is reachable
+only through the API. The mechanism is proven on two sites, but no reader can
+mask anything from the interface. This is the one open product question before
+archiving — see the gaps section below.
 
 ### 3. Then archive
 

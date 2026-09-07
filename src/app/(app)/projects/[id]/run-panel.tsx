@@ -20,6 +20,7 @@ import { Performance } from "./performance-table";
 import { RunHistory } from "./run-history";
 import { countPages, summariseList } from "./summarise";
 import { TrendGrid } from "./trend-grid";
+import { describeVisualChange } from "./visual";
 import { VisualPanel } from "./visual-panel";
 
 /**
@@ -1718,6 +1719,56 @@ function Evidence({
 						<code className="font-mono">{str("userAgentGroup")}</code> group
 					</div>
 					<Listed items={urls.map(pathOf)} />
+				</>
+			);
+		}
+
+		case "visual_changed": {
+			const change = describeVisualChange(detail);
+			const { shown: regionsShown, hidden: regionsHidden } = summariseList(
+				change.regions,
+			);
+
+			/**
+			 * Deliberately not the appearance section's sentence. That one gives the
+			 * share; this one gives the count, its denominator and where the regions
+			 * are — because the two sit on the same screen and a reader who reads
+			 * both should learn twice.
+			 */
+			return (
+				<>
+					<span className="text-ink">{change.sentence}</span>
+					<div className="mt-1.5 break-all font-mono text-ink-soft text-xs">
+						{pathOf(str("url"))}
+					</div>
+					{change.height === null ? null : (
+						<div className="mt-1.5 text-ink-soft text-xs">{change.height}</div>
+					)}
+					{/*
+					 * Regions get their own list rather than the shared one: that counts
+					 * what it hides in pages, and these are rectangles on one page.
+					 */}
+					<ul className="mt-1.5 flex flex-col gap-1">
+						{regionsShown.map((region) => (
+							<li
+								className="break-all font-mono text-ink-soft text-xs"
+								key={region}
+							>
+								{region}
+							</li>
+						))}
+						{regionsHidden > 0 ? (
+							<li className="text-ink-faint text-xs italic">
+								and {regionsHidden} more{" "}
+								{regionsHidden === 1 ? "region" : "regions"}
+							</li>
+						) : null}
+					</ul>
+					{change.threshold === null ? null : (
+						<p className="mt-1.5 text-ink-faint text-xs italic">
+							{change.threshold}
+						</p>
+					)}
 				</>
 			);
 		}

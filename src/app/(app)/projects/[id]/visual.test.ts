@@ -4,6 +4,7 @@ import { MIN_CHANGED_SHARE } from "~/server/crawl/visual-noise";
 
 import {
 	changeShare,
+	describeVisualChange,
 	differsMeaningfully,
 	orderSnapshots,
 	type SnapshotRow,
@@ -382,5 +383,116 @@ describe("differsMeaningfully", () => {
 			"clean",
 			"noise",
 		]);
+	});
+});
+
+/**
+ * What the findings list says about a changed page.
+ *
+ * Caught by hand, not by a test: `visual_changed` reached the Problems list
+ * with no entry in the evidence switch, so the reader was shown the raw detail
+ * object — `{"url":"…","regions":[{"x":224,…`. Every other finding type states
+ * what was expected and what was observed in the reader's own terms, and this
+ * one has to as well.
+ *
+ * The property throughout: it says something the appearance section does not.
+ * The section already gives the share; repeating it here would be two lines of
+ * one fact, so this says the count, its denominator, and where on the page.
+ */
+describe("describeVisualChange", () => {
+	const detail = {
+		url: "https://client.test/",
+		changedPixels: 209_286,
+		comparedPixels: 2_595_840,
+		regions: [
+			{ x: 224, y: 192, width: 832, height: 176 },
+			{ x: 272, y: 448, width: 736, height: 128 },
+		],
+		regionsCapped: false,
+		thresholdShare: MIN_CHANGED_SHARE,
+		heightDelta: -32,
+	};
+
+	it("counts the changed pixels against the area both pictures cover", () => {
+		expect(describeVisualChange(detail).sentence).toBe(
+			"209,286 of 2,595,840 compared pixels differ, in 2 regions",
+		);
+	});
+
+	/** A share here would be the appearance section's sentence, printed twice. */
+	it("does not repeat the section's percentage", () => {
+		expect(describeVisualChange(detail).sentence).not.toContain("%");
+	});
+
+	/**
+	 * Where, not just how much. FR-033 is the requirement that a reader be told
+	 * which part of the page moved, and a region nobody can locate does not.
+	 */
+	it("places each region by size and position", () => {
+		expect(describeVisualChange(detail).regions).toEqual([
+			"832 × 176 at 224, 192",
+			"736 × 128 at 272, 448",
+		]);
+	});
+
+	/** The largest first: it is what the reader opened the finding to find. */
+	it("puts the largest region first", () => {
+		const described = describeVisualChange({
+			...detail,
+			regions: [
+				{ x: 10, y: 10, width: 20, height: 20 },
+				{ x: 40, y: 60, width: 400, height: 300 },
+			],
+		});
+		expect(described.regions[0]).toBe("400 × 300 at 40, 60");
+	});
+
+	/** A capped list is a list that is not the whole truth, and says so. */
+	it("says when there were more regions than it kept", () => {
+		expect(
+			describeVisualChange({ ...detail, regionsCapped: true }).sentence,
+		).toBe("209,286 of 2,595,840 compared pixels differ, in 2 regions or more");
+	});
+
+	/**
+	 * A page that reflowed shifts everything below the change, so the regions
+	 * read as a page-wide difference. Saying the length moved is what makes that
+	 * legible rather than alarming.
+	 */
+	it("reports a page that got shorter", () => {
+		expect(describeVisualChange(detail).height).toBe(
+			"The page is 32px shorter than the baseline",
+		);
+	});
+
+	it("reports a page that got taller", () => {
+		expect(describeVisualChange({ ...detail, heightDelta: 48 }).height).toBe(
+			"The page is 48px taller than the baseline",
+		);
+	});
+
+	it("says nothing about length when the page is the same height", () => {
+		expect(
+			describeVisualChange({ ...detail, heightDelta: 0 }).height,
+		).toBeNull();
+	});
+
+	/** Ours, so it is shown — the same courtesy `image_oversized` extends. */
+	it("shows the threshold that made it say so", () => {
+		expect(describeVisualChange(detail).threshold).toBe(
+			"Reported above 0.05% of the compared area",
+		);
+	});
+
+	/**
+	 * The detail is a `Record<string, unknown>` off a database row, so a shape
+	 * that predates a field must render rather than throw.
+	 */
+	it("survives a detail missing every optional field", () => {
+		const described = describeVisualChange({ url: "https://client.test/" });
+		expect(described.sentence).toBe("Differs from the baseline");
+		expect(described.regions).toEqual([]);
+		expect(described.height).toBeNull();
+		expect(described.threshold).toBeNull();
 	});
 });

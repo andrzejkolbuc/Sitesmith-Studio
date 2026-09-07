@@ -206,3 +206,83 @@ export function orderSnapshots(rows: SnapshotRow[]): SnapshotRow[] {
 		return a.url.localeCompare(b.url);
 	});
 }
+
+/** A rectangle of the page that differs, in the picture's own coordinates. */
+type ChangedRegion = { x: number; y: number; width: number; height: number };
+
+/**
+ * What the findings list says about a page that stopped looking like itself.
+ *
+ * Here rather than in the component for the reason the rest of this file is:
+ * the sentence is a decision, and the one time it was left to the component it
+ * silently printed the raw detail object at a reader.
+ *
+ * It deliberately does **not** print a percentage. The appearance section above
+ * already says "8.1% of the page differs" for the same page, and a findings
+ * entry repeating it would be one fact wearing two hats. What this adds is the
+ * count with its denominator — the pixels, over the area both pictures actually
+ * cover — and where on the page they are, which is the half of FR-033 a share
+ * cannot carry.
+ */
+export function describeVisualChange(detail: Record<string, unknown>): {
+	sentence: string;
+	/** Largest first: what the reader opened the finding to find. */
+	regions: string[];
+	/** Null when the page is exactly as long as the baseline. */
+	height: string | null;
+	/** Null when the finding predates the recorded threshold. */
+	threshold: string | null;
+} {
+	const num = (key: string): number | null =>
+		typeof detail[key] === "number" ? (detail[key] as number) : null;
+
+	const changed = num("changedPixels");
+	const compared = num("comparedPixels");
+	const capped = detail.regionsCapped === true;
+	const heightDelta = num("heightDelta");
+	const thresholdShare = num("thresholdShare");
+
+	const regions: ChangedRegion[] = (
+		Array.isArray(detail.regions) ? (detail.regions as ChangedRegion[]) : []
+	)
+		.filter(
+			(region): region is ChangedRegion =>
+				typeof region?.width === "number" && typeof region?.height === "number",
+		)
+		.sort((a, b) => b.width * b.height - a.width * a.height);
+
+	/**
+	 * A detail written by an older rule set still has to render. Silence about a
+	 * number we do not have beats a sentence built around `null of null`.
+	 */
+	const sentence =
+		changed === null || compared === null
+			? "Differs from the baseline"
+			: `${changed.toLocaleString("en-GB")} of ${compared.toLocaleString("en-GB")} compared pixels differ, in ${regions.length} ${regions.length === 1 ? "region" : "regions"}${capped ? " or more" : ""}`;
+
+	return {
+		sentence,
+		regions: regions.map(
+			(region) =>
+				`${region.width} × ${region.height} at ${region.x}, ${region.y}`,
+		),
+		/**
+		 * A page that reflowed shifts every pixel below the edit, so the regions
+		 * read as though the whole page moved. Saying the length changed is what
+		 * turns that from alarming into explicable.
+		 */
+		height:
+			heightDelta === null || heightDelta === 0
+				? null
+				: `The page is ${Math.abs(heightDelta)}px ${heightDelta < 0 ? "shorter" : "taller"} than the baseline`,
+		/**
+		 * Ours, so it is shown — the same courtesy `image_oversized` extends with
+		 * its byte threshold. A reader who thinks 0.05% is too coarse for their
+		 * site can then disagree with the number rather than only with the verdict.
+		 */
+		threshold:
+			thresholdShare === null
+				? null
+				: `Reported above ${Number((thresholdShare * 100).toFixed(4))}% of the compared area`,
+	};
+}

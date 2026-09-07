@@ -157,6 +157,38 @@ export function VisualPanel({
 						))}
 					</ul>
 
+					{/*
+					 * Re-pinning, which the no-baseline state offers once and nothing
+					 * offered again. A baseline that can only ever be set once turns
+					 * every intended redesign into a permanent finding, and masks are
+					 * unusable without it — editing them refuses every later comparison
+					 * until a run is pinned under the new list.
+					 *
+					 * Worded as a replacement rather than as a pin: the reader already
+					 * has a baseline, and the thing they need to know is that this run
+					 * takes its place.
+					 */}
+					{capturable ? (
+						<div className="mt-5 border-rule border-l-2 py-1 pl-4">
+							<button
+								className="rounded-sm border border-rule px-3 py-1.5 font-mono text-ink text-xs hover:bg-sheet disabled:opacity-50"
+								disabled={pin.isPending}
+								onClick={() => pin.mutate({ projectId, runId })}
+								type="button"
+							>
+								{pin.isPending ? "Pinning…" : "Make this run the new baseline"}
+							</button>
+							<p className="mt-2 max-w-prose text-ink-faint text-xs">
+								Later runs will be compared against this one instead. Do it
+								after a change you meant to make, or after editing the masked
+								regions.
+							</p>
+							{pin.error ? (
+								<p className="mt-2 text-flag text-xs">{pin.error.message}</p>
+							) : null}
+						</div>
+					) : null}
+
 					<p className="mt-5 max-w-prose text-ink-faint text-xs">
 						A watched set, not the whole site: the pages the baseline
 						photographed are the pages later runs re-photograph, so the same
