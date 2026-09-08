@@ -1,9 +1,9 @@
 ---
 change_id: visual-regression-baselines
 title: Visual regression with baselines and masked regions
-status: implementing
+status: implemented
 created: 2026-09-06
-updated: 2026-09-06
+updated: 2026-09-08
 archived_at: null
 ---
 
@@ -64,3 +64,22 @@ that is the risk this slice is managing, not a reason to defer it further.
   comparison across this slice's deployment should refuse rather than report.
   Additionally: a *re-baseline* is our state changing, not the site's, and the
   comparison has to know that.
+
+## Closing note, 2026-09-08
+
+All six phases landed, and the two verification gaps the handoff named — a
+deliberately changed page, and masks against a real page — were closed by hand
+against a fixture site and `tecalliance.net`. `proof.md` carries both halves.
+
+That reading found three things the suite could not:
+
+1. `visual_changed` printed its raw detail object at the reader. It had a label
+   but no case in the findings list's evidence switch.
+2. A baseline could be pinned exactly once, which made masks unusable — editing
+   them refuses every comparison until a run is pinned under the new list.
+3. `setMasks` had no interface at all.
+
+All three are fixed. The mask control is **work beyond the plan**, taken on
+because FR-035 asks for masking as a user capability and the slice had shipped
+it as a procedure. It is recorded here rather than as a new Progress row so the
+plan's phases still read as what was planned.

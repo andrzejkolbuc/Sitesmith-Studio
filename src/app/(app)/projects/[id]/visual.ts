@@ -286,3 +286,43 @@ export function describeVisualChange(detail: Record<string, unknown>): {
 				: `Reported above ${Number((thresholdShare * 100).toFixed(4))}% of the compared area`,
 	};
 }
+
+/** The procedure's own limits, checked here so a reader hears them first. */
+const MAX_MASKS = 50;
+const MAX_SELECTOR_LENGTH = 255;
+
+/**
+ * A textarea of masked regions, read as a list.
+ *
+ * **One selector per line, never comma-separated.** A comma is part of CSS —
+ * `h1, h2` is a single selector list — so splitting on it would quietly mask two
+ * things where the reader wrote one, and the reader would have no way to say
+ * what they meant.
+ *
+ * The limits are `project.setMasks`'s. Repeating them here is not a second
+ * validation of the same thing: the procedure's job is to refuse bad input, and
+ * this one's is to tell the person typing what is wrong before they send it.
+ */
+export function parseMaskSelectors(text: string): {
+	selectors: string[];
+	/** Null when the list is sendable. A sentence, not a code. */
+	problem: string | null;
+} {
+	const selectors = [
+		...new Set(
+			text
+				.split("\n")
+				.map((line) => line.trim())
+				.filter((line) => line.length > 0),
+		),
+	];
+
+	const problem =
+		selectors.length > MAX_MASKS
+			? `A project can mask at most ${MAX_MASKS} regions.`
+			: selectors.some((selector) => selector.length > MAX_SELECTOR_LENGTH)
+				? `A selector cannot be longer than ${MAX_SELECTOR_LENGTH} characters.`
+				: null;
+
+	return { selectors, problem };
+}

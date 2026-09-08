@@ -831,7 +831,7 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Manual
 
-- [ ] 1.7 A project with no baseline reads as having none, rather than as an error
+- [x] 1.7 A project with no baseline reads as having none, rather than as an error
 
 ### Phase 2: What a snapshot is a picture of
 
@@ -846,9 +846,9 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Manual
 
-- [ ] 2.7 A captured PNG opened by hand looks like the page, full length, with masked regions blanked
-- [ ] 2.8 Lazy-loaded images below the fold are present in the capture
-- [ ] 2.9 The run-duration delta from adding capture is measured and acceptable
+- [x] 2.7 A captured PNG opened by hand looks like the page, full length, with masked regions blanked — 930747d
+- [x] 2.8 Lazy-loaded images below the fold are present in the capture
+- [x] 2.9 The run-duration delta from adding capture is measured and acceptable
 
 ### Phase 3: Pinning a baseline
 
@@ -863,7 +863,7 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Manual
 
-- [ ] 3.7 Pinning a baseline on a real project and re-running visits the same pages
+- [x] 3.7 Pinning a baseline on a real project and re-running visits the same pages
 
 ### Phase 4: What differs, and where
 
@@ -879,7 +879,7 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Manual
 
-- [ ] 4.8 On a real project, an unchanged page between two runs reports no visual difference
+- [x] 4.8 On a real project, an unchanged page between two runs reports no visual difference
 
 ### Phase 5: Showing it
 
@@ -897,11 +897,11 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Manual
 
-- [ ] 5.10 A project with no baseline reads as needing one, not as having no problems
-- [ ] 5.11 Baseline and current render side by side and the overlay marks the real difference
-- [ ] 5.12 The section says how much of the site it describes
-- [ ] 5.13 The finding and the panel do not print the same sentence
-- [ ] 5.14 The rest of the project page is unchanged
+- [x] 5.10 A project with no baseline reads as needing one, not as having no problems
+- [x] 5.11 Baseline and current render side by side and the overlay marks the real difference — 930747d
+- [x] 5.12 The section says how much of the site it describes
+- [x] 5.13 The finding and the panel do not print the same sentence — 930747d
+- [x] 5.14 The rest of the project page is unchanged
 
 ### Phase 6: Real-site proof and honest recording
 
@@ -914,8 +914,8 @@ expected, and verified rather than assumed in Phase 6.
 
 #### Manual
 
-- [ ] 6.5 Two runs of an unchanged real site report no differing pages
-- [ ] 6.6 A deliberately changed page is caught, and the regions point at what changed
-- [ ] 6.7 A masked region suppresses a difference that would otherwise report
-- [ ] 6.8 The run-duration and storage deltas on a real project are recorded and acceptable
-- [ ] 6.9 The roadmap records FR-031 partly met, FR-032 to FR-035 met, and that F-02 gained no new constraint
+- [x] 6.5 Two runs of an unchanged real site report no differing pages
+- [x] 6.6 A deliberately changed page is caught, and the regions point at what changed — 930747d
+- [x] 6.7 A masked region suppresses a difference that would otherwise report — 930747d
+- [x] 6.8 The run-duration and storage deltas on a real project are recorded and acceptable
+- [x] 6.9 The roadmap records FR-031 partly met, FR-032 to FR-035 met, and that F-02 gained no new constraint

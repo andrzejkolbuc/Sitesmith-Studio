@@ -235,7 +235,10 @@ Foundations below assume these are present and do NOT re-scaffold them.
     the project baseline; later runs report which watched pages differ and where,
     as changed-pixel counts and bounding boxes; baseline and current are
     reviewable side by side with an overlay generated on demand; per-project CSS
-    selectors are masked by the browser before the picture exists.
+    selectors are masked by the browser before the picture exists, entered
+    through a **Masked regions** control on the project page. Verified by hand on
+    a fixture site and on a real client site: with a region masked, two blocks
+    changed at once produced a finding naming only the unmasked one.
   - **FR-031 — partly met.** Snapshots are captured for a **bounded watched set**
     — the pages the baseline photographed — rather than for each page in a run.
     Per-page capture is 1.5–2 hours per run on a 1,200-URL site at the ~3s per

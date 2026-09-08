@@ -283,3 +283,33 @@ under the new list, which the interface offered no way to do. Fixed by offering
 by hand. The mechanism is proven on two sites, but **a reader cannot mask
 anything from the interface**, which is worth weighing against FR-035's wording
 before this slice is called done.
+
+## The mask control, built and read by hand
+
+The gap above was closed rather than recorded. `project.setMasks` now has an
+interface: **Masked regions**, collapsed under the appearance section, one CSS
+selector per line.
+
+One selector per line and never comma-separated, because a comma is part of CSS
+— `h1, h2` is a single selector list, and splitting on it would quietly mask two
+things where the reader wrote one. `parseMaskSelectors` in `visual.ts` does the
+trimming, the de-duplication and both of the procedure's limits, so a reader
+hears what is wrong before the round trip rather than from a rejected request.
+
+Read by hand on the fixture project: the box opens pre-filled with the project's
+current list, Save is inert until the list actually changes, saving writes
+through `setMasks` and the count in the header follows. Adding a selector and
+removing it again round-tripped correctly through the database.
+
+The last measurement is the one that matters, and it is the property nothing had
+checked until now — **a mask silences its own region without blinding the rest
+of the page.** With `#volatile` masked, two blocks were changed at once: the
+masked banner, and an unmasked block above it.
+
+> **127,554 of 2,595,840 compared pixels differ, in 1 region**
+> `832 × 176 at 224, 192`
+
+One region, and it is the unmasked block. The masked banner changed colour and
+label in the same edit and is not in the finding, not in the count, and not in
+the picture. That is FR-035 as written: volatile regions stop reporting, and
+nothing else stops reporting with them.

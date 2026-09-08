@@ -7,6 +7,7 @@ import {
 	describeVisualChange,
 	differsMeaningfully,
 	orderSnapshots,
+	parseMaskSelectors,
 	type SnapshotRow,
 	uncomparedReason,
 	type VisualSummary,
@@ -494,5 +495,67 @@ describe("describeVisualChange", () => {
 		expect(described.regions).toEqual([]);
 		expect(described.height).toBeNull();
 		expect(described.threshold).toBeNull();
+	});
+});
+
+/**
+ * Turning a textarea into a mask list.
+ *
+ * One selector per line rather than comma-separated, because a comma is part of
+ * CSS: `h1, h2` is one selector list and splitting it would silently mask two
+ * things the reader wrote as one. The limits are the procedure's own, checked
+ * here so the reader is told before the round trip rather than by a 400.
+ */
+describe("parseMaskSelectors", () => {
+	it("takes one selector per line", () => {
+		expect(parseMaskSelectors("#promo\n.ticker\n").selectors).toEqual([
+			"#promo",
+			".ticker",
+		]);
+	});
+
+	/** A comma is CSS, not a separator: `h1, h2` is one selector list. */
+	it("keeps a selector list on one line intact", () => {
+		expect(parseMaskSelectors("h1, h2").selectors).toEqual(["h1, h2"]);
+	});
+
+	it("drops blank lines and surrounding space", () => {
+		expect(parseMaskSelectors("  #promo  \n\n\n  .ticker\n").selectors).toEqual(
+			["#promo", ".ticker"],
+		);
+	});
+
+	/** Masking the same thing twice is one mask, and the second is noise. */
+	it("keeps the first of a repeated selector", () => {
+		expect(parseMaskSelectors("#promo\n.ticker\n#promo").selectors).toEqual([
+			"#promo",
+			".ticker",
+		]);
+	});
+
+	it("reads an empty box as masking nothing", () => {
+		expect(parseMaskSelectors("\n  \n").selectors).toEqual([]);
+		expect(parseMaskSelectors("").problem).toBeNull();
+	});
+
+	/**
+	 * Both limits are the procedure's. Saying so here means the reader is told
+	 * what is wrong, rather than told by a rejected request.
+	 */
+	it("refuses more selectors than the procedure accepts", () => {
+		const many = Array.from({ length: 51 }, (_, i) => `.mask-${i}`).join("\n");
+		expect(parseMaskSelectors(many).problem).toBe(
+			"A project can mask at most 50 regions.",
+		);
+	});
+
+	it("refuses a selector longer than the procedure accepts", () => {
+		expect(parseMaskSelectors(`.${"a".repeat(255)}`).problem).toBe(
+			"A selector cannot be longer than 255 characters.",
+		);
+	});
+
+	it("has no problem with an ordinary list", () => {
+		expect(parseMaskSelectors("#promo\n.ticker").problem).toBeNull();
 	});
 });

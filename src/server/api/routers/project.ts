@@ -545,7 +545,7 @@ export const projectRouter = createTRPCRouter({
 			 * pin something they have already pinned.
 			 */
 			const project = await ctx.db.query.projects.findFirst({
-				columns: { baselineRunId: true },
+				columns: { baselineRunId: true, maskSelectors: true },
 				where: and(
 					tenantScope(projects, ctx.tenantId),
 					eq(projects.id, run.projectId),
@@ -556,6 +556,13 @@ export const projectRouter = createTRPCRouter({
 				snapshots: rows,
 				summary: run.visualSummary,
 				projectBaselineRunId: project?.baselineRunId ?? null,
+				/**
+				 * The masks in force *now*, which the section both explains and edits.
+				 * Returned here rather than fetched separately because the panel cannot
+				 * render its own state without them, and two round trips would let the
+				 * list and the pictures it describes disagree for a frame.
+				 */
+				maskSelectors: project?.maskSelectors ?? [],
 				/** How many pages the run recorded, so the watched set has a proportion. */
 				pagesCrawled: run.pagesCrawled,
 			};

@@ -7,6 +7,7 @@ import {
 	changeShare,
 	differsMeaningfully,
 	orderSnapshots,
+	parseMaskSelectors,
 	type SnapshotRow,
 	uncomparedReason,
 	visualState,
@@ -46,7 +47,13 @@ export function VisualPanel({
 
 	if (!data.data) return null;
 
-	const { snapshots, summary, pagesCrawled, projectBaselineRunId } = data.data;
+	const {
+		snapshots,
+		summary,
+		pagesCrawled,
+		projectBaselineRunId,
+		maskSelectors,
+	} = data.data;
 	const rows: SnapshotRow[] = snapshots.map((row) => ({
 		id: row.id,
 		url: row.url,
@@ -199,7 +206,110 @@ export function VisualPanel({
 					</p>
 				</>
 			) : null}
+
+			{/*
+			 * The one control here that is about the project rather than about this
+			 * run, which is why it sits below every state rather than inside one: a
+			 * reader whose pictures are full of a rotating banner needs to say so
+			 * whether or not this particular run compared cleanly.
+			 */}
+			<Masks projectId={projectId} selectors={maskSelectors} />
 		</section>
+	);
+}
+
+/**
+ * Which regions never count as changed.
+ *
+ * FR-035's only interface. Collapsed by default because most projects never
+ * need one, and a section that opens with a configuration box would bury the
+ * pictures it is there to explain.
+ *
+ * The warning is not decoration. Editing this list makes every later
+ * comparison refuse until a run is pinned under the new list — two pictures
+ * hiding different things are not two views of one page — and a reader who
+ * edits masks without being told that would read the refusal as a bug.
+ */
+function Masks({
+	projectId,
+	selectors,
+}: {
+	projectId: string;
+	selectors: string[];
+}) {
+	const [open, setOpen] = useState(false);
+	const [text, setText] = useState(selectors.join("\n"));
+	const utils = api.useUtils();
+	const save = api.project.setMasks.useMutation({
+		onSuccess: async () => {
+			await utils.project.runSnapshots.invalidate();
+		},
+	});
+
+	const parsed = parseMaskSelectors(text);
+	/** Saved and unchanged since, so the button has nothing to do. */
+	const unchanged =
+		parsed.selectors.length === selectors.length &&
+		parsed.selectors.every((selector, index) => selector === selectors[index]);
+
+	return (
+		<div className="mt-6 border-rule-soft border-t pt-4">
+			<button
+				className="flex items-baseline gap-3 font-mono text-ink-soft text-xs hover:text-ink"
+				onClick={() => setOpen(!open)}
+				type="button"
+			>
+				<span>{open ? "−" : "+"} Masked regions</span>
+				<span className="text-ink-faint">
+					{selectors.length === 0
+						? "none"
+						: `${selectors.length} ${selectors.length === 1 ? "selector" : "selectors"}`}
+				</span>
+			</button>
+
+			{open ? (
+				<div className="mt-3 max-w-prose">
+					<p className="text-ink-soft text-xs leading-relaxed">
+						One CSS selector per line. Anything they match is painted out when
+						the picture is taken, so a rotating banner or a live counter never
+						enters storage and can never be reported as a change.
+					</p>
+
+					<textarea
+						className="mt-3 w-full rounded-sm border border-rule bg-page px-3 py-2 font-mono text-ink text-xs"
+						onChange={(event) => setText(event.target.value)}
+						placeholder={"#promo-banner\n.live-ticker"}
+						rows={4}
+						spellCheck={false}
+						value={text}
+					/>
+
+					<p className="mt-2 text-ink-faint text-xs leading-relaxed">
+						Changing this list makes the next comparison refuse rather than
+						report: two pictures hiding different things are not two views of
+						one page. Pin a run under the new list to start comparing again.
+					</p>
+
+					<button
+						className="mt-3 rounded-sm border border-rule px-3 py-1.5 font-mono text-ink text-xs hover:bg-sheet disabled:opacity-50"
+						disabled={save.isPending || parsed.problem !== null || unchanged}
+						onClick={() =>
+							save.mutate({ projectId, selectors: parsed.selectors })
+						}
+						type="button"
+					>
+						{save.isPending ? "Saving…" : "Save masked regions"}
+					</button>
+
+					{parsed.problem ? (
+						<p className="mt-2 text-flag text-xs">{parsed.problem}</p>
+					) : null}
+					{save.error ? (
+						<p className="mt-2 text-flag text-xs">{save.error.message}</p>
+					) : null}
+				</div>
+			) : null}
+		</div>
 	);
 }
 

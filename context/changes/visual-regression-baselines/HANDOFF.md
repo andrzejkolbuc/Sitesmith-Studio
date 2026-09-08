@@ -76,10 +76,14 @@ handoff:
    run is pinned under the new list. The compared state now offers **"Make this
    run the new baseline"**.
 
-**What is still not built: a mask control.** `project.setMasks` is reachable
-only through the API. The mechanism is proven on two sites, but no reader can
-mask anything from the interface. This is the one open product question before
-archiving — see the gaps section below.
+**The mask control was then built**, on the user's call: **Masked regions**,
+collapsed under the appearance section, one CSS selector per line, parsed by
+`parseMaskSelectors` in `visual.ts` against the procedure's own limits. Verified
+by hand end to end — saved through the interface, and the final run proved the
+property nothing had checked before it: with `#volatile` masked, two blocks were
+changed at once and the finding named **only the unmasked one**, one region,
+`832 × 176 at 224, 192`. A mask silences its own region without blinding the
+rest of the page.
 
 ### 3. Then archive
 
@@ -133,7 +137,7 @@ It is reported in every finding's `detail.thresholdShare`.
   `e8708ac` (p3 pinning), `c0ac500` (p4 comparison), `df876c6` (p5 UI),
   `568017c` (p6 proof), `0d4aa43` (SHA write-back), plus the noise-floor commit
   that follows this handoff.
-- **Test counts to expect:** 727 unit, 87 integration, 17 e2e.
+- **Test counts to expect:** 745 unit, 87 integration, 17 e2e.
 - **Schema changes go through `npm run db:push`.** There is no `drizzle/`
   migrations directory. If `db:push` warns about data loss on a NOT NULL column,
   it needs a database-level `.default()`, not `$defaultFn` — that bit us once.
@@ -151,12 +155,10 @@ It is reported in every finding's `detail.thresholdShare`.
   `a03c07cc-0f5b-499a-a7bc-fd5c9fff43df`, scoped to `/` and `/company`, with a
   baseline currently pinned to run `22d72d70-147e-4341-a109-6b6b8ee79db6`.
 
-## Two known gaps that are not bugs
+## One known gap that is not a bug
 
-- **`setMasks` has no UI.** The procedure and the capture-time masking both work
-  and are tested; nothing on the project page calls it. FR-035 is recorded as met
-  on the strength of the mechanism, which is defensible but worth a second
-  opinion before archiving.
+- **~~`setMasks` has no UI.~~** Built 2026-09-06. FR-035 is now met through the
+  interface rather than on the strength of the mechanism.
 - **Storage is ~960 MB at full scale**, not the "tens to low hundreds of
   megabytes" the plan estimated. Bounded and affordable, but F-02 should size a
   host from the measured figure in `proof.md`.
