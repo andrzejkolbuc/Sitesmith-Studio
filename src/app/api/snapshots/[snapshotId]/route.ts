@@ -1,11 +1,13 @@
 import { and, eq } from "drizzle-orm";
 
 import { auth } from "~/server/auth";
+import { isOwner } from "~/server/auth/roles";
 import { diffOverlay } from "~/server/crawl/visual";
 import { db } from "~/server/db";
 import {
 	pageSnapshots,
 	pages,
+	projectAssignments,
 	projects,
 	runs,
 	users,
@@ -55,7 +57,7 @@ export async function GET(
 	if (!userId) return notFound();
 
 	const user = await db.query.users.findFirst({
-		columns: { tenantId: true },
+		columns: { tenantId: true, role: true },
 		where: eq(users.id, userId),
 	});
 	if (!user?.tenantId) return notFound();
@@ -77,6 +79,39 @@ export async function GET(
 	});
 	if (!snapshot) return notFound();
 
+	/**
+	 * Which project this picture belongs to, resolved before any bytes are
+	 * returned rather than only on the diff path below.
+	 *
+	 * Tenant scoping was the whole of the answer while an account either saw its
+	 * agency's work or was not in the agency. It stopped being the whole answer
+	 * the moment a Client-viewer could exist: they hold a legitimate session in a
+	 * legitimate tenant, and a tenant-only predicate would hand them every
+	 * screenshot of every other client the agency has.
+	 *
+	 * This handler inherits nothing — no tRPC middleware, no route-group layout —
+	 * so the check is written out here rather than composed. That duplication is
+	 * deliberate and matches the note above: the id in the URL is not a
+	 * permission, and this handler re-establishes ownership itself.
+	 */
+	const run = await db.query.runs.findFirst({
+		columns: { projectId: true },
+		where: and(eq(runs.id, snapshot.runId), eq(runs.tenantId, user.tenantId)),
+	});
+	if (!run) return notFound();
+
+	if (!isOwner(user.role)) {
+		const assignment = await db.query.projectAssignments.findFirst({
+			columns: { projectId: true },
+			where: and(
+				eq(projectAssignments.userId, userId),
+				eq(projectAssignments.tenantId, user.tenantId),
+				eq(projectAssignments.projectId, run.projectId),
+			),
+		});
+		if (!assignment) return notFound();
+	}
+
 	if (view === "current") {
 		if (!snapshot.image) return notFound();
 		return new Response(new Uint8Array(snapshot.image), { headers: HEADERS });
@@ -94,12 +129,6 @@ export async function GET(
 		where: eq(pages.id, snapshot.pageId),
 	});
 	if (!page) return notFound();
-
-	const run = await db.query.runs.findFirst({
-		columns: { projectId: true },
-		where: and(eq(runs.id, snapshot.runId), eq(runs.tenantId, user.tenantId)),
-	});
-	if (!run) return notFound();
 
 	const project = await db.query.projects.findFirst({
 		columns: { baselineRunId: true },

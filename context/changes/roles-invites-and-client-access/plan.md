@@ -508,12 +508,12 @@ The schema is push-based with no migrations directory; both test harnesses apply
 
 #### Automated
 
-- [x] 2.1 Type checking passes: `npm run typecheck`
-- [x] 2.2 Linting passes: `npm run check`
-- [x] 2.3 Unit tests pass: `npm run test:unit`
-- [x] 2.4 Integration tests pass, including the new matrix: `npm run test:integration`
-- [x] 2.5 The isolation completeness guard passes with every new procedure classified
-- [x] 2.6 Deliberate-break check: removing one `assertProjectAccess` call fails the within-tenant matrix by name
+- [x] 2.1 Type checking passes: `npm run typecheck` — e3f370a
+- [x] 2.2 Linting passes: `npm run check` — e3f370a
+- [x] 2.3 Unit tests pass: `npm run test:unit` — e3f370a
+- [x] 2.4 Integration tests pass, including the new matrix: `npm run test:integration` — e3f370a
+- [x] 2.5 The isolation completeness guard passes with every new procedure classified — e3f370a
+- [x] 2.6 Deliberate-break check: removing one `assertProjectAccess` call fails the within-tenant matrix by name — e3f370a
 
 #### Manual
 
@@ -523,10 +523,10 @@ The schema is push-based with no migrations directory; both test harnesses apply
 
 #### Automated
 
-- [ ] 3.1 Type checking passes: `npm run typecheck`
-- [ ] 3.2 Linting passes: `npm run check`
-- [ ] 3.3 Integration tests pass, including both new route cases: `npm run test:integration`
-- [ ] 3.4 Deliberate-break check: removing the project term from the route makes the viewer-refusal case fail
+- [x] 3.1 Type checking passes: `npm run typecheck`
+- [x] 3.2 Linting passes: `npm run check`
+- [x] 3.3 Integration tests pass, including both new route cases: `npm run test:integration`
+- [x] 3.4 Deliberate-break check: removing the project term from the route makes the viewer-refusal case fail
 
 #### Manual
 

@@ -9,6 +9,7 @@ import {
 	findings,
 	pageSnapshots,
 	pages,
+	projectAssignments,
 	projects,
 	runs,
 	tenants,
@@ -46,7 +47,16 @@ if (!new URL(databaseUrl).pathname.endsWith("-test")) {
 
 const connection = postgres(databaseUrl, { max: 1 });
 const db = drizzle(connection, {
-	schema: { findings, pages, pageSnapshots, projects, runs, tenants, users },
+	schema: {
+		findings,
+		pages,
+		pageSnapshots,
+		projectAssignments,
+		projects,
+		runs,
+		tenants,
+		users,
+	},
 });
 
 /**
@@ -513,5 +523,46 @@ describe("the snapshot image route", () => {
 		signedOut();
 
 		expect((await request(victim.snapshot.id)).status).toBe(404);
+	});
+
+	/**
+	 * The same commitment one level down, and the reason this route needed
+	 * changing at all when roles arrived.
+	 *
+	 * A Client-viewer is inside the tenant, so every tenant predicate on this
+	 * route says yes to them. Without a project-level check they would be handed
+	 * full-page screenshots of every other client the agency has — which is the
+	 * isolation promise failing between two of the agency's own clients rather
+	 * than between two agencies.
+	 *
+	 * Asserted in both directions in one test, because a route that refused
+	 * everyone would satisfy the first half alone.
+	 */
+	it("answers 404 to a viewer not assigned to the snapshot's project", async () => {
+		const agency = await seedTenant("route-roles");
+
+		const [viewer] = await db
+			.insert(users)
+			.values({
+				email: "route-viewer@isolation.test",
+				tenantId: agency.tenant.id,
+				role: "viewer",
+			})
+			.returning();
+		if (!viewer) throw new Error("viewer insert returned nothing");
+
+		signedInAs(viewer.id);
+		const refused = await request(agency.snapshot.id);
+		expect(refused.status).toBe(404);
+
+		await db.insert(projectAssignments).values({
+			tenantId: agency.tenant.id,
+			userId: viewer.id,
+			projectId: agency.project.id,
+		});
+
+		const allowed = await request(agency.snapshot.id);
+		expect(allowed.status).toBe(200);
+		expect(allowed.headers.get("content-type")).toBe("image/png");
 	});
 });
