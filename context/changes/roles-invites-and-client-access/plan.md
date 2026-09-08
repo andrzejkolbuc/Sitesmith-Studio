@@ -553,12 +553,12 @@ The schema is push-based with no migrations directory; both test harnesses apply
 
 #### Automated
 
-- [x] 5.1 Type checking passes: `npm run typecheck`
-- [x] 5.2 Linting passes: `npm run check`
-- [x] 5.3 Unit tests pass: `npm run test:unit`
-- [x] 5.4 Integration tests pass: `npm run test:integration`
-- [x] 5.5 End-to-end tests pass, including the new journey and the auto-enrolled `/team` route: `npm run test:e2e`
-- [x] 5.6 Full suite green: `npm run test:all`
+- [x] 5.1 Type checking passes: `npm run typecheck` — a06a6d4
+- [x] 5.2 Linting passes: `npm run check` — a06a6d4
+- [x] 5.3 Unit tests pass: `npm run test:unit` — a06a6d4
+- [x] 5.4 Integration tests pass: `npm run test:integration` — a06a6d4
+- [x] 5.5 End-to-end tests pass, including the new journey and the auto-enrolled `/team` route: `npm run test:e2e` — a06a6d4
+- [x] 5.6 Full suite green: `npm run test:all` — a06a6d4
 
 #### Manual
 
