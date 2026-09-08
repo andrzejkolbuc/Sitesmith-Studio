@@ -47,6 +47,12 @@ function callerFor(userId: string | null, tenantId: string | null) {
 		db,
 		session: userId ? { user: { id: userId }, expires: "" } : null,
 		tenantId,
+		/**
+		 * Owner with unrestricted access — the shape `createTRPCContext` produces
+		 * for the accounts these cases seed, which carry the column default.
+		 */
+		role: "owner",
+		assignedProjectIds: null,
 		headers: new Headers(),
 	} as unknown as Parameters<typeof createCaller>[0]);
 }

@@ -492,12 +492,12 @@ The schema is push-based with no migrations directory; both test harnesses apply
 
 #### Automated
 
-- [x] 1.1 Schema applies cleanly to a populated database: `npm run db:push`
-- [x] 1.2 Type checking passes: `npm run typecheck`
-- [x] 1.3 Linting and formatting pass: `npm run check`
-- [x] 1.4 Unit tests pass: `npm run test:unit`
-- [x] 1.5 Integration tests pass unchanged: `npm run test:integration`
-- [x] 1.6 A new unit test asserts every existing user row resolves as `owner` when `role` is unset
+- [x] 1.1 Schema applies cleanly to a populated database: `npm run db:push` — f8d06ac
+- [x] 1.2 Type checking passes: `npm run typecheck` — f8d06ac
+- [x] 1.3 Linting and formatting pass: `npm run check` — f8d06ac
+- [x] 1.4 Unit tests pass: `npm run test:unit` — f8d06ac
+- [x] 1.5 Integration tests pass unchanged: `npm run test:integration` — f8d06ac
+- [x] 1.6 A new unit test asserts every existing user row resolves as `owner` when `role` is unset — f8d06ac
 
 #### Manual
 
@@ -508,12 +508,12 @@ The schema is push-based with no migrations directory; both test harnesses apply
 
 #### Automated
 
-- [ ] 2.1 Type checking passes: `npm run typecheck`
-- [ ] 2.2 Linting passes: `npm run check`
-- [ ] 2.3 Unit tests pass: `npm run test:unit`
-- [ ] 2.4 Integration tests pass, including the new matrix: `npm run test:integration`
-- [ ] 2.5 The isolation completeness guard passes with every new procedure classified
-- [ ] 2.6 Deliberate-break check: removing one `assertProjectAccess` call fails the within-tenant matrix by name
+- [x] 2.1 Type checking passes: `npm run typecheck`
+- [x] 2.2 Linting passes: `npm run check`
+- [x] 2.3 Unit tests pass: `npm run test:unit`
+- [x] 2.4 Integration tests pass, including the new matrix: `npm run test:integration`
+- [x] 2.5 The isolation completeness guard passes with every new procedure classified
+- [x] 2.6 Deliberate-break check: removing one `assertProjectAccess` call fails the within-tenant matrix by name
 
 #### Manual
 

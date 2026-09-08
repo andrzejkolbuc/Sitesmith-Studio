@@ -87,6 +87,9 @@ function callerFor(userId: string, tenantId: string) {
 		db,
 		session: { user: { id: userId }, expires: "" },
 		tenantId,
+		/** Owner with unrestricted project access — the shape these seeds produce. */
+		role: "owner",
+		assignedProjectIds: null,
 		headers: new Headers(),
 	} as unknown as Parameters<typeof createCaller>[0]);
 }
@@ -281,8 +284,13 @@ describe("run comparison over two real crawls", () => {
 		await expect(intruder.project.comparison({ runId })).rejects.toMatchObject({
 			code: "NOT_FOUND",
 		});
-		expect(await intruder.project.runs({ projectId: a.project.id })).toEqual(
-			[],
-		);
+		/**
+		 * Answered empty until project-level access arrived — the rows were tenant
+		 * scoped, but nothing established that the project existed for the caller.
+		 * It now refuses, matching `comparison` above.
+		 */
+		await expect(
+			intruder.project.runs({ projectId: a.project.id }),
+		).rejects.toMatchObject({ code: "NOT_FOUND" });
 	});
 });

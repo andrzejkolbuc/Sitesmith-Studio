@@ -94,6 +94,9 @@ function callerFor(userId: string, tenantId: string) {
 		db,
 		session: { user: { id: userId }, expires: "" },
 		tenantId,
+		/** Owner with unrestricted project access — the shape these seeds produce. */
+		role: "owner",
+		assignedProjectIds: null,
 		headers: new Headers(),
 	} as unknown as Parameters<typeof createCaller>[0]);
 }

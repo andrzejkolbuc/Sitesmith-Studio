@@ -3,10 +3,13 @@ import { and, count, desc, eq, inArray, isNotNull, lt } from "drizzle-orm";
 import { z } from "zod";
 
 import {
+	assertProjectAccess,
 	createTRPCRouter,
+	ownerProcedure,
 	tenantProcedure,
 	tenantScope,
 } from "~/server/api/trpc";
+import { canRunChecks } from "~/server/auth/roles";
 import { comparability, compareFindings } from "~/server/crawl/comparison";
 import { MAX_MASKS, MAX_SELECTOR_LENGTH } from "~/server/crawl/masks";
 import { RunAlreadyActiveError, startRun } from "~/server/crawl/run";
@@ -42,9 +45,27 @@ import {
 const TREND_RUN_LIMIT = 12;
 
 export const projectRouter = createTRPCRouter({
+	/**
+	 * The one procedure whose result set differs for all three roles.
+	 *
+	 * An Owner sees the tenant; everyone else sees what they were assigned. The
+	 * empty case is returned early rather than folded into the query, because
+	 * `inArray(column, [])` is not reliably an empty result across drivers — and
+	 * getting that wrong here would turn "assigned to nothing" into "assigned to
+	 * everything", which is the one mistake in this file that would be silent.
+	 */
 	list: tenantProcedure.query(async ({ ctx }) => {
+		const assigned = ctx.assignedProjectIds;
+		if (assigned !== null && assigned.length === 0) return [];
+
 		return ctx.db.query.projects.findMany({
-			where: tenantScope(projects, ctx.tenantId),
+			where:
+				assigned === null
+					? tenantScope(projects, ctx.tenantId)
+					: and(
+							tenantScope(projects, ctx.tenantId),
+							inArray(projects.id, assigned),
+						),
 			orderBy: (project, { asc }) => [asc(project.name)],
 		});
 	}),
@@ -52,6 +73,8 @@ export const projectRouter = createTRPCRouter({
 	byId: tenantProcedure
 		.input(z.object({ projectId: z.string() }))
 		.query(async ({ ctx, input }) => {
+			await assertProjectAccess(ctx, input.projectId);
+
 			const project = await ctx.db.query.projects.findFirst({
 				where: and(
 					tenantScope(projects, ctx.tenantId),
@@ -62,7 +85,7 @@ export const projectRouter = createTRPCRouter({
 			return project;
 		}),
 
-	create: tenantProcedure
+	create: ownerProcedure
 		.input(
 			z.object({
 				name: z.string().min(1).max(255),
@@ -102,6 +125,21 @@ export const projectRouter = createTRPCRouter({
 	startRun: tenantProcedure
 		.input(z.object({ projectId: z.string() }))
 		.mutation(async ({ ctx, input }) => {
+			/**
+			 * Reachability first, capability second, and the order matters. A caller
+			 * who cannot reach the project gets `NOT_FOUND` and learns nothing;
+			 * answering `FORBIDDEN` first would confirm the project exists to
+			 * somebody who should not know that.
+			 */
+			await assertProjectAccess(ctx, input.projectId);
+
+			if (!canRunChecks(ctx.role)) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "This account has read-only access to this project.",
+				});
+			}
+
 			try {
 				return await startRun(ctx.db, {
 					tenantId: ctx.tenantId,
@@ -130,9 +168,11 @@ export const projectRouter = createTRPCRouter({
 	 * visually. A set that reshuffled under exactly the condition being hunted
 	 * would drop pages out of comparison silently.
 	 */
-	pinBaseline: tenantProcedure
+	pinBaseline: ownerProcedure
 		.input(z.object({ projectId: z.string(), runId: z.string() }))
 		.mutation(async ({ ctx, input }) => {
+			await assertProjectAccess(ctx, input.projectId);
+
 			const project = await ctx.db.query.projects.findFirst({
 				where: and(
 					tenantScope(projects, ctx.tenantId),
@@ -202,7 +242,7 @@ export const projectRouter = createTRPCRouter({
 	 * markup, which we do not have at this point — so a selector the browser
 	 * cannot parse is caught at capture and recorded there instead.
 	 */
-	setMasks: tenantProcedure
+	setMasks: ownerProcedure
 		.input(
 			z.object({
 				projectId: z.string(),
@@ -217,6 +257,8 @@ export const projectRouter = createTRPCRouter({
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
+			await assertProjectAccess(ctx, input.projectId);
+
 			const [updated] = await ctx.db
 				.update(projects)
 				.set({ maskSelectors: input.selectors })
@@ -235,6 +277,8 @@ export const projectRouter = createTRPCRouter({
 	latestRun: tenantProcedure
 		.input(z.object({ projectId: z.string() }))
 		.query(async ({ ctx, input }) => {
+			await assertProjectAccess(ctx, input.projectId);
+
 			return (
 				(await ctx.db.query.runs.findFirst({
 					where: and(
@@ -253,6 +297,7 @@ export const projectRouter = createTRPCRouter({
 				where: and(tenantScope(runs, ctx.tenantId), eq(runs.id, input.runId)),
 			});
 			if (!run) throw new TRPCError({ code: "NOT_FOUND" });
+			await assertProjectAccess(ctx, run.projectId);
 			return run;
 		}),
 
@@ -268,6 +313,7 @@ export const projectRouter = createTRPCRouter({
 				where: and(tenantScope(runs, ctx.tenantId), eq(runs.id, input.runId)),
 			});
 			if (!run) throw new TRPCError({ code: "NOT_FOUND" });
+			await assertProjectAccess(ctx, run.projectId);
 
 			return ctx.db.query.findings.findMany({
 				where: and(
@@ -288,6 +334,8 @@ export const projectRouter = createTRPCRouter({
 	runs: tenantProcedure
 		.input(z.object({ projectId: z.string() }))
 		.query(async ({ ctx, input }) => {
+			await assertProjectAccess(ctx, input.projectId);
+
 			return ctx.db.query.runs.findMany({
 				where: and(
 					tenantScope(runs, ctx.tenantId),
@@ -313,6 +361,7 @@ export const projectRouter = createTRPCRouter({
 				where: and(tenantScope(runs, ctx.tenantId), eq(runs.id, input.runId)),
 			});
 			if (!run) throw new TRPCError({ code: "NOT_FOUND" });
+			await assertProjectAccess(ctx, run.projectId);
 
 			const current = await ctx.db.query.findings.findMany({
 				where: and(
@@ -389,6 +438,8 @@ export const projectRouter = createTRPCRouter({
 	trend: tenantProcedure
 		.input(z.object({ projectId: z.string() }))
 		.query(async ({ ctx, input }) => {
+			await assertProjectAccess(ctx, input.projectId);
+
 			const history = await ctx.db.query.runs.findMany({
 				where: and(
 					tenantScope(runs, ctx.tenantId),
@@ -468,6 +519,7 @@ export const projectRouter = createTRPCRouter({
 				where: and(tenantScope(runs, ctx.tenantId), eq(runs.id, input.runId)),
 			});
 			if (!run) throw new TRPCError({ code: "NOT_FOUND" });
+			await assertProjectAccess(ctx, run.projectId);
 
 			const observed = await ctx.db
 				.select({
@@ -519,6 +571,7 @@ export const projectRouter = createTRPCRouter({
 				where: and(tenantScope(runs, ctx.tenantId), eq(runs.id, input.runId)),
 			});
 			if (!run) throw new TRPCError({ code: "NOT_FOUND" });
+			await assertProjectAccess(ctx, run.projectId);
 
 			const rows = await ctx.db
 				.select({
@@ -579,6 +632,19 @@ export const projectRouter = createTRPCRouter({
 	runPages: tenantProcedure
 		.input(z.object({ runId: z.string() }))
 		.query(async ({ ctx, input }) => {
+			/**
+			 * The run is resolved here purely to have a project to authorise against.
+			 * Tenant scoping on `pages` was sufficient while tenant was the only
+			 * question; it cannot answer which project a caller may reach, because
+			 * `pages` carries no project id.
+			 */
+			const run = await ctx.db.query.runs.findFirst({
+				columns: { projectId: true },
+				where: and(tenantScope(runs, ctx.tenantId), eq(runs.id, input.runId)),
+			});
+			if (!run) throw new TRPCError({ code: "NOT_FOUND" });
+			await assertProjectAccess(ctx, run.projectId);
+
 			return ctx.db.query.pages.findMany({
 				where: and(
 					tenantScope(pages, ctx.tenantId),

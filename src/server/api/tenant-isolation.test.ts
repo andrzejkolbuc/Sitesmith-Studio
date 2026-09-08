@@ -4,6 +4,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "~/app/api/snapshots/[snapshotId]/route";
 import { appRouter, createCaller } from "~/server/api/root";
 import { auth } from "~/server/auth";
+import type { UserRole } from "~/server/auth/roles";
 import {
 	findings,
 	pageSnapshots,
@@ -48,11 +49,28 @@ const db = drizzle(connection, {
 	schema: { findings, pages, pageSnapshots, projects, runs, tenants, users },
 });
 
-function callerFor(userId: string, tenantId: string) {
+/**
+ * Defaults to an Owner with unrestricted project access, which is what every
+ * caller in this file is: the question here is cross-tenant leakage, and giving
+ * the intruder the *most* authority their own tenant can grant is the sharpest
+ * form of it. Within-tenant restriction is a different question, asserted in
+ * `within-tenant-access.test.ts`.
+ *
+ * `assignedProjectIds: null` means unrestricted, not "assigned to nothing" —
+ * see `createTRPCContext`.
+ */
+function callerFor(
+	userId: string,
+	tenantId: string,
+	role: UserRole = "owner",
+	assignedProjectIds: string[] | null = null,
+) {
 	return createCaller({
 		db,
 		session: { user: { id: userId }, expires: "" },
 		tenantId,
+		role,
+		assignedProjectIds,
 		headers: new Headers(),
 	} as unknown as Parameters<typeof createCaller>[0]);
 }

@@ -82,6 +82,9 @@ function callerFor(userId: string | null, tenantId: string | null) {
 		db,
 		session: userId ? { user: { id: userId }, expires: "" } : null,
 		tenantId,
+		/** Owner with unrestricted project access — the shape these seeds produce. */
+		role: "owner",
+		assignedProjectIds: null,
 		headers: new Headers(),
 	} as unknown as Parameters<typeof createCaller>[0]);
 }
@@ -847,10 +850,19 @@ describe("run procedures", () => {
 		).rejects.toMatchObject({
 			code: "NOT_FOUND",
 		});
-		expect(await intruder.project.runPages({ runId })).toEqual([]);
-		expect(
-			await intruder.project.latestRun({ projectId: a.project.id }),
-		).toBeNull();
+		/**
+		 * These two answered empty rather than refusing until project-level access
+		 * arrived: `runPages` scoped its rows by tenant but never established that
+		 * the run existed, and `latestRun` did the same for the project. Both now
+		 * resolve the project and refuse, which is the stricter answer and the one
+		 * the other procedures here already gave.
+		 */
+		await expect(intruder.project.runPages({ runId })).rejects.toMatchObject({
+			code: "NOT_FOUND",
+		});
+		await expect(
+			intruder.project.latestRun({ projectId: a.project.id }),
+		).rejects.toMatchObject({ code: "NOT_FOUND" });
 	});
 
 	it("creates a project and reads it back", async () => {

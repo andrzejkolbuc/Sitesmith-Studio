@@ -16,7 +16,7 @@ import { ZodError } from "zod";
 import { auth } from "~/server/auth";
 import { isOwner } from "~/server/auth/roles";
 import { db } from "~/server/db";
-import { projectAssignments, users } from "~/server/db/schema";
+import { projectAssignments, projects, users } from "~/server/db/schema";
 
 /**
  * 1. CONTEXT
@@ -249,3 +249,76 @@ export const tenantScope = <T extends { tenantId: PgColumn }>(
 	table: T,
 	tenantId: string,
 ) => eq(table.tenantId, tenantId);
+
+/**
+ * Owner-only procedure
+ *
+ * For anything that manages the tenant rather than uses it: creating projects,
+ * configuring what a check does, and managing who else may sign in.
+ *
+ * `FORBIDDEN` rather than `NOT_FOUND`, which is the opposite of what
+ * {@link assertProjectAccess} does, and the difference is deliberate. This
+ * refusal is about the *caller's* own capability — they know their own role, so
+ * concealing it protects nothing and only makes the failure harder to read.
+ * `assertProjectAccess` refuses on behalf of a resource, where concealment is
+ * the entire point.
+ */
+export const ownerProcedure = tenantProcedure.use(({ ctx, next }) => {
+	if (!isOwner(ctx.role)) {
+		throw new TRPCError({
+			code: "FORBIDDEN",
+			message: "This action is available to the workspace owner.",
+		});
+	}
+
+	return next();
+});
+
+/**
+ * The second authorization dimension, asked once per procedure.
+ *
+ * Tenant scoping answers *which agency*; this answers *which project within it*,
+ * and nothing in the tenant predicates has room for the second question. Rather
+ * than thread another term through every query in the router, procedures call
+ * this once — at the point they resolve a project or a run — and the existing
+ * `tenantScope` carries the rest.
+ *
+ * Two conditions, refused identically:
+ *
+ * 1. **Not assigned.** An Owner has `assignedProjectIds === null` and skips
+ *    this; everyone else must have the project in their list. Note that an empty
+ *    list refuses everything, which is correct — assigned to nothing means
+ *    reaching nothing.
+ * 2. **Not in the tenant, or not there at all.**
+ *
+ * Both throw a bare `NOT_FOUND`. A project the caller may not see is
+ * indistinguishable from one that does not exist, which is the answer the
+ * product already gives across tenants and the one that matters most here: a
+ * Client-viewer must not be able to learn that the agency has other clients.
+ *
+ * This also closes a gap that predates roles — `latestRun`, `runs`, `trend` and
+ * `runPages` took a project or run id and never checked the project existed at
+ * all, returning an empty result either way.
+ */
+export const assertProjectAccess = async (
+	ctx: {
+		db: typeof db;
+		tenantId: string;
+		assignedProjectIds: string[] | null;
+	},
+	projectId: string,
+): Promise<void> => {
+	if (
+		ctx.assignedProjectIds !== null &&
+		!ctx.assignedProjectIds.includes(projectId)
+	) {
+		throw new TRPCError({ code: "NOT_FOUND" });
+	}
+
+	const project = await ctx.db.query.projects.findFirst({
+		columns: { id: true },
+		where: and(tenantScope(projects, ctx.tenantId), eq(projects.id, projectId)),
+	});
+
+	if (!project) throw new TRPCError({ code: "NOT_FOUND" });
+};
