@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { canRunChecks, type UserRole } from "~/server/auth/roles";
 import type { FindingStatus } from "~/server/crawl/comparison";
 import { api } from "~/trpc/react";
 import {
@@ -156,9 +157,11 @@ function pathOf(url: unknown): string {
 export function RunPanel({
 	projectId,
 	expectedLocales,
+	role,
 }: {
 	projectId: string;
 	expectedLocales: string[];
+	role: UserRole;
 }) {
 	const [startError, setStartError] = useState<string | null>(null);
 	/**
@@ -328,6 +331,7 @@ export function RunPanel({
 				<button
 					className="rounded-sm bg-ink px-5 py-2.5 font-medium text-paper text-sm transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-35"
 					disabled={latestRun.isPending || latestActive || startRun.isPending}
+					hidden={!canRunChecks(role)}
 					onClick={() => startRun.mutate({ projectId })}
 					type="button"
 				>
@@ -425,7 +429,7 @@ export function RunPanel({
 			 * is where a project without a baseline learns it needs one.
 			 */}
 			{settled && selectedRunId ? (
-				<VisualPanel projectId={projectId} runId={selectedRunId} />
+				<VisualPanel projectId={projectId} role={role} runId={selectedRunId} />
 			) : null}
 
 			{settled && correlated.problems.length > 0 ? (

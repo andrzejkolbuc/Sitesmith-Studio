@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { currentAccount } from "~/server/auth/account";
 import { api } from "~/trpc/server";
 import { RunPanel } from "./run-panel";
 
@@ -17,6 +18,16 @@ export default async function ProjectPage({
 	params: Promise<{ id: string }>;
 }) {
 	const { id } = await params;
+
+	/**
+	 * Presentation only. The panel hides controls this role cannot use; every one
+	 * of them is refused server-side regardless.
+	 *
+	 * The layout has already established there is a session and a tenant, so a
+	 * null here would mean the account vanished mid-request.
+	 */
+	const account = await currentAccount();
+	if (!account) notFound();
 
 	let project: Awaited<ReturnType<typeof api.project.byId>>;
 	try {
@@ -95,7 +106,11 @@ export default async function ProjectPage({
 					) : null}
 				</dl>
 
-				<RunPanel expectedLocales={project.locales} projectId={project.id} />
+				<RunPanel
+					expectedLocales={project.locales}
+					projectId={project.id}
+					role={account.role}
+				/>
 			</div>
 		</main>
 	);

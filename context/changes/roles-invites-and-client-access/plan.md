@@ -536,12 +536,12 @@ The schema is push-based with no migrations directory; both test harnesses apply
 
 #### Automated
 
-- [x] 4.1 Type checking passes: `npm run typecheck`
-- [x] 4.2 Linting passes: `npm run check`
-- [x] 4.3 Unit tests pass, including the token contract: `npm run test:unit`
-- [x] 4.4 Integration tests pass, including the invite lifecycle: `npm run test:integration`
-- [x] 4.5 The isolation completeness guard passes with all four invite procedures classified
-- [x] 4.6 Deliberate-break check: removing the invite deletion from the accept transaction fails the single-use case
+- [x] 4.1 Type checking passes: `npm run typecheck` — 1af470a
+- [x] 4.2 Linting passes: `npm run check` — 1af470a
+- [x] 4.3 Unit tests pass, including the token contract: `npm run test:unit` — 1af470a
+- [x] 4.4 Integration tests pass, including the invite lifecycle: `npm run test:integration` — 1af470a
+- [x] 4.5 The isolation completeness guard passes with all four invite procedures classified — 1af470a
+- [x] 4.6 Deliberate-break check: removing the invite deletion from the accept transaction fails the single-use case — 1af470a
 
 #### Manual
 
@@ -553,12 +553,12 @@ The schema is push-based with no migrations directory; both test harnesses apply
 
 #### Automated
 
-- [ ] 5.1 Type checking passes: `npm run typecheck`
-- [ ] 5.2 Linting passes: `npm run check`
-- [ ] 5.3 Unit tests pass: `npm run test:unit`
-- [ ] 5.4 Integration tests pass: `npm run test:integration`
-- [ ] 5.5 End-to-end tests pass, including the new journey and the auto-enrolled `/team` route: `npm run test:e2e`
-- [ ] 5.6 Full suite green: `npm run test:all`
+- [x] 5.1 Type checking passes: `npm run typecheck`
+- [x] 5.2 Linting passes: `npm run check`
+- [x] 5.3 Unit tests pass: `npm run test:unit`
+- [x] 5.4 Integration tests pass: `npm run test:integration`
+- [x] 5.5 End-to-end tests pass, including the new journey and the auto-enrolled `/team` route: `npm run test:e2e`
+- [x] 5.6 Full suite green: `npm run test:all`
 
 #### Manual
 

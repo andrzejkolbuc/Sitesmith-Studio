@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { canConfigureProject, type UserRole } from "~/server/auth/roles";
 import { api } from "~/trpc/react";
 import {
 	changeShare,
@@ -32,9 +33,11 @@ const percent = (share: number): string =>
 
 export function VisualPanel({
 	projectId,
+	role,
 	runId,
 }: {
 	projectId: string;
+	role: UserRole;
 	runId: string;
 }) {
 	const data = api.project.runSnapshots.useQuery({ runId });
@@ -100,7 +103,7 @@ export function VisualPanel({
 						against. Pin a run you are happy with and every later run will
 						report which of its pages stopped looking like it.
 					</p>
-					{capturable ? (
+					{capturable && canConfigureProject(role) ? (
 						<button
 							className="mt-3 rounded-sm border border-rule px-3 py-1.5 font-mono text-ink text-xs hover:bg-sheet disabled:opacity-50"
 							disabled={pin.isPending}
@@ -178,7 +181,7 @@ export function VisualPanel({
 					 * has a baseline, and the thing they need to know is that this run
 					 * takes its place.
 					 */}
-					{capturable ? (
+					{capturable && canConfigureProject(role) ? (
 						<div className="mt-5 border-rule border-l-2 py-1 pl-4">
 							<button
 								className="rounded-sm border border-rule px-3 py-1.5 font-mono text-ink text-xs hover:bg-sheet disabled:opacity-50"
@@ -216,7 +219,14 @@ export function VisualPanel({
 			 * reader whose pictures are full of a rotating banner needs to say so
 			 * whether or not this particular run compared cleanly.
 			 */}
-			<Masks projectId={projectId} selectors={maskSelectors} />
+			{/*
+			 * Editing masks is project configuration, which the requirements reserve
+			 * to the owner. A team member runs checks; they do not change what a
+			 * check ignores.
+			 */}
+			{canConfigureProject(role) ? (
+				<Masks projectId={projectId} selectors={maskSelectors} />
+			) : null}
 		</section>
 	);
 }

@@ -1,16 +1,27 @@
 import Link from "next/link";
 
 import { auth, signOut } from "~/server/auth";
+import { currentAccount } from "~/server/auth/account";
+import { isOwner } from "~/server/auth/roles";
 import { api } from "~/trpc/server";
 
 export default async function ProjectsPage() {
 	/**
 	 * Scoping is not applied here. `project.list` runs on `tenantProcedure`, which
-	 * resolves the caller's tenant and filters server-side — a page that filtered
-	 * again would imply the API could be trusted to return too much.
+	 * resolves the caller's tenant, narrows to the caller's assigned projects, and
+	 * filters server-side — a page that filtered again would imply the API could
+	 * be trusted to return too much.
 	 */
 	const projects = await api.project.list();
 	const session = await auth();
+
+	/**
+	 * Read to decide what to render, never to decide what is allowed. Every
+	 * control hidden below is also refused server-side; hiding it only stops the
+	 * product offering an action it would then reject.
+	 */
+	const account = await currentAccount();
+	const owner = isOwner(account?.role);
 
 	return (
 		<main className="min-h-screen">
@@ -26,12 +37,23 @@ export default async function ProjectsPage() {
 					</div>
 
 					<div className="flex items-center gap-5">
-						<Link
-							className="rounded-sm bg-ink px-4 py-2 font-medium text-paper text-sm transition-opacity hover:opacity-85"
-							href="/projects/new"
-						>
-							New project
-						</Link>
+						{owner ? (
+							<Link
+								className="text-ink-faint text-sm underline-offset-4 hover:text-ink hover:underline"
+								href="/team"
+							>
+								People
+							</Link>
+						) : null}
+
+						{owner ? (
+							<Link
+								className="rounded-sm bg-ink px-4 py-2 font-medium text-paper text-sm transition-opacity hover:opacity-85"
+								href="/projects/new"
+							>
+								New project
+							</Link>
+						) : null}
 
 						<form
 							action={async () => {
@@ -56,18 +78,33 @@ export default async function ProjectsPage() {
 					 */
 					<div className="mt-14 max-w-prose">
 						<p className="font-display font-semibold text-2xl text-ink">
-							No projects yet
+							{owner ? "No projects yet" : "No projects assigned"}
 						</p>
-						<p className="mt-3 text-ink-soft text-sm leading-relaxed">
-							Add a client site and run a check against it to see which pages
-							are missing a language variant.
-						</p>
-						<Link
-							className="mt-6 inline-block rounded-sm bg-ink px-4 py-2 font-medium text-paper text-sm transition-opacity hover:opacity-85"
-							href="/projects/new"
-						>
-							Create your first project
-						</Link>
+						{owner ? (
+							<>
+								<p className="mt-3 text-ink-soft text-sm leading-relaxed">
+									Add a client site and run a check against it to see which
+									pages are missing a language variant.
+								</p>
+								<Link
+									className="mt-6 inline-block rounded-sm bg-ink px-4 py-2 font-medium text-paper text-sm transition-opacity hover:opacity-85"
+									href="/projects/new"
+								>
+									Create your first project
+								</Link>
+							</>
+						) : (
+							/**
+							 * The owner's empty state invites them to create something. For
+							 * everyone else that is the wrong instruction — they cannot
+							 * create projects, so being told to would read as a broken
+							 * button rather than as an explanation.
+							 */
+							<p className="mt-3 text-ink-soft text-sm leading-relaxed">
+								Nothing has been shared with this account yet. Ask the owner of
+								this workspace to assign you a project.
+							</p>
+						)}
 					</div>
 				) : (
 					<ul className="mt-2">
