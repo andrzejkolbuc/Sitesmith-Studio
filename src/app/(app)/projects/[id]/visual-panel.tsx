@@ -8,6 +8,7 @@ import {
 	differsMeaningfully,
 	orderSnapshots,
 	parseMaskSelectors,
+	regionOverlay,
 	type SnapshotRow,
 	uncomparedReason,
 	visualState,
@@ -60,6 +61,8 @@ export function VisualPanel({
 		byteSize: row.byteSize,
 		captureError: row.captureError,
 		expiredAt: row.expiredAt,
+		imageWidth: row.imageWidth,
+		imageHeight: row.imageHeight,
 		comparison: row.comparison ?? null,
 	}));
 
@@ -376,8 +379,14 @@ function Row({ row }: { row: SnapshotRow }) {
 								caption="Baseline"
 								src={`/api/snapshots/${row.id}?view=baseline`}
 							/>
+							{/*
+							 * The outlines ride on the picture the reader is already
+							 * looking at, so "where did it change" is answered without
+							 * fetching a second full-page image to find out.
+							 */}
 							<Figure
 								caption="This run"
+								regions={regionOverlay(row)}
 								src={`/api/snapshots/${row.id}?view=current`}
 							/>
 						</div>
@@ -393,20 +402,54 @@ function Row({ row }: { row: SnapshotRow }) {
 	);
 }
 
-function Figure({ caption, src }: { caption: string; src: string }) {
+function Figure({
+	caption,
+	regions = [],
+	src,
+}: {
+	caption: string;
+	/** Fractions of the picture, so they hold at whatever width it renders. */
+	regions?: { left: number; top: number; width: number; height: number }[];
+	src: string;
+}) {
 	return (
 		<figure className="min-w-0">
 			<figcaption className="font-mono text-ink-faint text-xs uppercase tracking-wider">
 				{caption}
 			</figcaption>
-			{/* biome-ignore lint/performance/noImgElement: a stored PNG served by our
-			    own route, not an asset the image optimiser can pre-process. */}
-			<img
-				alt={caption}
-				className="mt-1.5 w-full border border-rule"
-				loading="lazy"
-				src={src}
-			/>
+			<div className="relative mt-1.5">
+				{/* biome-ignore lint/performance/noImgElement: a stored PNG served by our
+				    own route, not an asset the image optimiser can pre-process. */}
+				<img
+					alt={caption}
+					className="w-full border border-rule"
+					loading="lazy"
+					src={src}
+				/>
+				{regions.map((region) => (
+					<span
+						aria-hidden="true"
+						className="pointer-events-none absolute border-2 border-mark"
+						key={`${region.left}-${region.top}-${region.width}-${region.height}`}
+						style={{
+							left: `${region.left * 100}%`,
+							top: `${region.top * 100}%`,
+							width: `${region.width * 100}%`,
+							height: `${region.height * 100}%`,
+						}}
+					/>
+				))}
+			</div>
+			{/*
+			 * The boxes are decoration over an image; the same information reaches a
+			 * reader who cannot see them as coordinates on the finding itself.
+			 */}
+			{regions.length > 0 ? (
+				<figcaption className="mt-1 text-ink-faint text-xs">
+					{regions.length} outlined{" "}
+					{regions.length === 1 ? "region" : "regions"}
+				</figcaption>
+			) : null}
 		</figure>
 	);
 }

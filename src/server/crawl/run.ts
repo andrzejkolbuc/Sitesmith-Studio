@@ -17,6 +17,7 @@ import { chooseRenderSample, countInboundLinks } from "./sample";
 import { inScopePath } from "./scope";
 import { groupVariants } from "./variants";
 import { compareSnapshots, type SnapshotComparison } from "./visual";
+import { MIN_CHANGED_SHARE } from "./visual-noise";
 
 /**
  * The run lifecycle.
@@ -422,23 +423,30 @@ async function execute(
 	const visual = new Map<string, SnapshotComparison>();
 
 	if (project.baselineRunId !== null && watched.length > 0) {
-		const columns = {
-			url: pages.url,
-			image: pageSnapshots.image,
-			viewportWidth: pageSnapshots.viewportWidth,
-			viewportHeight: pageSnapshots.viewportHeight,
-			maskSelectors: pageSnapshots.maskSelectors,
-		};
+		const baselineRunId = project.baselineRunId;
 
-		const load = async (id: string) =>
-			db
-				.select(columns)
+		/**
+		 * One page's picture from one run, fetched when that page is compared.
+		 *
+		 * Deliberately not two whole-run maps. A full-page PNG measured around two
+		 * megabytes on a real site, and there are up to `MAX_RENDERS` of them on
+		 * each side, so holding both sets would keep tens of megabytes resident for
+		 * the length of the loop — the same accumulation the capture sink exists to
+		 * avoid. Read one pair, compare it, let it go.
+		 */
+		const load = async (id: string, url: string) => {
+			const [row] = await db
+				.select({
+					image: pageSnapshots.image,
+					viewportWidth: pageSnapshots.viewportWidth,
+					viewportHeight: pageSnapshots.viewportHeight,
+					maskSelectors: pageSnapshots.maskSelectors,
+				})
 				.from(pageSnapshots)
 				.innerJoin(pages, eq(pages.id, pageSnapshots.pageId))
-				.where(eq(pageSnapshots.runId, id));
+				.where(and(eq(pageSnapshots.runId, id), eq(pages.url, url)));
 
-		const asImage = (row: Awaited<ReturnType<typeof load>>[number]) =>
-			row.image === null
+			return !row || row.image === null
 				? null
 				: {
 						image: row.image,
@@ -446,14 +454,12 @@ async function execute(
 						viewportHeight: row.viewportHeight,
 						maskSelectors: row.maskSelectors,
 					};
+		};
 
-		const before = new Map(
-			(await load(project.baselineRunId)).map((row) => [row.url, asImage(row)]),
-		);
-		const after = new Map(
-			(await load(runId)).map((row) => [row.url, asImage(row)]),
-		);
-
+		/**
+		 * Ids only, so this one may stay a map: it carries no bytes, and the loop
+		 * needs a row to write each comparison back onto.
+		 */
 		const currentIdByUrl = new Map(
 			(
 				await db
@@ -466,8 +472,8 @@ async function execute(
 
 		for (const url of watched) {
 			const comparison = compareSnapshots(
-				before.get(url) ?? null,
-				after.get(url) ?? null,
+				await load(baselineRunId, url),
+				await load(runId, url),
 			);
 			visual.set(url, comparison);
 
@@ -489,6 +495,13 @@ async function execute(
 								changedPixels: comparison.changedPixels,
 								comparedPixels: comparison.comparedPixels,
 								heightDelta: comparison.heightDelta,
+								/**
+								 * Carried onto the row so the panel can outline them over the
+								 * picture it already loaded. The alternative was the reader
+								 * fetching a whole second image to learn where to look.
+								 */
+								regions: comparison.regions,
+								regionsCapped: comparison.regionsCapped,
 							}
 						: { comparable: false, reason: comparison.reason },
 				})
@@ -620,7 +633,7 @@ async function execute(
 			/**
 			 * What the visual pass covered and what it measured against.
 			 *
-			 * Recorded even when there is no baseline:  is the
+			 * Recorded even when there is no baseline: `baselineRunId: null` is the
 			 * fact that this run had nothing to compare with, which is different
 			 * from the column being null and meaning nobody recorded anything.
 			 */
@@ -629,8 +642,21 @@ async function execute(
 				watched: watched.length,
 				captured: capturedCount,
 				compared: [...visual.values()].filter((v) => v.comparable).length,
+				/**
+				 * Counted on the same floor the rule and the panel use, from the same
+				 * constant. A page that moved by less than {@link MIN_CHANGED_SHARE}
+				 * did not differ — that is what the floor decides — and a summary
+				 * counting raw non-zero pixels would record two differing pages on a
+				 * site where the product reports none, which is the disagreement
+				 * `visual-noise.ts` exists to make impossible. It matters more here
+				 * than on screen: this number is written to the run row and cannot be
+				 * recomputed once the pictures expire.
+				 */
 				differing: [...visual.values()].filter(
-					(v) => v.comparable && v.changedPixels > 0,
+					(v) =>
+						v.comparable &&
+						v.comparedPixels > 0 &&
+						v.changedPixels / v.comparedPixels >= MIN_CHANGED_SHARE,
 				).length,
 				complete: render.complete,
 			},

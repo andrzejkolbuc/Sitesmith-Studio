@@ -2369,7 +2369,8 @@ export function detectMissingVariants(options: DetectOptions): Finding[] {
 		 * Below the floor we cannot attribute the difference to the site rather
 		 * than to our own rendering, so we do not. Measured on a real project: two
 		 * runs with nothing deployed between them still differ by up to 0.015% of
-		 * the compared area, invisible to a reader. See .
+		 * the compared area, invisible to a reader. See {@link MIN_CHANGED_SHARE}
+		 * in `visual-noise.ts` for the measurement and what the floor costs.
 		 *
 		 * Zero is the ordinary case this also covers — most pages on most deploys
 		 * are untouched, and saying so is what the whole slice is for.

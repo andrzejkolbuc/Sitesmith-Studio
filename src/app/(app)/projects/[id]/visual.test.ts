@@ -8,6 +8,7 @@ import {
 	differsMeaningfully,
 	orderSnapshots,
 	parseMaskSelectors,
+	regionOverlay,
 	type SnapshotRow,
 	uncomparedReason,
 	type VisualSummary,
@@ -33,6 +34,8 @@ function row(overrides: Partial<SnapshotRow> = {}): SnapshotRow {
 		byteSize: 120_000,
 		captureError: null,
 		expiredAt: null,
+		imageWidth: 1280,
+		imageHeight: 4000,
 		comparison: {
 			comparable: true,
 			changedPixels: 0,
@@ -557,5 +560,108 @@ describe("parseMaskSelectors", () => {
 
 	it("has no problem with an ordinary list", () => {
 		expect(parseMaskSelectors("#promo\n.ticker").problem).toBeNull();
+	});
+});
+
+/**
+ * Where to draw the boxes over the picture the reader already has.
+ *
+ * The property throughout is that a box is only offered when it can be placed
+ * honestly. Everything else here — no comparison, no dimensions, a difference
+ * below the floor — returns nothing, because a rectangle pointing at the wrong
+ * part of a page is worse than no rectangle.
+ */
+describe("region overlay", () => {
+	/** Enough changed pixels to clear MIN_CHANGED_SHARE on a 1,000,000px area. */
+	const changedPixels = Math.ceil(MIN_CHANGED_SHARE * 1_000_000) + 1;
+
+	function withRegions(
+		regions: { x: number; y: number; width: number; height: number }[],
+		overrides: Partial<SnapshotRow> = {},
+	) {
+		return row({
+			imageWidth: 1000,
+			imageHeight: 2000,
+			comparison: {
+				comparable: true,
+				changedPixels,
+				comparedPixels: 1_000_000,
+				regions,
+			},
+			...overrides,
+		});
+	}
+
+	it("places a box as fractions of the picture, not as pixels", () => {
+		expect(
+			regionOverlay(withRegions([{ x: 100, y: 400, width: 250, height: 200 }])),
+		).toEqual([{ left: 0.1, top: 0.2, width: 0.25, height: 0.1 }]);
+	});
+
+	it("offers a box for every region it was given", () => {
+		expect(
+			regionOverlay(
+				withRegions([
+					{ x: 0, y: 0, width: 100, height: 100 },
+					{ x: 500, y: 1000, width: 100, height: 100 },
+				]),
+			),
+		).toHaveLength(2);
+	});
+
+	/**
+	 * A page that moved by less than the floor is a page the rest of the section
+	 * calls unchanged. Outlining it would be this file disagreeing with the row
+	 * beside it about the same page.
+	 */
+	it("offers nothing for a difference below the noise floor", () => {
+		expect(
+			regionOverlay(
+				withRegions([{ x: 0, y: 0, width: 16, height: 16 }], {
+					comparison: {
+						comparable: true,
+						changedPixels: 1,
+						comparedPixels: 1_000_000,
+						regions: [{ x: 0, y: 0, width: 16, height: 16 }],
+					},
+				}),
+			),
+		).toEqual([]);
+	});
+
+	/** A run recorded before the boxes shipped has none, which is not zero. */
+	it("offers nothing where the run recorded no regions", () => {
+		expect(
+			regionOverlay(
+				row({
+					imageWidth: 1000,
+					imageHeight: 2000,
+					comparison: {
+						comparable: true,
+						changedPixels,
+						comparedPixels: 1_000_000,
+					},
+				}),
+			),
+		).toEqual([]);
+	});
+
+	it("offers nothing without dimensions to place the boxes against", () => {
+		expect(
+			regionOverlay(
+				withRegions([{ x: 0, y: 0, width: 100, height: 100 }], {
+					imageWidth: null,
+					imageHeight: null,
+				}),
+			),
+		).toEqual([]);
+	});
+
+	it("offers nothing where the pair refused", () => {
+		expect(
+			regionOverlay(
+				row({ comparison: { comparable: false, reason: "masks_differ" } }),
+			),
+		).toEqual([]);
 	});
 });

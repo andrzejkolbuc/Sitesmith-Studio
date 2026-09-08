@@ -8,6 +8,7 @@ import {
 	tenantScope,
 } from "~/server/api/trpc";
 import { comparability, compareFindings } from "~/server/crawl/comparison";
+import { MAX_MASKS, MAX_SELECTOR_LENGTH } from "~/server/crawl/masks";
 import { RunAlreadyActiveError, startRun } from "~/server/crawl/run";
 import {
 	findings,
@@ -205,7 +206,14 @@ export const projectRouter = createTRPCRouter({
 		.input(
 			z.object({
 				projectId: z.string(),
-				selectors: z.array(z.string().min(1).max(255)).max(50),
+				/**
+				 * Both bounds come from `masks.ts`, which the textarea's own check
+				 * also reads — so the button never stays enabled for a list this
+				 * would refuse, and never refuses one this would take.
+				 */
+				selectors: z
+					.array(z.string().min(1).max(MAX_SELECTOR_LENGTH))
+					.max(MAX_MASKS),
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {

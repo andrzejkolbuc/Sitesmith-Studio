@@ -630,6 +630,22 @@ export const pageSnapshots = createTable(
 					changedPixels: number;
 					comparedPixels: number;
 					heightDelta: number;
+					/**
+					 * Where the differences are, in the picture's own pixels, measured
+					 * from its top-left. Stored rather than recomputed for the reason
+					 * the counts beside them are: a reader looking at an old run must
+					 * see where it concluded the page changed, not where today's code
+					 * would put the boxes. Optional because runs recorded before the
+					 * boxes shipped have none, and an absent list is not an empty one.
+					 */
+					regions?: {
+						x: number;
+						y: number;
+						width: number;
+						height: number;
+					}[];
+					/** True when there were more regions than the cap reports. */
+					regionsCapped?: boolean;
 			  }
 			| { comparable: false; reason: string }
 		>(),

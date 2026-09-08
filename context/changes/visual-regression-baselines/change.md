@@ -1,7 +1,7 @@
 ---
 change_id: visual-regression-baselines
 title: Visual regression with baselines and masked regions
-status: implemented
+status: impl_reviewed
 created: 2026-09-06
 updated: 2026-09-08
 archived_at: null

@@ -1,8 +1,9 @@
-import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { GET } from "~/app/api/snapshots/[snapshotId]/route";
 import { appRouter, createCaller } from "~/server/api/root";
+import { auth } from "~/server/auth";
 import {
 	findings,
 	pageSnapshots,
@@ -54,6 +55,33 @@ function callerFor(userId: string, tenantId: string) {
 		tenantId,
 		headers: new Headers(),
 	} as unknown as Parameters<typeof createCaller>[0]);
+}
+
+/**
+ * The session the snapshot route reads, and nothing else.
+ *
+ * `~/server/auth` builds a NextAuth instance at import time, which needs a
+ * request context this test has no way to produce. Stubbing it substitutes only
+ * *who is calling* — the tenant lookup, the scoped query and the 404 are all
+ * the handler's own code running against the real schema.
+ */
+vi.mock("~/server/auth", () => ({ auth: vi.fn() }));
+
+/**
+ * Narrowed to what the handler actually reads. NextAuth's own `auth` is
+ * overloaded across four call shapes, and threading its return type through the
+ * stub would say nothing about this test beyond how that overload is declared.
+ */
+const mockedAuth = vi.mocked(auth) as unknown as {
+	mockResolvedValue: (session: { user: { id: string } } | null) => void;
+};
+
+function signedInAs(userId: string) {
+	mockedAuth.mockResolvedValue({ user: { id: userId } });
+}
+
+function signedOut() {
+	mockedAuth.mockResolvedValue(null);
 }
 
 /** A tenant with one of everything, so every read path has something to leak. */
@@ -420,28 +448,52 @@ describe("the classification above", () => {
  * query scoped to the reader's own tenant, so a foreign id matches nothing.
  */
 describe("the snapshot image route", () => {
-	it("cannot reach another tenant's snapshot by id", async () => {
+	/**
+	 * Driven through `GET` itself, not through a restatement of its query.
+	 *
+	 * The earlier version of this case asserted that a `pageSnapshots` lookup
+	 * scoped to the intruder's tenant found nothing — which is a property of the
+	 * query *the test* wrote, and would have kept passing if the handler had
+	 * dropped its own tenant predicate. The commitment is about what the surface
+	 * answers, so the surface is what gets asked.
+	 *
+	 * Only `auth()` is stubbed, and only to choose who is calling. The scoping
+	 * under test still runs against the real schema, which is the distinction
+	 * this file's opening note draws between a mock and a fixture.
+	 */
+	const request = (snapshotId: string, view?: string) =>
+		GET(
+			new Request(
+				`http://localhost/api/snapshots/${snapshotId}${view ? `?view=${view}` : ""}`,
+			),
+			{ params: Promise.resolve({ snapshotId }) },
+		);
+
+	it("answers 404 for another tenant's snapshot", async () => {
 		const victim = await seedTenant("route-victim");
 		const intruder = await seedTenant("route-intruder");
 
-		const found = await db.query.pageSnapshots.findFirst({
-			where: and(
-				eq(pageSnapshots.id, victim.snapshot.id),
-				eq(pageSnapshots.tenantId, intruder.tenant.id),
-			),
-		});
+		signedInAs(intruder.owner.id);
+		const refused = await request(victim.snapshot.id);
 
-		expect(found).toBeUndefined();
+		expect(refused.status).toBe(404);
 
-		/** And the same query for its rightful owner does find it, so the check
-		 * above is refusing rather than simply never matching anything. */
-		const mine = await db.query.pageSnapshots.findFirst({
-			where: and(
-				eq(pageSnapshots.id, victim.snapshot.id),
-				eq(pageSnapshots.tenantId, victim.tenant.id),
-			),
-		});
+		/**
+		 * And the rightful owner does get the bytes, so the check above is
+		 * refusing rather than simply never answering anything.
+		 */
+		signedInAs(victim.owner.id);
+		const allowed = await request(victim.snapshot.id);
 
-		expect(mine?.id).toBe(victim.snapshot.id);
+		expect(allowed.status).toBe(200);
+		expect(allowed.headers.get("content-type")).toBe("image/png");
+	});
+
+	it("answers 404 to a caller with no session", async () => {
+		const victim = await seedTenant("route-anon");
+
+		signedOut();
+
+		expect((await request(victim.snapshot.id)).status).toBe(404);
 	});
 });

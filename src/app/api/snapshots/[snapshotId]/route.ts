@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
 import { auth } from "~/server/auth";
-import { compareSnapshots, diffOverlay } from "~/server/crawl/visual";
+import { diffOverlay } from "~/server/crawl/visual";
 import { db } from "~/server/db";
 import {
 	pageSnapshots,
@@ -156,8 +156,13 @@ export async function GET(
 			}
 		: null;
 
-	if (!compareSnapshots(before, after).comparable) return notFound();
-
+	/**
+	 * One comparison, not two. `diffOverlay` runs the same `diff` a count would
+	 * and answers nothing on every refusal, so asking `compareSnapshots` first
+	 * bought only a second decode of both files, a second pixelmatch pass and a
+	 * region scan whose answer was thrown away — on a ten-thousand-pixel page,
+	 * hundreds of megabytes to learn what the null below already says.
+	 */
 	const overlay = diffOverlay(before, after);
 	if (!overlay) return notFound();
 

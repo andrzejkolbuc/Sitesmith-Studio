@@ -1,3 +1,4 @@
+import { MAX_MASKS, MAX_SELECTOR_LENGTH } from "~/server/crawl/masks";
 import { MIN_CHANGED_SHARE } from "~/server/crawl/visual-noise";
 
 /**
@@ -24,15 +25,53 @@ export type SnapshotRow = {
 	captureError: string | null;
 	/** Set when retention dropped the bytes. */
 	expiredAt: Date | null;
+	/** The picture's own dimensions, which the region outlines are drawn against. */
+	imageWidth: number | null;
+	imageHeight: number | null;
 	/**
 	 * How this page compares against the baseline, or null where the run made no
 	 * comparison for it.
 	 */
 	comparison:
-		| { comparable: true; changedPixels: number; comparedPixels: number }
+		| {
+				comparable: true;
+				changedPixels: number;
+				comparedPixels: number;
+				/** Absent on runs recorded before the outlines shipped. */
+				regions?: ChangedRegion[];
+				regionsCapped?: boolean;
+		  }
 		| { comparable: false; reason: string }
 		| null;
 };
+
+/**
+ * The outlines to draw over a page's current picture, as fractions of it.
+ *
+ * Fractions rather than pixels because the picture is rendered at whatever
+ * width the column happens to be, and a box measured in image pixels would
+ * drift off the thing it points at the moment the layout moved. Returns an
+ * empty list wherever the boxes cannot be placed honestly — no comparison, no
+ * regions recorded, or no dimensions to place them against — because a box in
+ * the wrong place is worse than no box.
+ */
+export function regionOverlay(
+	row: SnapshotRow,
+): { left: number; top: number; width: number; height: number }[] {
+	if (!row.comparison?.comparable) return [];
+	if (!row.imageWidth || !row.imageHeight) return [];
+	if (!differsMeaningfully(row)) return [];
+
+	const width = row.imageWidth;
+	const height = row.imageHeight;
+
+	return (row.comparison.regions ?? []).map((region) => ({
+		left: region.x / width,
+		top: region.y / height,
+		width: region.width / width,
+		height: region.height / height,
+	}));
+}
 
 export type VisualSummary = {
 	baselineRunId: string | null;
@@ -287,10 +326,6 @@ export function describeVisualChange(detail: Record<string, unknown>): {
 	};
 }
 
-/** The procedure's own limits, checked here so a reader hears them first. */
-const MAX_MASKS = 50;
-const MAX_SELECTOR_LENGTH = 255;
-
 /**
  * A textarea of masked regions, read as a list.
  *
@@ -299,9 +334,11 @@ const MAX_SELECTOR_LENGTH = 255;
  * things where the reader wrote one, and the reader would have no way to say
  * what they meant.
  *
- * The limits are `project.setMasks`'s. Repeating them here is not a second
- * validation of the same thing: the procedure's job is to refuse bad input, and
- * this one's is to tell the person typing what is wrong before they send it.
+ * Checking the limits here is not a second validation of the same thing: the
+ * procedure's job is to refuse bad input, and this one's is to tell the person
+ * typing what is wrong before they send it. The two roles differ; the numbers
+ * must not, so both read them from `masks.ts` rather than each writing them
+ * down.
  */
 export function parseMaskSelectors(text: string): {
 	selectors: string[];
