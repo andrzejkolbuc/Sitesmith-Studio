@@ -3,7 +3,7 @@ project: "Sitesmith-Studio"
 version: 1
 status: draft
 created: 2026-08-21
-updated: 2026-09-06
+updated: 2026-09-08
 prd_version: 1
 main_goal: market-feedback
 top_blocker: capacity
@@ -61,7 +61,7 @@ works.
 | S-07 | run-history-and-comparison      | compare a run against the previous one and see only what changed               | S-01             | US-02, FR-037, FR-038                                                                | done     |
 | S-08 | visual-regression-baselines     | set a baseline and see which pages changed visually, ignoring volatile regions | S-06, S-07       | US-02, FR-031, FR-032, FR-033, FR-034, FR-035                                        | done     |
 | S-09 | correlated-findings             | see one explained problem per underlying cause instead of many symptoms        | S-02, S-04, S-05 | US-01, FR-040                                                                        | done     |
-| S-10 | roles-invites-and-client-access | invite team members and client viewers, scoped to the right projects           | F-01             | FR-001, FR-003, FR-004, FR-005, FR-010, NFR-2                                        | proposed |
+| S-10 | roles-invites-and-client-access | invite team members and client viewers, scoped to the right projects           | F-01             | FR-001, FR-003, FR-004, FR-005, FR-010, NFR-2                                        | done     |
 | S-11 | client-readable-report          | generate a client-readable report from a stored run                            | S-09, S-10       | FR-041                                                                               | proposed |
 | S-12 | quality-trend-history           | see issue counts over time (scores half needs S-06)                            | S-07             | FR-039 (partly)                                                                      | done     |
 | S-13 | scheduled-and-staging-runs      | schedule recurring runs and check protected or staging environments            | F-02, S-01       | FR-042, FR-043                                                                       | proposed |
@@ -253,8 +253,8 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Unknowns:**
   - ~~How long is a snapshot kept?~~ Answered in PRD Open Question 5: the pinned baseline never expires; beyond it only the three most recent runs keep their images. Retention binds the bytes, not the history.
   - ~~With per-finding muting ruled out, are masked regions enough to keep visual noise tolerable?~~ **Answered for renderer noise, on a real project, measured twice.** It is not masks that solve it. With pixelmatch's anti-aliasing exclusion, two runs of an *unchanged* site still differ by 0.014–0.015% of the compared area (1,831 then 1,742 pixels of 12.3M), invisible to a reader — so the rule as first written fired on a site nobody touched. The fix is a measured noise floor, `MIN_CHANGED_SHARE = 0.05%`, at roughly three times the observed ceiling and reported in every finding so it can be argued with. Re-measured after: zero findings on an unchanged site. See `proof.md`. Masks remain the answer to *site* noise — carousels, rotating banners — and Open Question 2 stays open for the non-visual checks, which have neither mechanism.
-- **Risk:** The most expensive subsystem in the product and the one most likely to be abandoned, which is why it is sequenced late rather than early despite answering the user's most-stated pain. The retention answer removes the reason it was blocked, but not the reason it is last: it still needs S-06 (rendering) and S-07 (run comparison), neither of which is built.
-- **Status:** proposed
+- **Risk:** The most expensive subsystem in the product and the one most likely to be abandoned, which is why it is sequenced late rather than early despite answering the user's most-stated pain. The retention answer removed the reason it was blocked; S-06 (rendering) and S-07 (run comparison) are both built, and this shipped on top of them.
+- **Status:** done
 
 ### S-09: Correlated findings
 
@@ -279,7 +279,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Blockers:** —
 - **Unknowns:** —
 - **Risk:** Completes the account model F-01 opened. Sequenced deliberately late: no check the product performs needs roles to function, and the PRD flagged account work as the classic way this kind of project spends a month before checking a single page. Fully parallel with every checking slice, so it is available whenever capacity allows without ever sitting on the critical path.
-- **Status:** proposed
+- **Status:** done
 
 ### S-11: Client-readable report
 
@@ -350,9 +350,9 @@ Foundations below assume these are present and do NOT re-scaffold them.
 | S-05       | seo-metadata-checks             | SEO metadata checks                                         | done                  | Needs S-01. Best effort-to-value ratio         |
 | S-06       | browser-observed-checks         | Console errors, sampled performance, image weight           | done                  | Needs S-01. Introduces page rendering          |
 | S-07       | run-history-and-comparison      | Run history and run-over-run comparison                     | done                  | Needs S-01                                     |
-| S-08       | visual-regression-baselines     | Visual regression with baselines and masked regions         | no                    | Blocked — snapshot retention window            |
+| S-08       | visual-regression-baselines     | Visual regression with baselines and masked regions         | done                  | Needs S-06, S-07. FR-031 partly met            |
 | S-09       | correlated-findings             | Correlated findings — one explained problem per cause       | done                  | Needs S-02, S-04, S-05. The domain rule        |
-| S-10       | roles-invites-and-client-access | Roles, invites and client access                            | yes                   | Needs F-01. Parallel with all checking work    |
+| S-10       | roles-invites-and-client-access | Roles, invites and client access                            | done                  | Needs F-01. Parallel with all checking work    |
 | S-11       | client-readable-report          | Client-readable report from a stored run                    | no                    | Needs S-09, S-10                               |
 | S-12       | quality-trend-history           | Quality trend history                                       | done                  | Needs S-07. Counts half; scores need S-06      |
 | S-13       | scheduled-and-staging-runs      | Scheduled runs and staging environments                     | no                    | Needs F-02, S-01                               |
