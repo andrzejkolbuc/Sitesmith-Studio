@@ -4,9 +4,11 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "~/app/api/snapshots/[snapshotId]/route";
 import { appRouter, createCaller } from "~/server/api/root";
 import { auth } from "~/server/auth";
+import { hashInviteToken } from "~/server/auth/invite";
 import type { UserRole } from "~/server/auth/roles";
 import {
 	findings,
+	invites,
 	pageSnapshots,
 	pages,
 	projectAssignments,
@@ -49,6 +51,7 @@ const connection = postgres(databaseUrl, { max: 1 });
 const db = drizzle(connection, {
 	schema: {
 		findings,
+		invites,
 		pages,
 		pageSnapshots,
 		projectAssignments,
@@ -190,7 +193,21 @@ async function seedTenant(label: string) {
 		.returning();
 	if (!snapshot) throw new Error("snapshot insert returned nothing");
 
-	return { tenant, owner, project, run, page, finding, snapshot };
+	const [invite] = await db
+		.insert(invites)
+		.values({
+			tenantId: tenant.id,
+			email: `invitee-${label}@isolation.test`,
+			role: "viewer",
+			projectId: project.id,
+			tokenHash: hashInviteToken(`token-${label}`),
+			expiresAt: new Date(Date.now() + 60_000),
+			invitedByUserId: owner.id,
+		})
+		.returning();
+	if (!invite) throw new Error("invite insert returned nothing");
+
+	return { tenant, owner, project, run, page, finding, snapshot, invite };
 }
 
 type Seed = Awaited<ReturnType<typeof seedTenant>>;
@@ -280,6 +297,40 @@ const CASES: Record<string, Case> = {
 		kind: "foreign-id",
 		input: (victim) => ({ runId: victim.run.id }),
 	},
+	/**
+	 * The invite router is Owner-only, and the intruder here *is* an Owner — of
+	 * their own tenant. So these still exercise scope rather than role: the
+	 * builder lets them through, and the tenant predicate is what has to refuse.
+	 * Role refusal is asserted separately, in the invite router tests.
+	 */
+	"invite.issue": {
+		kind: "foreign-id",
+		input: (victim) => ({
+			email: "intruder-invitee@isolation.test",
+			role: "viewer" as const,
+			projectId: victim.project.id,
+		}),
+	},
+	"invite.revoke": {
+		kind: "foreign-id",
+		input: (victim) => ({ inviteId: victim.invite.id }),
+	},
+	"invite.assign": {
+		kind: "foreign-id",
+		input: (victim) => ({
+			userId: victim.owner.id,
+			projectId: victim.project.id,
+			assigned: true,
+		}),
+	},
+	"invite.list": {
+		kind: "no-tenant-input",
+		why: "takes no identifier; tenant scoping is asserted in the invite router tests",
+	},
+	"invite.members": {
+		kind: "no-tenant-input",
+		why: "takes no identifier; tenant scoping is asserted in the invite router tests",
+	},
 };
 
 /** Walks `caller.project.byId` from the string "project.byId". */
@@ -313,6 +364,8 @@ function fingerprints(victim: Seed): Array<[label: string, value: string]> {
 		["page url", victim.page.url],
 		["finding id", victim.finding.id],
 		["owner email", victim.owner.email ?? ""],
+		["invite id", victim.invite.id],
+		["invitee email", victim.invite.email],
 	];
 }
 

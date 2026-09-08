@@ -523,10 +523,10 @@ The schema is push-based with no migrations directory; both test harnesses apply
 
 #### Automated
 
-- [x] 3.1 Type checking passes: `npm run typecheck`
-- [x] 3.2 Linting passes: `npm run check`
-- [x] 3.3 Integration tests pass, including both new route cases: `npm run test:integration`
-- [x] 3.4 Deliberate-break check: removing the project term from the route makes the viewer-refusal case fail
+- [x] 3.1 Type checking passes: `npm run typecheck` — 5ae2808
+- [x] 3.2 Linting passes: `npm run check` — 5ae2808
+- [x] 3.3 Integration tests pass, including both new route cases: `npm run test:integration` — 5ae2808
+- [x] 3.4 Deliberate-break check: removing the project term from the route makes the viewer-refusal case fail — 5ae2808
 
 #### Manual
 
@@ -536,12 +536,12 @@ The schema is push-based with no migrations directory; both test harnesses apply
 
 #### Automated
 
-- [ ] 4.1 Type checking passes: `npm run typecheck`
-- [ ] 4.2 Linting passes: `npm run check`
-- [ ] 4.3 Unit tests pass, including the token contract: `npm run test:unit`
-- [ ] 4.4 Integration tests pass, including the invite lifecycle: `npm run test:integration`
-- [ ] 4.5 The isolation completeness guard passes with all four invite procedures classified
-- [ ] 4.6 Deliberate-break check: removing the invite deletion from the accept transaction fails the single-use case
+- [x] 4.1 Type checking passes: `npm run typecheck`
+- [x] 4.2 Linting passes: `npm run check`
+- [x] 4.3 Unit tests pass, including the token contract: `npm run test:unit`
+- [x] 4.4 Integration tests pass, including the invite lifecycle: `npm run test:integration`
+- [x] 4.5 The isolation completeness guard passes with all four invite procedures classified
+- [x] 4.6 Deliberate-break check: removing the invite deletion from the accept transaction fails the single-use case
 
 #### Manual
 
