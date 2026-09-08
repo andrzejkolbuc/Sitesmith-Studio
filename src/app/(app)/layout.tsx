@@ -46,7 +46,7 @@ export default async function AppLayout({
 	 * the token expired.
 	 */
 	const account = await db.query.users.findFirst({
-		columns: { tenantId: true },
+		columns: { tenantId: true, role: true },
 		where: eq(users.id, session.user.id),
 	});
 

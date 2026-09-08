@@ -23,8 +23,16 @@ declare module "next-auth" {
 	interface Session extends DefaultSession {
 		user: {
 			id: string;
-			// ...other properties
-			// role: UserRole;
+			/**
+			 * Nothing else belongs here, and `role` in particular does not.
+			 *
+			 * Sessions are JWTs and cannot be revoked, so any authorization claim
+			 * carried on one stays wrong until the token expires — demoting someone
+			 * or un-assigning a project would not take effect. Role and project
+			 * assignments are therefore re-read per request in `createTRPCContext`,
+			 * exactly as the tenant already is, and for exactly the same reason.
+			 * See the note above `createTRPCContext` in `~/server/api/trpc`.
+			 */
 		} & DefaultSession["user"];
 	}
 }

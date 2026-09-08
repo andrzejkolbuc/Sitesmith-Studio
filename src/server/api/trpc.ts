@@ -8,14 +8,15 @@
  */
 
 import { initTRPC, TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
 import { auth } from "~/server/auth";
+import { isOwner } from "~/server/auth/roles";
 import { db } from "~/server/db";
-import { users } from "~/server/db/schema";
+import { projectAssignments, users } from "~/server/db/schema";
 
 /**
  * 1. CONTEXT
@@ -47,19 +48,49 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 	 * becomes a refusal.
 	 */
 	const userId = session?.user?.id;
-	const tenantId = userId
-		? ((
-				await db.query.users.findFirst({
-					columns: { tenantId: true },
-					where: eq(users.id, userId),
-				})
-			)?.tenantId ?? null)
-		: null;
+	const account = userId
+		? await db.query.users.findFirst({
+				columns: { tenantId: true, role: true },
+				where: eq(users.id, userId),
+			})
+		: undefined;
+
+	const tenantId = account?.tenantId ?? null;
+	const role = account?.role ?? null;
+
+	/**
+	 * Which projects this caller may reach — or `null` meaning "every project in
+	 * the tenant", which is what an Owner gets.
+	 *
+	 * `null` is deliberately not the same as `[]`. An empty array is a real
+	 * answer: a Team-member who has been assigned nothing sees nothing. Conflating
+	 * the two would turn "assigned to no projects" into "unrestricted", which is
+	 * the one mistake in this file that would be silent.
+	 *
+	 * Resolved here for the same reason the tenant is, and at the same cost: it
+	 * cannot live in the session token, because sessions are unrevocable JWTs and
+	 * un-assigning someone would not take effect until their token expired. An
+	 * Owner still costs exactly one query — the branch below skips the second.
+	 */
+	const assignedProjectIds =
+		userId && tenantId && !isOwner(role)
+			? (
+					await db.query.projectAssignments.findMany({
+						columns: { projectId: true },
+						where: and(
+							eq(projectAssignments.userId, userId),
+							eq(projectAssignments.tenantId, tenantId),
+						),
+					})
+				).map((row) => row.projectId)
+			: null;
 
 	return {
 		db,
 		session,
 		tenantId,
+		role,
+		assignedProjectIds,
 		...opts,
 	};
 };

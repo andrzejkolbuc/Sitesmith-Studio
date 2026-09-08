@@ -8,6 +8,8 @@ import {
 } from "drizzle-orm/pg-core";
 import type { AdapterAccount } from "next-auth/adapters";
 
+import type { UserRole } from "../auth/roles.ts";
+
 /**
  * Raw bytes.
  *
@@ -82,6 +84,25 @@ export const users = createTable(
 		 * Do not "fix" this to NOT NULL without also handling adapter-created users.
 		 */
 		tenantId: d.varchar({ length: 255 }).references(() => tenants.id),
+		/**
+		 * What this person may do within their tenant — see `~/server/auth/roles`.
+		 *
+		 * Which *projects* they may reach is a different question with a different
+		 * answer: an Owner reaches all of them with no `projectAssignments` row
+		 * existing, while a Team-member or Client-viewer reaches exactly the rows
+		 * they have. Do not infer project access from this column alone.
+		 *
+		 * A database-level default rather than `$defaultFn`, for the same reason
+		 * `projects.maskSelectors` uses one: this column arrives on a table that
+		 * already has rows, and an application-side default leaves them violating
+		 * the constraint. Existing accounts were the only account, so `owner` is
+		 * both the safe default and the historically accurate one.
+		 */
+		role: d
+			.varchar({ length: 16 })
+			.$type<UserRole>()
+			.notNull()
+			.default("owner"),
 	}),
 	(t) => [index("user_tenant_id_idx").on(t.tenantId)],
 );
@@ -244,6 +265,70 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
 	}),
 	runs: many(runs),
 }));
+
+/**
+ * Which projects a non-Owner may reach.
+ *
+ * A join table, which the foundation slice ruled out for the user↔tenant edge on
+ * the grounds that it rebuilds the multi-agency capability the requirements cut.
+ * That ruling was about tenants. This edge is genuinely many-to-many — a
+ * Team-member is assigned to some projects and not others — and there is no way
+ * to express it as a column.
+ *
+ * **An Owner has no rows here.** Their access is implied by role, not enumerated,
+ * so creating a project never has to backfill memberships and a missed backfill
+ * can never silently remove the Owner's own access. A Client-viewer has exactly
+ * one row; a Team-member has zero or more.
+ *
+ * `tenantId` is stored rather than derived through `projectId`. It is redundant
+ * on paper, but without it this table cannot be passed to `tenantScope`, whose
+ * whole point is that a table lacking a tenant column fails to compile.
+ */
+export const projectAssignments = createTable(
+	"project_assignment",
+	(d) => ({
+		tenantId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => tenants.id),
+		userId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => users.id),
+		projectId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => projects.id),
+		createdAt: d
+			.timestamp({ withTimezone: true })
+			.$defaultFn(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	}),
+	(t) => [
+		primaryKey({ columns: [t.userId, t.projectId] }),
+		index("project_assignment_tenant_id_idx").on(t.tenantId),
+		index("project_assignment_user_id_idx").on(t.userId),
+		index("project_assignment_project_id_idx").on(t.projectId),
+	],
+);
+
+export const projectAssignmentsRelations = relations(
+	projectAssignments,
+	({ one }) => ({
+		tenant: one(tenants, {
+			fields: [projectAssignments.tenantId],
+			references: [tenants.id],
+		}),
+		user: one(users, {
+			fields: [projectAssignments.userId],
+			references: [users.id],
+		}),
+		project: one(projects, {
+			fields: [projectAssignments.projectId],
+			references: [projects.id],
+		}),
+	}),
+);
 
 /**
  * One execution of a check against a project.
@@ -752,6 +837,84 @@ export const findingsRelations = relations(findings, ({ one }) => ({
 export const tenantsRelations = relations(tenants, ({ many }) => ({
 	users: many(users),
 	projects: many(projects),
+}));
+
+/**
+ * A pending invitation.
+ *
+ * A row here *is* a pending invite. Acceptance and revocation both delete it, so
+ * there is no accepted/revoked status to interpret and no way for a consumed
+ * link to still read as pending. Single use is therefore a property of the
+ * schema rather than a rule the code has to remember.
+ *
+ * Not stored in `verificationTokens` despite that table existing and being
+ * unused: it has three columns and nowhere to put the role, the target project
+ * or the inviter, and it shares a `(identifier, token)` namespace that the
+ * Auth.js adapter would write to the moment an email provider is added.
+ *
+ * Only the digest of the token is kept — see `~/server/auth/invite`. A database
+ * dump, a log line or a stray backup therefore yields no usable invite link,
+ * which matters more here than elsewhere because the token grants an account.
+ */
+export const invites = createTable(
+	"invite",
+	(d) => ({
+		id: d
+			.varchar({ length: 255 })
+			.notNull()
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		tenantId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => tenants.id),
+		/**
+		 * Stored already normalised — trimmed and lowercased — because the account
+		 * this creates must be findable by the same spelling sign-in looks up. See
+		 * the normalisation note in `scripts/seed-owner.ts`.
+		 */
+		email: d.varchar({ length: 255 }).notNull(),
+		role: d.varchar({ length: 16 }).$type<UserRole>().notNull(),
+		/**
+		 * The project this invite grants access to.
+		 *
+		 * Required for a `viewer`, who exists only in relation to one project.
+		 * Optional for a `member`, where it means "assign them this project on
+		 * acceptance" and null means "assign them nothing yet". Never set for an
+		 * `owner`, who reaches every project by role.
+		 */
+		projectId: d.varchar({ length: 255 }).references(() => projects.id),
+		/** SHA-256 hex of the token. The token itself is never stored. */
+		tokenHash: d.varchar({ length: 64 }).notNull(),
+		expiresAt: d.timestamp({ withTimezone: true }).notNull(),
+		invitedByUserId: d
+			.varchar({ length: 255 })
+			.notNull()
+			.references(() => users.id),
+		createdAt: d
+			.timestamp({ withTimezone: true })
+			.$defaultFn(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	}),
+	(t) => [
+		uniqueIndex("invite_token_hash_uq").on(t.tokenHash),
+		index("invite_tenant_id_idx").on(t.tenantId),
+	],
+);
+
+export const invitesRelations = relations(invites, ({ one }) => ({
+	tenant: one(tenants, {
+		fields: [invites.tenantId],
+		references: [tenants.id],
+	}),
+	project: one(projects, {
+		fields: [invites.projectId],
+		references: [projects.id],
+	}),
+	invitedBy: one(users, {
+		fields: [invites.invitedByUserId],
+		references: [users.id],
+	}),
 }));
 
 export const verificationTokens = createTable(
