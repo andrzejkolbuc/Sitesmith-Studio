@@ -395,17 +395,17 @@ None. No schema change, no data migration. Runs predating the provenance columns
 
 #### Automated
 
-- [ ] 1.1 Type checking passes: `npm run typecheck`
-- [ ] 1.2 Linting passes: `npm run check`
-- [ ] 1.3 Unit tests pass: `npm run test:unit`
-- [ ] 1.4 Integration tests pass: `npm run test:integration`
-- [ ] 1.5 New coverage module has tests covering every nullable column's not-recorded state
+- [x] 1.1 Type checking passes: `npm run typecheck`
+- [x] 1.2 Linting passes: `npm run check`
+- [x] 1.3 Unit tests pass: `npm run test:unit`
+- [x] 1.4 Integration tests pass: `npm run test:integration`
+- [x] 1.5 New coverage module has tests covering every nullable column's not-recorded state
 
 #### Manual
 
 - [ ] 1.6 A run that hit the page ceiling no longer reads "Complete" in the badge
-- [ ] 1.7 A clean, fully-recorded run shows no coverage block at all
-- [ ] 1.8 The coverage block reads as a statement about the check, not as an error
+- [x] 1.7 A clean, fully-recorded run shows no coverage block at all
+- [x] 1.8 The coverage block reads as a statement about the check, not as an error
 
 ### Phase 2: Client vocabulary
 

@@ -15,6 +15,7 @@ import {
 	statusIndex,
 } from "./comparison-view";
 import { type CorrelatedProblem, correlate } from "./correlate";
+import { coverageSentences, runCoverage, runStatusLabel } from "./coverage";
 import { FINDING_LABEL } from "./finding-labels";
 import { buildParity, type Cell } from "./parity";
 import { Performance } from "./performance-table";
@@ -228,6 +229,17 @@ export function RunPanel({
 	const isActive = viewingLatest && latestActive;
 	const settled = Boolean(run) && !isActive;
 
+	/**
+	 * Coverage is read off the run row alone, so it is known as soon as the run
+	 * is — it does not wait on findings, pages or the comparison. That ordering
+	 * is deliberate: the reader should learn how much of their site was looked at
+	 * before the list of what was found starts arriving underneath it.
+	 */
+	const coverage = useMemo(
+		() => (run ? coverageSentences(runCoverage(run)) : []),
+		[run],
+	);
+
 	const findings = api.project.findings.useQuery(
 		{ runId: selectedRunId ?? "" },
 		{ enabled: settled },
@@ -344,7 +356,7 @@ export function RunPanel({
 							STATUS_STYLE[run.status] ?? STATUS_STYLE.queued
 						}`}
 					>
-						{STATUS_LABEL[run.status] ?? run.status}
+						{runStatusLabel(run, STATUS_LABEL)}
 						{isActive ? " …" : null}
 					</span>
 				) : null}
@@ -379,11 +391,33 @@ export function RunPanel({
 				</p>
 			) : null}
 
+			{/*
+			 * What this check covered, before what it found.
+			 *
+			 * Only the facts with no other surface: where the crawl stopped, what it
+			 * was scoped to, whether we know which checks ran. The sampled sections
+			 * state their own coverage further down, and saying it twice on one
+			 * screen trains the reader to skip both. Renders nothing for a run that
+			 * covered everything — a clean run must not be made to look qualified.
+			 */}
+			{run && !isActive && coverage.length > 0 ? (
+				<div className="mt-6 border-flag border-l-2 bg-flag-soft px-4 py-3">
+					{coverage.map((sentence) => (
+						<p
+							className="max-w-prose text-flag text-sm leading-relaxed [&+p]:mt-2"
+							key={sentence}
+						>
+							{sentence}
+						</p>
+					))}
+				</div>
+			) : null}
+
 			<RunHistory
 				onSelect={setPinnedRunId}
 				runs={history.data ?? []}
 				selectedRunId={selectedRunId}
-				statusLabel={STATUS_LABEL}
+				statusLabel={(historyRun) => runStatusLabel(historyRun, STATUS_LABEL)}
 				statusStyle={STATUS_STYLE}
 			/>
 

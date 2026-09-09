@@ -1,7 +1,7 @@
 ---
 change_id: client-readable-report
 title: Client-readable report
-status: planned
+status: implementing
 created: 2026-09-08
 updated: 2026-09-09
 archived_at: null

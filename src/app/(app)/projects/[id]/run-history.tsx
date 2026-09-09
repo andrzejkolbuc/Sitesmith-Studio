@@ -16,6 +16,13 @@ export type RunSummary = {
 	finishedAt: Date | null;
 	pagesCrawled: number;
 	findingsCount: number;
+	/**
+	 * Carried so the row's badge can say the same thing the panel's does. A run
+	 * that stopped at its page ceiling closes as `done`, and a history that calls
+	 * it "Complete" reintroduces the misread one row down from where it was fixed.
+	 */
+	crawlComplete: boolean | null;
+	reachedPageLimit: boolean | null;
 };
 
 function when(value: Date | null): string {
@@ -38,8 +45,14 @@ export function RunHistory({
 	runs: RunSummary[];
 	selectedRunId: string | null;
 	onSelect: (runId: string) => void;
-	/** Passed in rather than duplicated: the panel owns this vocabulary. */
-	statusLabel: Record<string, string>;
+	/**
+	 * Passed in rather than duplicated: the panel owns this vocabulary.
+	 *
+	 * A function rather than a map because the label is derived from the run's
+	 * completeness, not from its status alone — `done` is not the same claim on a
+	 * run that ran out of pages as on one that reached the end of the site.
+	 */
+	statusLabel: (run: RunSummary) => string;
 	statusStyle: Record<string, string>;
 }) {
 	if (runs.length < 2) return null;
@@ -80,7 +93,7 @@ export function RunHistory({
 										statusStyle[run.status] ?? statusStyle.queued
 									}`}
 								>
-									{statusLabel[run.status] ?? run.status}
+									{statusLabel(run)}
 								</span>
 
 								<span className="tnum font-mono text-ink-soft text-xs">
