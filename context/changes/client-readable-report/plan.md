@@ -395,27 +395,27 @@ None. No schema change, no data migration. Runs predating the provenance columns
 
 #### Automated
 
-- [x] 1.1 Type checking passes: `npm run typecheck`
-- [x] 1.2 Linting passes: `npm run check`
-- [x] 1.3 Unit tests pass: `npm run test:unit`
-- [x] 1.4 Integration tests pass: `npm run test:integration`
-- [x] 1.5 New coverage module has tests covering every nullable column's not-recorded state
+- [x] 1.1 Type checking passes: `npm run typecheck` — 9e468cc
+- [x] 1.2 Linting passes: `npm run check` — 9e468cc
+- [x] 1.3 Unit tests pass: `npm run test:unit` — 9e468cc
+- [x] 1.4 Integration tests pass: `npm run test:integration` — 9e468cc
+- [x] 1.5 New coverage module has tests covering every nullable column's not-recorded state — 9e468cc
 
 #### Manual
 
 - [ ] 1.6 A run that hit the page ceiling no longer reads "Complete" in the badge
-- [x] 1.7 A clean, fully-recorded run shows no coverage block at all
-- [x] 1.8 The coverage block reads as a statement about the check, not as an error
+- [x] 1.7 A clean, fully-recorded run shows no coverage block at all — 9e468cc
+- [x] 1.8 The coverage block reads as a statement about the check, not as an error — 9e468cc
 
 ### Phase 2: Client vocabulary
 
 #### Automated
 
-- [ ] 2.1 Type checking passes: `npm run typecheck`
-- [ ] 2.2 Linting passes: `npm run check`
-- [ ] 2.3 Unit tests pass: `npm run test:unit`
-- [ ] 2.4 Every `FINDING_TYPES` key has a client label and a non-empty client sentence
-- [ ] 2.5 No client-facing string contains banned jargon
+- [x] 2.1 Type checking passes: `npm run typecheck`
+- [x] 2.2 Linting passes: `npm run check`
+- [x] 2.3 Unit tests pass: `npm run test:unit`
+- [x] 2.4 Every `FINDING_TYPES` key has a client label and a non-empty client sentence
+- [x] 2.5 No client-facing string contains banned jargon
 
 #### Manual
 

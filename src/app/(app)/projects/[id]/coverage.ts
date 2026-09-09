@@ -220,6 +220,97 @@ export function coverageSentences(coverage: RunCoverage): string[] {
 }
 
 /**
+ * The same coverage, for someone who does not run the site.
+ *
+ * Wider than `coverageSentences` on purpose. That one leaves out what the
+ * sampled sections state for themselves, because on screen they are a few
+ * hundred pixels below it. A report is read on paper, where that co-location is
+ * gone and a section's coverage line can end up pages away from the numbers it
+ * qualifies — or, if the reader skims, never be reached at all. So the report's
+ * statement carries all of it, once, at the top.
+ *
+ * The operator register does not survive the move either. "No browser was
+ * available during this run" is candid and correct for a customer of this tool;
+ * to a client contact it is either meaningless or alarming, and neither reaction
+ * is the one the sentence is for.
+ */
+export function clientCoverageSentences(coverage: RunCoverage): string[] {
+	const out: string[] = [];
+
+	switch (coverage.crawl.kind) {
+		case "page_limit":
+			out.push(
+				"This check looked at as many pages as it is allowed to in one run, so your site is larger than what is described here. Some checks are held back on a partial pass, which means this report may show fewer problems than a full one would.",
+			);
+			break;
+		case "stopped_early":
+			out.push(
+				"This check ended before it had seen the whole site. Some checks are held back on a partial pass, which means this report may show fewer problems than a full one would.",
+			);
+			break;
+		case "not_recorded":
+			out.push(
+				"How much of the site this check reached was not recorded, so we cannot say what share of your site this describes.",
+			);
+			break;
+		case "whole_crawl":
+			out.push("This check looked at every page it could reach on the site.");
+			break;
+	}
+
+	if (coverage.scope.kind === "narrowed") {
+		out.push(
+			"This check was deliberately limited to part of the site, so pages outside that part are not described here.",
+		);
+	}
+
+	if (coverage.rules.kind === "not_recorded") {
+		out.push(
+			"Which checks ran was not recorded for this run. Where nothing is listed under a heading, we cannot tell you whether that means nothing was wrong or that we did not look.",
+		);
+	}
+
+	switch (coverage.sample.kind) {
+		case "sampled":
+			out.push(
+				`Speed and loading errors were measured on ${coverage.sample.measured} of ${coverage.sample.crawled} pages — a sample, not the whole site.`,
+			);
+			break;
+		case "unavailable":
+		case "nothing_measured":
+			out.push(
+				"Speed and loading errors could not be measured during this check, so nothing here describes them.",
+			);
+			break;
+		case "not_recorded":
+			break;
+	}
+
+	switch (coverage.pictures.kind) {
+		case "watched":
+			out.push(
+				`Appearance was compared on ${coverage.pictures.compared} of ${coverage.pictures.crawled} pages against a reference set earlier.`,
+			);
+			break;
+		case "no_baseline":
+			out.push(
+				"No reference pictures have been set for this site yet, so nothing here says whether its appearance has changed.",
+			);
+			break;
+		case "unavailable":
+		case "nothing_watched":
+			out.push(
+				"Appearance could not be compared during this check, so nothing here says whether it has changed.",
+			);
+			break;
+		case "not_recorded":
+			break;
+	}
+
+	return out;
+}
+
+/**
  * The run's status in the reader's words.
  *
  * Derived from completeness rather than read straight off `status`, because a
