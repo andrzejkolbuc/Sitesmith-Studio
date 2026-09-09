@@ -426,11 +426,11 @@ None. No schema change, no data migration. Runs predating the provenance columns
 
 #### Automated
 
-- [x] 3.1 Type checking passes: `npm run typecheck`
-- [x] 3.2 Linting passes: `npm run check`
-- [x] 3.3 Unit tests pass: `npm run test:unit`
-- [x] 3.4 Integration tests pass: `npm run test:integration`
-- [x] 3.5 E2E suite passes, including the auto-enrolled tenantless-account route test: `npm run test:e2e`
+- [x] 3.1 Type checking passes: `npm run typecheck` — 951d093
+- [x] 3.2 Linting passes: `npm run check` — 951d093
+- [x] 3.3 Unit tests pass: `npm run test:unit` — 951d093
+- [x] 3.4 Integration tests pass: `npm run test:integration` — 951d093
+- [x] 3.5 E2E suite passes, including the auto-enrolled tenantless-account route test: `npm run test:e2e` — 951d093
 
 #### Manual
 
