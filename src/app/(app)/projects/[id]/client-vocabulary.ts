@@ -183,7 +183,8 @@ export function clientSentence(finding: ClientFinding): string {
 
 		case "sitemap_url_failed": {
 			const entries = Array.isArray(d.entries) ? d.entries.length : null;
-			return `The list of pages this site submits to search engines includes ${these(entries, "address", "addresses")} that do not open, so search engines are sent to missing pages.`;
+			const verb = entries === 1 ? "does" : "do";
+			return `The list of pages this site submits to search engines includes ${these(entries, "address", "addresses")} that ${verb} not open, so search engines are sent to missing pages.`;
 		}
 
 		case "page_missing_from_sitemap": {
@@ -193,7 +194,8 @@ export function clientSentence(finding: ClientFinding): string {
 
 		case "robots_blocks_indexable": {
 			const pages = list(d.urls).length;
-			return `This site both asks search engines to ignore ${these(pages || null, "page", "pages")} and submits those same pages to be listed. The two instructions contradict each other.`;
+			const same = pages === 1 ? "that same page" : "those same pages";
+			return `This site both asks search engines to ignore ${these(pages || null, "page", "pages")} and submits ${same} to be listed. The two instructions contradict each other.`;
 		}
 
 		case "page_orphaned": {
@@ -226,7 +228,8 @@ export function clientSentence(finding: ClientFinding): string {
 				images !== null && of !== null
 					? `${images} of ${of} images`
 					: these(images, "image", "images");
-			return `${scope} on this page use older formats that take longer to download than they need to.`;
+			const verb = images === 1 ? "uses" : "use";
+			return `${scope} on this page ${verb} older formats that take longer to download than they need to.`;
 		}
 
 		case "image_oversized": {

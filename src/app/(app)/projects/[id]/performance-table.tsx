@@ -125,6 +125,40 @@ export function Performance({ runId }: { runId: string }) {
 	);
 }
 
+/**
+ * A shape as well as a colour.
+ *
+ * The band was carried by colour alone — same glyph, same weight, same format
+ * for good, needs-improvement and poor. Printed, or read by anyone who does not
+ * separate amber from red, the entire verdict collapsed into three identical
+ * grey numbers. Every other signal in this interface already pairs colour with a
+ * shape or a word: the parity grid has its glyphs, a new finding says "New".
+ * This was the one that did not.
+ */
+const BAND_MARK: Record<string, string> = {
+	good: "",
+	"needs-improvement": "△",
+	poor: "▲",
+	unmeasured: "",
+};
+
+const BAND_MEANING: Record<string, string> = {
+	"needs-improvement": "needs improvement",
+	poor: "poor",
+};
+
+function BandMark({ band }: { band: string }) {
+	const mark = BAND_MARK[band];
+	if (!mark) return null;
+
+	return (
+		<span className="ml-1 text-xs">
+			<span aria-hidden="true">{mark}</span>
+			<span className="sr-only">{BAND_MEANING[band]}</span>
+		</span>
+	);
+}
+
 function Row({ observation }: { observation: Observation }) {
 	const shift = parseCls(observation.cls);
 
@@ -150,6 +184,10 @@ function Row({ observation }: { observation: Observation }) {
 		);
 	}
 
+	const ttfbBand = bandFor("ttfbMs", observation.ttfbMs);
+	const lcpBand = bandFor("lcpMs", observation.lcpMs);
+	const clsBand = bandFor("cls", shift);
+
 	return (
 		<tr className="border-rule-soft border-b">
 			<th
@@ -160,19 +198,22 @@ function Row({ observation }: { observation: Observation }) {
 				{pathOf(observation.url)}
 			</th>
 			<td
-				className={`tnum px-2 py-2.5 text-right text-sm ${BAND_STYLE[bandFor("ttfbMs", observation.ttfbMs)]}`}
+				className={`tnum px-2 py-2.5 text-right text-sm ${BAND_STYLE[ttfbBand]}`}
 			>
 				{ms(observation.ttfbMs)}
+				<BandMark band={ttfbBand} />
 			</td>
 			<td
-				className={`tnum px-2 py-2.5 text-right text-sm ${BAND_STYLE[bandFor("lcpMs", observation.lcpMs)]}`}
+				className={`tnum px-2 py-2.5 text-right text-sm ${BAND_STYLE[lcpBand]}`}
 			>
 				{ms(observation.lcpMs)}
+				<BandMark band={lcpBand} />
 			</td>
 			<td
-				className={`tnum px-2 py-2.5 text-right text-sm ${BAND_STYLE[bandFor("cls", shift)]}`}
+				className={`tnum px-2 py-2.5 text-right text-sm ${BAND_STYLE[clsBand]}`}
 			>
 				{cls(shift)}
+				<BandMark band={clsBand} />
 			</td>
 			<td className="tnum px-2 py-2.5 text-right text-ink-soft text-sm">
 				{observation.firstPartyErrors === 0 ? (

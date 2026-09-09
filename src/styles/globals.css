@@ -83,3 +83,85 @@ body {
 		transition-duration: 0.01ms !important;
 	}
 }
+
+/**
+ * Paper.
+ *
+ * The report is the one view meant to leave the screen, and paper takes away
+ * three things the interface relies on: hover, the ability to expand something,
+ * and a viewport that scrolls in both directions. What is left has to carry the
+ * meaning on its own.
+ *
+ * Deliberately global rather than scoped to the report. The operator view can be
+ * printed too, and a page-break rule that only worked on one of them would be a
+ * rule nobody remembered to apply to the other.
+ */
+@media print {
+	/* Controls are dead affordances on paper, and the crawl's own configuration
+	   is not the reader's business. */
+	[data-no-print] {
+		/* biome-ignore lint/complexity/noImportantStyles: must outrank utility classes */
+		display: none !important;
+	}
+
+	/* A finding split across a page break loses the sentence that explains it
+	   from the pages it names. */
+	.report-block,
+	figure,
+	li,
+	tr {
+		break-inside: avoid;
+	}
+
+	/* A heading orphaned at the foot of a page introduces nothing. */
+	h1,
+	h2,
+	h3 {
+		break-after: avoid;
+	}
+
+	/* Tables and grids scroll sideways on screen; on paper an overflow container
+	   is silently clipped, with no indication anything was cut. */
+	.overflow-x-auto {
+		/* biome-ignore lint/complexity/noImportantStyles: must outrank the utility class it undoes */
+		overflow-x: visible !important;
+	}
+
+	table {
+		/* biome-ignore lint/complexity/noImportantStyles: must outrank a min-width utility */
+		width: 100% !important;
+		/* biome-ignore lint/complexity/noImportantStyles: must outrank a min-width utility */
+		min-width: 0 !important;
+	}
+
+	/* A truncated cell is recoverable on screen by hovering for the title. On
+	   paper it is simply gone. */
+	.truncate {
+		/* biome-ignore lint/complexity/noImportantStyles: must outrank the truncate utility */
+		overflow: visible !important;
+		/* biome-ignore lint/complexity/noImportantStyles: must outrank the truncate utility */
+		white-space: normal !important;
+		/* biome-ignore lint/complexity/noImportantStyles: must outrank the truncate utility */
+		max-width: none !important;
+	}
+
+	/* A full-page screenshot must not push everything after it onto its own
+	   sheet, and must not be cut in half by the page edge. */
+	img {
+		max-height: 22cm;
+		object-fit: contain;
+	}
+
+	/* Tinted notices carry meaning by their background; browsers drop those by
+	   default. The left rule survives regardless, so this is belt and braces. */
+	[data-coverage],
+	[class*="bg-flag-soft"],
+	[class*="bg-mark-soft"] {
+		print-color-adjust: exact;
+		-webkit-print-color-adjust: exact;
+	}
+
+	@page {
+		margin: 18mm 16mm;
+	}
+}

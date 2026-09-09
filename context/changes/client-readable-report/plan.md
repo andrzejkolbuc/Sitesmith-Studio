@@ -411,11 +411,11 @@ None. No schema change, no data migration. Runs predating the provenance columns
 
 #### Automated
 
-- [x] 2.1 Type checking passes: `npm run typecheck`
-- [x] 2.2 Linting passes: `npm run check`
-- [x] 2.3 Unit tests pass: `npm run test:unit`
-- [x] 2.4 Every `FINDING_TYPES` key has a client label and a non-empty client sentence
-- [x] 2.5 No client-facing string contains banned jargon
+- [x] 2.1 Type checking passes: `npm run typecheck` — baf745f
+- [x] 2.2 Linting passes: `npm run check` — baf745f
+- [x] 2.3 Unit tests pass: `npm run test:unit` — baf745f
+- [x] 2.4 Every `FINDING_TYPES` key has a client label and a non-empty client sentence — baf745f
+- [x] 2.5 No client-facing string contains banned jargon — baf745f
 
 #### Manual
 
@@ -426,11 +426,11 @@ None. No schema change, no data migration. Runs predating the provenance columns
 
 #### Automated
 
-- [ ] 3.1 Type checking passes: `npm run typecheck`
-- [ ] 3.2 Linting passes: `npm run check`
-- [ ] 3.3 Unit tests pass: `npm run test:unit`
-- [ ] 3.4 Integration tests pass: `npm run test:integration`
-- [ ] 3.5 E2E suite passes, including the auto-enrolled tenantless-account route test: `npm run test:e2e`
+- [x] 3.1 Type checking passes: `npm run typecheck`
+- [x] 3.2 Linting passes: `npm run check`
+- [x] 3.3 Unit tests pass: `npm run test:unit`
+- [x] 3.4 Integration tests pass: `npm run test:integration`
+- [x] 3.5 E2E suite passes, including the auto-enrolled tenantless-account route test: `npm run test:e2e`
 
 #### Manual
 

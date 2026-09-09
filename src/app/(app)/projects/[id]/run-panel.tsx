@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { canRunChecks, type UserRole } from "~/server/auth/roles";
@@ -349,6 +350,24 @@ export function RunPanel({
 				>
 					{latestActive ? "Check in progress…" : "Run a check"}
 				</button>
+
+				{/*
+				 * Offered for a settled run only. A report of a crawl still in progress
+				 * would describe a site by however much of it had been seen when the
+				 * page was printed, which is the one thing this slice exists to stop.
+				 *
+				 * Not gated on role: reading a report needs only access to the project,
+				 * which `assertProjectAccess` has already established for everything
+				 * on this page.
+				 */}
+				{settled && selectedRunId ? (
+					<Link
+						className="font-mono text-ink-soft text-xs underline underline-offset-4 hover:text-ink"
+						href={`/projects/${projectId}/report/${selectedRunId}`}
+					>
+						Client report →
+					</Link>
+				) : null}
 
 				{run ? (
 					<span
