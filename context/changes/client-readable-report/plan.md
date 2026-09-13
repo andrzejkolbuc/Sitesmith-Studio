@@ -403,7 +403,7 @@ None. No schema change, no data migration. Runs predating the provenance columns
 
 #### Manual
 
-- [ ] 1.6 A run that hit the page ceiling no longer reads "Complete" in the badge
+- [x] 1.6 A run that hit the page ceiling no longer reads "Complete" in the badge — verified 2026-09-13, reads "Stopped at page limit"
 - [x] 1.7 A clean, fully-recorded run shows no coverage block at all — 9e468cc
 - [x] 1.8 The coverage block reads as a statement about the check, not as an error — 9e468cc
 
@@ -419,8 +419,8 @@ None. No schema change, no data migration. Runs predating the provenance columns
 
 #### Manual
 
-- [ ] 2.6 Reading the 29 sentences end to end, they sound like one voice
-- [ ] 2.7 A non-technical reader could understand each one
+- [x] 2.6 Reading the 29 sentences end to end, they sound like one voice — verified 2026-09-13 after D-2 fixed
+- [x] 2.7 A non-technical reader could understand each one — verified 2026-09-13
 
 ### Phase 3: Report view
 
@@ -434,8 +434,71 @@ None. No schema change, no data migration. Runs predating the provenance columns
 
 #### Manual
 
-- [ ] 3.6 PDF has no clipped tables and no findings split mid-row across a page break
-- [ ] 3.7 Snapshot images appear in the PDF
-- [ ] 3.8 The performance verdict is readable in grayscale
-- [ ] 3.9 No operator chrome, dead buttons or crawl configuration in the printed output
-- [ ] 3.10 A truncated run's report states what was not covered, in client register
+- [x] 3.6 PDF has no clipped tables and no findings split mid-row across a page break — verified 2026-09-13 after D-1 fixed
+- [x] 3.7 Snapshot images appear in the PDF — verified 2026-09-13, baseline + current, unclipped
+- [x] 3.8 The performance verdict is readable in grayscale — verified 2026-09-13 (glyph carrier; the report itself carries no performance table)
+- [x] 3.9 No operator chrome, dead buttons or crawl configuration in the printed output — verified 2026-09-13
+- [x] 3.10 A truncated run's report states what was not covered, in client register — verified 2026-09-13
+
+## Defects found and fixed
+
+Found during the manual verification pass on 2026-09-13, and fixed in the same
+pass. Neither was caught by the automated suite, which is why both survived
+phases 1-3 green; the suite asserts that the report renders and carries its
+coverage statement, and says nothing about how it paginates or what language its
+date is in.
+
+### D-1: near-blank pages in the printed report (blocked 3.6) — fixed
+
+**Symptom.** In a 47-page report for `yazaki`, pages 9, 30 and 42 carry a finding
+heading and its `N instances` line and nothing else — the body starts on the next
+sheet. Roughly one sheet in fifteen is wasted, and the heading is orphaned from
+what it introduces, which is the exact failure `break-after: avoid` was added to
+prevent.
+
+**Cause.** `.report-block` carries `break-inside: avoid` and is applied to both the
+per-type `<article>` and the per-finding `<li>`. When a finding's `Pages involved`
+list runs to hundreds of URLs the block is taller than a sheet, so the browser
+first pushes the whole block to a fresh page to honour the rule, then breaks it
+anyway because it cannot fit. The push is what empties the preceding page.
+
+**Direction.** `break-inside: avoid` is right for a short finding and wrong for a
+long one. Scope it to blocks that can actually fit — e.g. keep it on the `<li>` but
+drop it from the `<article>`, and cap or omit it once `Pages involved` exceeds a
+page's worth of lines. `break-after: avoid` on the heading should stay.
+
+### D-2: report date renders in the server host's locale (blocked 2.6) — fixed
+
+**Symptom.** The report header reads `Checked 8 września 2026` — a Polish month
+name in a document that is otherwise entirely English.
+
+**Cause.** `formatDate` in `report/[runId]/page.tsx` calls
+`toLocaleDateString(undefined, …)`. The page is a server component, so `undefined`
+resolves to the *server host's* ICU locale, not the reader's and not the report's.
+This dev host is `pl-PL`; a container would likely be `en-US`. The rendered date is
+therefore both off-register and non-deterministic across environments.
+
+**Direction.** Pin the locale the rest of the report is written in (`en-GB` reads
+naturally with the existing `day month year` order). A reader-chosen locale would
+need the report's prose to be translated too, which is out of this slice's scope.
+
+### Resolution
+
+**D-1.** `break-inside: avoid` is now asked for only where the browser can grant
+it. The print block marks `.report-block` / `.report-line` / `figure` / `tr`
+instead of a bare `li`, which had been forcing every finding atomic regardless of
+size; the per-type `<article>` no longer claims atomicity at all; and a finding
+keeps it only while its address list is at or under `MAX_UNBROKEN_PAGES` (20). A
+longer finding is allowed to break, with `.report-lead` on its sentence so the
+sentence still meets the reader on the same sheet as the first addresses.
+
+Measured on the `yazaki` report: **47 pages with 3 near-blank → 40 pages with 0**.
+Short findings are still kept whole, and the snapshot figures still are.
+
+**D-2.** `formatDate` pins `en-GB` rather than passing `undefined`, which on a
+server component resolved to the host's ICU locale. The report now reads
+`Checked 4 September 2026` regardless of where it is rendered.
+
+**Verification after the fix:** `npm run typecheck`, `npm run check`,
+`npm run test:unit` (802), `npm run test:integration` (122) and
+`npm run test:e2e` (23) all pass.

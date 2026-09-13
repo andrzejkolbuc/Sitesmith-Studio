@@ -105,12 +105,25 @@ body {
 	}
 
 	/* A finding split across a page break loses the sentence that explains it
-	   from the pages it names. */
+	   from the pages it names.
+
+	   Marked explicitly rather than by element. A bare `li` selector also caught
+	   the finding items themselves, including ones listing hundreds of addresses:
+	   the browser pushed each to a fresh sheet to try to honour this, broke it
+	   anyway because it could not fit, and left the previous sheet empty. The
+	   report now asks for atomicity only on blocks that can fit one — see
+	   `MAX_UNBROKEN_PAGES` in the report page. */
 	.report-block,
+	.report-line,
 	figure,
-	li,
 	tr {
 		break-inside: avoid;
+	}
+
+	/* Where a finding is too long to keep whole, its sentence must still meet the
+	   reader on the same sheet as the first addresses it describes. */
+	.report-lead {
+		break-after: avoid;
 	}
 
 	/* A heading orphaned at the foot of a page introduces nothing. */

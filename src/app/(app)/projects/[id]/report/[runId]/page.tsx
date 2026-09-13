@@ -29,6 +29,24 @@ import { differsMeaningfully, orderSnapshots } from "../../visual";
  * group, so the session and tenant gate is structural, and every procedure it
  * calls runs `assertProjectAccess` for itself. It adds no procedure of its own.
  */
+/**
+ * How many addresses a finding may list and still be kept on one sheet.
+ *
+ * `break-inside: avoid` is an instruction the browser can only obey when the
+ * block fits a page. Handed one that does not, it first pushes the block to a
+ * fresh sheet to try, then breaks it anyway — and the sheet it left behind is
+ * empty. A findings report is exactly where that goes wrong: one
+ * `link_external_broken` finding can name five hundred pages, and asking for it
+ * whole cost three near-blank sheets in a forty-seven page document.
+ *
+ * So atomicity is asked for only where it can be granted. Twenty addresses is
+ * roughly a third of the printable height at this type size, which leaves the
+ * push affordable; past that the finding is allowed to break, and
+ * `.report-lead` keeps its sentence with the head of the list so the reader
+ * never meets addresses before the sentence explaining them.
+ */
+const MAX_UNBROKEN_PAGES = 20;
+
 export default async function ReportPage({
 	params,
 }: {
@@ -164,7 +182,7 @@ export default async function ReportPage({
 					) : (
 						<div className="mt-6 flex flex-col gap-10">
 							{[...groups].map(([type, items]) => (
-								<article className="report-block" key={type}>
+								<article key={type}>
 									<h3 className="font-display font-semibold text-ink text-lg">
 										{CLIENT_LABEL[type] ?? "Something to look at"}
 									</h3>
@@ -174,14 +192,30 @@ export default async function ReportPage({
 									</p>
 
 									<ul className="mt-4 flex flex-col gap-5">
-										{items.map((finding) => (
-											<li className="report-block" key={finding.id}>
-												<p className="max-w-prose text-ink text-sm leading-relaxed">
-													{clientSentence(finding)}
-												</p>
-												<Pages urls={pagesInvolved(finding)} />
-											</li>
-										))}
+										{items.map((finding) => {
+											/*
+											 * Deduplicated here rather than inside `Pages`, because
+											 * whether this finding fits on a sheet is a question about
+											 * the list the reader actually sees.
+											 */
+											const urls = [...new Set(pagesInvolved(finding))];
+
+											return (
+												<li
+													className={
+														urls.length <= MAX_UNBROKEN_PAGES
+															? "report-block"
+															: undefined
+													}
+													key={finding.id}
+												>
+													<p className="report-lead max-w-prose text-ink text-sm leading-relaxed">
+														{clientSentence(finding)}
+													</p>
+													<Pages urls={urls} />
+												</li>
+											);
+										})}
 									</ul>
 								</article>
 							))}
@@ -260,16 +294,15 @@ export default async function ReportPage({
  * the page doing the linking and the page that will not open — and without a
  * label the reader sees a number contradicting a list directly beneath it, then
  * distrusts both.
+ *
+ * Takes an already-deduplicated list. A page can hold both roles in one finding
+ * — for the duplicate rules the address that is wrong and the address that emits
+ * it are the same page — and listed twice it reads as two separate problems at
+ * one address. The caller does that collapsing because it also decides, from the
+ * same count, whether the finding can be kept whole on one sheet.
  */
 function Pages({ urls }: { urls: string[] }) {
-	/*
-	 * Deduplicated, because a page can hold both roles in one finding — the
-	 * address that is wrong and the address that emits it are the same page for
-	 * the duplicate rules. Listed twice it reads as two separate problems at one
-	 * address, which is the opposite of what the finding says.
-	 */
-	const unique = [...new Set(urls)];
-	if (unique.length === 0) return null;
+	if (urls.length === 0) return null;
 
 	return (
 		<div className="mt-2">
@@ -277,8 +310,11 @@ function Pages({ urls }: { urls: string[] }) {
 				Pages involved
 			</p>
 			<ul className="mt-1 flex flex-col gap-0.5">
-				{unique.map((url) => (
-					<li className="break-all font-mono text-ink-faint text-xs" key={url}>
+				{urls.map((url) => (
+					<li
+						className="report-line break-all font-mono text-ink-faint text-xs"
+						key={url}
+					>
 						{url}
 					</li>
 				))}
@@ -287,8 +323,21 @@ function Pages({ urls }: { urls: string[] }) {
 	);
 }
 
+/**
+ * The date the check ran, in the language the report is written in.
+ *
+ * Pinned rather than left to the host. This is a server component, so an
+ * undefined locale resolves to the *server's* ICU default — which made an
+ * otherwise English document read "Checked 8 września 2026" on a Polish
+ * workstation, and would have said something else again from a container. The
+ * date is part of the report's register, so it follows the prose rather than
+ * the machine that happened to render it.
+ *
+ * en-GB for its day-month-year order, which is what the surrounding sentences
+ * assume when they are read aloud.
+ */
 function formatDate(value: Date): string {
-	return new Date(value).toLocaleDateString(undefined, {
+	return new Date(value).toLocaleDateString("en-GB", {
 		day: "numeric",
 		month: "long",
 		year: "numeric",
