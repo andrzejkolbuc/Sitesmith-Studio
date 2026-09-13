@@ -1,10 +1,10 @@
 ---
 change_id: client-readable-report
 title: Client-readable report
-status: impl_reviewed
+status: archived
 created: 2026-09-08
 updated: 2026-09-13
-archived_at: null
+archived_at: 2026-09-13T21:37:50Z
 ---
 
 ## Notes

@@ -3,7 +3,7 @@ project: "Sitesmith-Studio"
 version: 1
 status: draft
 created: 2026-08-21
-updated: 2026-09-08
+updated: 2026-09-13
 prd_version: 1
 main_goal: market-feedback
 top_blocker: capacity
@@ -62,7 +62,7 @@ works.
 | S-08 | visual-regression-baselines     | set a baseline and see which pages changed visually, ignoring volatile regions | S-06, S-07       | US-02, FR-031, FR-032, FR-033, FR-034, FR-035                                        | done     |
 | S-09 | correlated-findings             | see one explained problem per underlying cause instead of many symptoms        | S-02, S-04, S-05 | US-01, FR-040                                                                        | done     |
 | S-10 | roles-invites-and-client-access | invite team members and client viewers, scoped to the right projects           | F-01             | FR-001, FR-003, FR-004, FR-005, FR-010, NFR-2                                        | done     |
-| S-11 | client-readable-report          | generate a client-readable report from a stored run                            | S-09, S-10       | FR-041                                                                               | proposed |
+| S-11 | client-readable-report          | generate a client-readable report from a stored run                            | S-09, S-10       | FR-041                                                                               | done     |
 | S-12 | quality-trend-history           | see issue counts over time (scores half needs S-06)                            | S-07             | FR-039 (partly)                                                                      | done     |
 | S-13 | scheduled-and-staging-runs      | schedule recurring runs and check protected or staging environments            | F-02, S-01       | FR-042, FR-043                                                                       | proposed |
 | S-14 | assisted-finding-prioritisation | have findings ranked by which matter most                                      | S-09             | FR-044                                                                               | proposed |
@@ -285,6 +285,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 
 - **Outcome:** User can generate a report from a stored run that a non-technical client contact can read.
 - **Change ID:** `client-readable-report`
+- **Status:** done
 - **PRD refs:** FR-041
 - **Prerequisites:** S-09, S-10
 - **Parallel with:** S-12, S-13, S-14
@@ -388,6 +389,8 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Observability tooling.** Why parked: no PRD requirement demands it, so no foundation opens for it. Revisit if operating scheduled runs proves opaque.
 
 ## Done
+
+- **S-11: User can generate a report from a stored run that a non-technical client contact can read.** — Archived 2026-09-13 → `context/archive/2026-09-08-client-readable-report/`. Lesson: a document that states coverage it never shows is worse than silence — the reader cannot tell a clean result from a missing one.
 
 - **S-06: User can see JavaScript console errors, Core Web Vitals and performance scores for a representative sample of pages, and image weight problems.** — Archived 2026-09-06 → `context/archive/2026-09-05-browser-observed-checks/`. FR-029 met; FR-015 and FR-028 partly met (rendered sample only, no composite score); FR-039's scores half now deliverable. Lesson: rendering is affordable at an absolute cap and only at an absolute cap — a sample defined by a formula measured 143 renders on a 533-page site.
 
