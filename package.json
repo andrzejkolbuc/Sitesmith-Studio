@@ -27,7 +27,8 @@
 		"test:integration": "vitest run --config vitest.integration.config.ts",
 		"test:unit": "vitest run --config vitest.unit.config.ts",
 		"test:watch": "vitest --config vitest.unit.config.ts",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"vault:mirror": "node scripts/mirror-context-to-vault.mjs"
 	},
 	"dependencies": {
 		"@auth/drizzle-adapter": "^1.7.2",
