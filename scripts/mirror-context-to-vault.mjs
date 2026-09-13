@@ -14,10 +14,11 @@
  *
  * The vault directory comes from OBSIDIAN_VAULT_DIR, or `--vault=<path>`.
  *
- * Output is deterministic from the commit being mirrored: same HEAD in, same
- * bytes out. Re-running on an unchanged repo writes nothing at all, which is
- * what makes `check` meaningful in the first place — any drift it reports is
- * real, not a timestamp that moved because the script ran again.
+ * Output is deterministic from the last commit that touched `context/` — not
+ * from HEAD, and not from the clock. Re-running writes nothing at all until the
+ * documents themselves change, which is what makes `check` meaningful in the
+ * first place: any drift it reports is real, rather than a stamp that moved
+ * because an unrelated commit landed or because the script ran again.
  *
  * The only transform applied to mirrored text is heading demotion, so that one
  * note has one H1 and Obsidian's outline stays navigable. `check` reverses it
@@ -625,9 +626,23 @@ function commitStamp(repo) {
 	try {
 		const run = (args) =>
 			execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
+		// The last commit that touched `context/`, not HEAD: stamping with HEAD
+		// would rewrite all 26 notes every time an unrelated commit landed, and
+		// the sha is meant to say which documents these are, not when it ran.
+		const commit = run(["log", "-1", "--format=%h", "--", "context/"]);
+		if (!commit) fail("no commit has touched `context/` yet.");
 		return {
-			commit: run(["rev-parse", "--short", "HEAD"]),
-			date: run(["log", "-1", "--format=%ad", "--date=format:%Y-%m-%d"]),
+			commit,
+			date: run([
+				"log",
+				"-1",
+				"--format=%ad",
+				"--date=format:%Y-%m-%d",
+				commit,
+			]),
+			// Uncommitted docs still get mirrored — they are the current truth —
+			// but the stamp would then name a commit that does not contain them.
+			dirty: run(["status", "--porcelain", "--", "context/"]).length > 0,
 		};
 	} catch {
 		fail(
@@ -644,6 +659,11 @@ if (!existsSync(join(repo, "context"))) {
 
 const vault = resolveVault();
 const stamp = commitStamp(repo);
+if (stamp.dirty) {
+	console.log(
+		`mirror: \`context/\` has uncommitted changes — the mirror will include them but is stamped \`${stamp.commit}\`, which does not.\n`,
+	);
+}
 const { notes, docs, changes } = buildNotes(repo, vault, stamp);
 const command =
 	process.argv[2] && !process.argv[2].startsWith("--")
