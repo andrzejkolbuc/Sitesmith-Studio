@@ -72,12 +72,47 @@ export async function GET(
 	 * capture. Reachable by id alone is exactly what this must not be.
 	 */
 	const snapshot = await db.query.pageSnapshots.findFirst({
+		/**
+		 * Metadata only. The bytes are the largest column in the schema and the
+		 * `view=baseline` path never touches them — it reads this row for its page
+		 * and run, then fetches a different row's picture entirely. Selecting the
+		 * whole row meant every baseline request in a report decoded a
+		 * multi-megabyte blob in order to throw it away, and a report asks for one
+		 * baseline per changed page.
+		 */
+		columns: {
+			runId: true,
+			pageId: true,
+			viewportWidth: true,
+			viewportHeight: true,
+			maskSelectors: true,
+		},
 		where: and(
 			eq(pageSnapshots.id, snapshotId),
 			eq(pageSnapshots.tenantId, user.tenantId),
 		),
 	});
 	if (!snapshot) return notFound();
+
+	/**
+	 * This snapshot's own picture, read only where it is actually returned.
+	 *
+	 * Scoped on the same tenant predicate as the row above, bound to a local
+	 * because the narrowing on `user.tenantId` does not survive into a closure.
+	 */
+	const tenantId = user.tenantId;
+	const ownImage = async (): Promise<Buffer | null> => {
+		const [row] = await db
+			.select({ image: pageSnapshots.image })
+			.from(pageSnapshots)
+			.where(
+				and(
+					eq(pageSnapshots.id, snapshotId),
+					eq(pageSnapshots.tenantId, tenantId),
+				),
+			);
+		return row?.image ?? null;
+	};
 
 	/**
 	 * Which project this picture belongs to, resolved before any bytes are
@@ -113,8 +148,9 @@ export async function GET(
 	}
 
 	if (view === "current") {
-		if (!snapshot.image) return notFound();
-		return new Response(new Uint8Array(snapshot.image), { headers: HEADERS });
+		const image = await ownImage();
+		if (!image) return notFound();
+		return new Response(new Uint8Array(image), { headers: HEADERS });
 	}
 
 	/**
@@ -176,9 +212,10 @@ export async function GET(
 		viewportHeight: baseline.viewportHeight,
 		maskSelectors: baseline.maskSelectors,
 	};
-	const after = snapshot.image
+	const currentImage = await ownImage();
+	const after = currentImage
 		? {
-				image: snapshot.image,
+				image: currentImage,
 				viewportWidth: snapshot.viewportWidth,
 				viewportHeight: snapshot.viewportHeight,
 				maskSelectors: snapshot.maskSelectors,

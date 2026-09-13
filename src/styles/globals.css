@@ -165,6 +165,24 @@ body {
 		object-fit: contain;
 	}
 
+	/* The two pictures stay side by side on paper regardless of the print
+	   viewport.
+
+	   `sm:grid-cols-2` is a screen breakpoint, and a narrow print width drops the
+	   figure to one column — two 22cm images stacked, which no sheet can hold. The
+	   `figure` rule above then does what a bare `li` selector used to do to
+	   findings: push the block to a fresh page, fail to fit it anyway, and leave
+	   the previous sheet near-empty. Bounding the height here is what keeps
+	   `break-inside: avoid` grantable on a figure. */
+	figure .grid {
+		/* biome-ignore lint/complexity/noImportantStyles: must outrank the responsive utility it pins */
+		grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+	}
+
+	figure img {
+		max-height: 11cm;
+	}
+
 	/* Tinted notices carry meaning by their background; browsers drop those by
 	   default. The left rule survives regardless, so this is belt and braces. */
 	[data-coverage],

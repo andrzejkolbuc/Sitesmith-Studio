@@ -1,13 +1,3 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
-
-import { api } from "~/trpc/server";
-import { CLIENT_LABEL, clientSentence } from "../../client-vocabulary";
-import { type AnnotatedRow, splitResolved } from "../../comparison-view";
-import { clientCoverageSentences, runCoverage } from "../../coverage";
-import { pagesInvolved } from "../../summarise";
-import { differsMeaningfully, orderSnapshots } from "../../visual";
-
 /**
  * One stored run, written for the client contact rather than the operator.
  *
@@ -29,6 +19,21 @@ import { differsMeaningfully, orderSnapshots } from "../../visual";
  * group, so the session and tenant gate is structural, and every procedure it
  * calls runs `assertProjectAccess` for itself. It adds no procedure of its own.
  */
+
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { api } from "~/trpc/server";
+import { CLIENT_LABEL, clientSentence } from "../../client-vocabulary";
+import { type AnnotatedRow, splitResolved } from "../../comparison-view";
+import { clientCoverageSentences, runCoverage } from "../../coverage";
+import { pagesInvolved } from "../../summarise";
+import {
+	differsMeaningfully,
+	orderSnapshots,
+	uncomparedReason,
+} from "../../visual";
+
 /**
  * How many addresses a finding may list and still be kept on one sheet.
  *
@@ -46,6 +51,24 @@ import { differsMeaningfully, orderSnapshots } from "../../visual";
  * never meets addresses before the sentence explaining them.
  */
 const MAX_UNBROKEN_PAGES = 20;
+
+/**
+ * How many addresses one finding may print before the report stops listing them.
+ *
+ * The no-caps rule is right and stays: "and 3 more" cannot be expanded once the
+ * document is on paper, so a truncated list is a promise the report cannot keep.
+ * But "no cap" and "no bound" are different things. One observed
+ * `link_external_broken` finding named five hundred and two pages, and the rule
+ * that produced it scales with the crawl — at the crawler's own two-thousand-page
+ * ceiling a handful of corpus-level findings would ask this page to serialise
+ * tens of thousands of nodes in a single server pass.
+ *
+ * So the list is never silently shortened; past this many addresses the report
+ * says plainly that it is not printing them and where to find them instead. That
+ * sentence is the honest version of a cap, and it is the only form of one this
+ * document's register allows.
+ */
+const MAX_LISTED_PAGES = 250;
 
 export default async function ReportPage({
 	params,
@@ -76,23 +99,30 @@ export default async function ReportPage({
 	 */
 	if (run.projectId !== project.id) notFound();
 
-	const [findings, pages, comparison, snapshots] = await Promise.all([
-		api.project.findings({ runId }),
-		api.project.runPages({ runId }),
+	/*
+	 * A run still going has nothing to report about a site, only about how far we
+	 * have got. The link that reaches this page already refuses to offer it, but a
+	 * link is not a gate: a bookmark or a forwarded URL arrives here regardless,
+	 * and what it would render is a document describing a site by however much of
+	 * it had been seen so far — the one thing this slice exists to stop. The
+	 * coverage statement cannot save it either, because `crawlComplete` is still
+	 * null mid-run and the sentence for that says only that we did not record it.
+	 */
+	if (run.status === "queued" || run.status === "running") notFound();
+
+	/*
+	 * `comparison` is the only source of findings here. Every one of its branches
+	 * returns the run's own findings — unannotated for a first run and for an
+	 * incomparable pair, annotated where the two runs could be compared — so a
+	 * separate `findings` call would re-read the same rows to produce a fallback
+	 * that can only fire when both are already empty.
+	 */
+	const [comparison, snapshots] = await Promise.all([
 		api.project.comparison({ runId }),
 		api.project.runSnapshots({ runId }),
 	]);
 
-	/*
-	 * The comparison leads where there is one, so a finding carries whether it is
-	 * new or was already there. Where the two runs were not comparable it returns
-	 * nothing, and the run's own findings stand in with no status — the report
-	 * says what is true now rather than refusing to say anything.
-	 */
-	const annotated: AnnotatedRow[] =
-		comparison.findings.length > 0
-			? comparison.findings
-			: findings.map((finding) => ({ ...finding, status: null }));
+	const annotated: AnnotatedRow[] = comparison.findings;
 
 	const { present, resolved } = splitResolved(annotated);
 	const coverage = clientCoverageSentences(runCoverage(run));
@@ -110,11 +140,50 @@ export default async function ReportPage({
 		else groups.set(finding.type, [finding]);
 	}
 
+	/** The same grouping for what is gone, where only the count is worth printing. */
+	const resolvedGroups = new Map<string, number>();
+	for (const finding of resolved) {
+		resolvedGroups.set(
+			finding.type,
+			(resolvedGroups.get(finding.type) ?? 0) + 1,
+		);
+	}
+
+	/*
+	 * Both halves of this matter, and only the second is about the site.
+	 *
+	 * `differsMeaningfully` reads the stored comparison and nothing else. Retention
+	 * takes a run's pictures away by nulling the bytes and stamping `expiredAt`,
+	 * and deliberately leaves the comparison in place so an expired picture stays
+	 * distinguishable from one that was never taken. A row in that state therefore
+	 * still answers "yes, this differs" — and the image route, having no bytes to
+	 * serve, answers every request for it with a 404. Printed, that is two broken
+	 * images per page, and it is certain rather than unlikely for any run older
+	 * than the retention window, which is exactly the run a handed-over document
+	 * gets re-opened from.
+	 */
 	const changed = orderSnapshots(snapshots.snapshots).filter(
-		differsMeaningfully,
+		(row) => uncomparedReason(row) === null && differsMeaningfully(row),
 	);
 
-	const pageCount = new Set(pages.map((page) => page.url)).size;
+	/*
+	 * True when the baseline was re-pinned after this run. The verdict beside each
+	 * picture was measured against the old reference, while the picture the route
+	 * serves for `view=baseline` is resolved against the project's current one —
+	 * so the two can disagree, and on paper the reader has no way to discover it.
+	 */
+	const supersededBaseline =
+		snapshots.summary !== null &&
+		snapshots.summary.baselineRunId !== snapshots.projectBaselineRunId;
+
+	/*
+	 * The run's own count, which is what the coverage sentences above already
+	 * divide by. Counting distinct URLs from `runPages` would mean reading every
+	 * page row of the run — up to the crawler's ceiling, each carrying its image
+	 * payload — to print a number that can then disagree with the one printed a
+	 * paragraph above it.
+	 */
+	const pageCount = run.pagesCrawled;
 
 	return (
 		<main className="min-h-screen">
@@ -229,7 +298,17 @@ export default async function ReportPage({
 							Pages that look different
 						</h2>
 						<p className="mt-2 max-w-prose text-ink-soft text-sm leading-relaxed">
-							Compared against the reference pictures set for this site.
+							{supersededBaseline
+								? /*
+									 * The reference has been replaced since this check ran, so the
+									 * "before" picture below is not the one the verdict was measured
+									 * against. Saying so is the only honest option on paper, where
+									 * the reader cannot click through to discover it — and it is a
+									 * fact about us, not about their site, so it is said plainly
+									 * rather than reported as a problem.
+									 */
+									"Compared against the reference pictures that were set for this site at the time of this check. Those reference pictures have since been replaced, so the earlier version shown below may not be the one this check compared against."
+								: "Compared against the reference pictures set for this site."}
 						</p>
 
 						<div className="mt-6 flex flex-col gap-10">
@@ -270,11 +349,22 @@ export default async function ReportPage({
 							this one.
 						</p>
 
+						{/*
+						 * Grouped and counted, for the same reason the section above is.
+						 * Listed one per finding, fifty resolved broken links print fifty
+						 * identical lines, and a reader with no way to tell them apart reads
+						 * fifty separate fixes where there was one.
+						 */}
 						<ul className="mt-6 flex flex-col gap-4">
-							{resolved.map((finding) => (
-								<li className="report-block" key={finding.id}>
+							{[...resolvedGroups].map(([type, count]) => (
+								<li className="report-block" key={type}>
 									<p className="max-w-prose text-ink-soft text-sm leading-relaxed">
-										{CLIENT_LABEL[finding.type] ?? "Something to look at"}
+										{CLIENT_LABEL[type] ?? "Something to look at"}
+										{count > 1 ? (
+											<span className="ml-2 font-mono text-ink-faint text-xs">
+												{count} instances
+											</span>
+										) : null}
 									</p>
 								</li>
 							))}
@@ -303,6 +393,27 @@ export default async function ReportPage({
  */
 function Pages({ urls }: { urls: string[] }) {
 	if (urls.length === 0) return null;
+
+	/*
+	 * Past the bound the list is not shortened — it is withdrawn, and the report
+	 * says so. A list cut to its first N with the rest implied is the "and 3 more"
+	 * this document refuses: on paper there is nothing to expand, and the reader
+	 * cannot tell a complete list from a trimmed one. Naming the count and where
+	 * the rest live is the one honest way to not print them.
+	 */
+	if (urls.length > MAX_LISTED_PAGES) {
+		return (
+			<div className="mt-2">
+				<p className="font-mono text-ink-faint text-xs uppercase tracking-wider">
+					Pages involved
+				</p>
+				<p className="mt-1 max-w-prose text-ink-soft text-sm leading-relaxed">
+					{urls.length} pages are affected — too many to list in a printed
+					report. Your developer can see the full list in the check itself.
+				</p>
+			</div>
+		);
+	}
 
 	return (
 		<div className="mt-2">

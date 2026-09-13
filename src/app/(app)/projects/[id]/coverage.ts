@@ -270,21 +270,18 @@ export function clientCoverageSentences(coverage: RunCoverage): string[] {
 		);
 	}
 
-	switch (coverage.sample.kind) {
-		case "sampled":
-			out.push(
-				`Speed and loading errors were measured on ${coverage.sample.measured} of ${coverage.sample.crawled} pages — a sample, not the whole site.`,
-			);
-			break;
-		case "unavailable":
-		case "nothing_measured":
-			out.push(
-				"Speed and loading errors could not be measured during this check, so nothing here describes them.",
-			);
-			break;
-		case "not_recorded":
-			break;
-	}
+	/*
+	 * Nothing about speed. The report has no speed section to qualify: the
+	 * measurements are TTFB, LCP and CLS, and there is no way to say those to a
+	 * client contact that is both true and useful — which is why
+	 * `client-vocabulary.ts` has no sentence for them and its test bans the terms
+	 * outright. A coverage line for a section that does not exist is worse than
+	 * silence: it tells the reader speed was looked at, then never says what was
+	 * found, and the reader cannot tell whether that means nothing was wrong.
+	 *
+	 * The operator's `coverageSentences` is unaffected — the results page does
+	 * show the measurements, and there the coverage line has something to qualify.
+	 */
 
 	switch (coverage.pictures.kind) {
 		case "watched":

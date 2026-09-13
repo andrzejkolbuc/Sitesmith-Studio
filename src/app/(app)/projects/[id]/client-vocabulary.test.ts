@@ -253,7 +253,15 @@ describe("clientCoverageSentences", () => {
 		);
 
 		expect(sentences[0]).toContain("every page it could reach");
-		expect(sentences.join(" ")).toContain("a sample, not the whole site");
+		expect(sentences.join(" ")).toContain("Appearance was compared");
+
+		/*
+		 * And says nothing about speed. The report has no speed section, because
+		 * there is no client-register sentence for TTFB, LCP or CLS — so a coverage
+		 * line claiming speed was measured would qualify a section that never
+		 * arrives, and the reader could not tell a clean result from a missing one.
+		 */
+		expect(sentences.join(" ")).not.toContain("Speed");
 	});
 
 	it("warns that a partial pass may show fewer problems, not fewer faults", () => {

@@ -502,3 +502,79 @@ server component resolved to the host's ICU locale. The report now reads
 **Verification after the fix:** `npm run typecheck`, `npm run check`,
 `npm run test:unit` (802), `npm run test:integration` (122) and
 `npm run test:e2e` (23) all pass.
+
+## Implementation review and its fixes
+
+Reviewed 2026-09-13 at `0998faf`; report in `reviews/impl-review.md`. Ten findings,
+all triaged and fixed. Three of them change decisions this plan recorded, so they
+are written back here rather than left only in the review.
+
+### The plan's own contract, amended
+
+**Speed coverage is no longer stated.** Phase 3 contracted the view to render from
+`runObservations` among others. It never did, and it should not: the measurements
+are TTFB, LCP and CLS, and Phase 2 deliberately built no client sentence for them —
+`client-vocabulary.test.ts` bans the terms outright. But `clientCoverageSentences`
+went on saying "Speed and loading errors were measured on N of M pages", qualifying
+a section that never arrives. A reader told speed was looked at, and then never told
+what was found, cannot tell a clean result from a missing one.
+
+So the sample-coverage sentences are gone from the client register. `runObservations`
+is struck from Phase 3's contract; the operator's `coverageSentences` is unchanged,
+because the results page does show the measurements and there the line has something
+to qualify.
+
+**The band carrier lives in the component, not the stylesheet.** Phase 3 asked for a
+non-colour carrier in the print CSS. It was implemented as a `BAND_MARK` glyph with
+`sr-only` text instead, which is better — it works on screen, serves colour-blind and
+screen-reader readers, and does not depend on a stylesheet being loaded. The plan
+entry is amended to match what shipped. `BAND_MARK`/`BAND_MEANING` now live in
+`performance.ts` beside `bandFor`, which is what makes them testable; four tests hold
+them.
+
+**`report-view.tsx` was never created, and will not be.** Phase 3 planned the tree as
+a separate file. The page is a server component with no client boundary, so the split
+would have bought a file and nothing else. Closed as cosmetic drift.
+
+### Defects fixed
+
+- **Expired snapshots printed as broken images** (critical). `differsMeaningfully`
+  reads the stored comparison only; retention nulls the bytes and stamps `expiredAt`
+  while deliberately keeping the comparison, so an expired row still answered "this
+  differs" and the image route answered its every request with a 404. Certain, not
+  unlikely, for any run older than the retention window — which is exactly the run a
+  handed-over document is re-opened from. Now gated on `uncomparedReason`, as
+  `visual-panel.tsx` already was.
+- **A superseded baseline was printed as if current.** `view=baseline` resolves
+  against the project's baseline *now*, while the verdict beside it came from the one
+  in force at run time. The caption now says so when they differ.
+- **The route defended none of its own preconditions.** A bookmarked URL rendered a
+  report of a still-running crawl; a transient query failure showed Next's unstyled
+  error page to a client contact. Now `notFound()` for `queued`/`running`, and an
+  `error.tsx` written in the report's own register.
+- **No bound of any kind.** The no-caps rule stays — "and 3 more" cannot be expanded
+  on paper — but past `MAX_LISTED_PAGES` the report now withdraws the list and says
+  it has, rather than attempting it. The snapshot route also stopped reading a
+  multi-megabyte blob on the `view=baseline` path that discards it.
+- **A redundant findings read and an unreachable fallback.** Every branch of the
+  `comparison` procedure returns the run's own findings, so the second query and its
+  ternary could only fire when both were already empty.
+- **Two page counts for one run.** The header counted distinct URLs from `runPages`
+  — every page row of the run, images payload included — while the coverage sentences
+  above it divided by `run.pagesCrawled`. Now one number.
+- **Fifty identical lines under "No longer reported."** Grouped and counted, as the
+  findings section above it already was.
+- **`figure` could still strand a sheet.** `sm:grid-cols-2` is a screen breakpoint; a
+  narrow print width stacked two 22cm images into a block no sheet could hold, which
+  is the D-1 shape again. Print CSS now pins the figure grid to two columns.
+
+### Tests added
+
+- A truncated run's report asserts the partial-coverage sentence end to end — the
+  Phase 3 contract item that was missing. The page-limit flag is written directly,
+  because the ceiling is two thousand pages and lowering it for a test would put a
+  test-only env var into shipped configuration.
+- A mismatched project/run pair asserts 404, guarding the one check that stands
+  between a valid run id and a document headed with the wrong client's name.
+- Four tests for `BAND_MARK`: distinct marks where action is needed, none where it is
+  not, a word for every marked band, and coverage of every band `bandFor` returns.

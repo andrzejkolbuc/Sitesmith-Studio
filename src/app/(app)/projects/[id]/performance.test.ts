@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+	BAND_MARK,
+	BAND_MEANING,
+	type Band,
 	bandFor,
 	type Observation,
 	orderObservations,
@@ -173,5 +176,45 @@ describe("orderObservations", () => {
 		orderObservations(input);
 
 		expect(input).toEqual(copy);
+	});
+});
+
+describe("BAND_MARK — the verdict without colour", () => {
+	/*
+	 * The table carries the band as a text colour. These assertions are what stop
+	 * that being the *only* carrier, which is the state the printed report and any
+	 * reader who does not separate amber from red would otherwise be left in.
+	 */
+	const BANDS: Band[] = ["good", "needs-improvement", "poor", "unmeasured"];
+
+	it("gives the two verdicts that need acting on distinct marks", () => {
+		expect(BAND_MARK["needs-improvement"]).not.toBe("");
+		expect(BAND_MARK.poor).not.toBe("");
+		expect(BAND_MARK.poor).not.toBe(BAND_MARK["needs-improvement"]);
+	});
+
+	it("leaves good and unmeasured unmarked, so a mark always means something", () => {
+		expect(BAND_MARK.good).toBe("");
+		expect(BAND_MARK.unmeasured).toBe("");
+	});
+
+	it("gives every marked band a word for a reader who cannot see the glyph", () => {
+		for (const band of BANDS) {
+			if (BAND_MARK[band] === "") continue;
+			expect(BAND_MEANING[band]).not.toBe("");
+		}
+	});
+
+	it("covers every band the thresholds can produce", () => {
+		for (const band of BANDS) {
+			expect(BAND_MARK).toHaveProperty(band);
+			expect(BAND_MEANING).toHaveProperty(band);
+		}
+
+		/** The bands are not a free-standing list: they are what `bandFor` returns. */
+		expect(bandFor("lcpMs", 900)).toBe("good");
+		expect(bandFor("lcpMs", 3000)).toBe("needs-improvement");
+		expect(bandFor("lcpMs", 5000)).toBe("poor");
+		expect(bandFor("lcpMs", null)).toBe("unmeasured");
 	});
 });

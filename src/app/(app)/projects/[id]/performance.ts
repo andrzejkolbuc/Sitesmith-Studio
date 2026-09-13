@@ -132,3 +132,31 @@ export function orderObservations(observations: Observation[]): Observation[] {
 		return a.url.localeCompare(b.url);
 	});
 }
+
+/**
+ * The band, said without colour.
+ *
+ * `BAND_STYLE` in the table carries the verdict as a text colour, and colour is
+ * the one carrier that does not survive the journeys this product's output
+ * actually takes: a grayscale print, a reader with a colour vision deficiency,
+ * a screen reader. A glyph survives all three, so the verdict travels as shape
+ * first and colour second rather than colour alone.
+ *
+ * `good` and `unmeasured` are deliberately unmarked. A mark on every row is a
+ * mark that carries nothing — the reader learns the shape of "fine" and stops
+ * seeing it — and the absence is unambiguous next to rows that do carry one.
+ */
+export const BAND_MARK: Record<Band, string> = {
+	good: "",
+	"needs-improvement": "△",
+	poor: "▲",
+	unmeasured: "",
+};
+
+/** The same verdict in words, for a reader who cannot see the glyph. */
+export const BAND_MEANING: Record<Band, string> = {
+	good: "",
+	"needs-improvement": "needs improvement",
+	poor: "poor",
+	unmeasured: "",
+};

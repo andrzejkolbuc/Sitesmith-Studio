@@ -2,6 +2,9 @@
 
 import { api } from "~/trpc/react";
 import {
+	BAND_MARK,
+	BAND_MEANING,
+	type Band,
 	bandFor,
 	type Observation,
 	orderObservations,
@@ -135,19 +138,8 @@ export function Performance({ runId }: { runId: string }) {
  * shape or a word: the parity grid has its glyphs, a new finding says "New".
  * This was the one that did not.
  */
-const BAND_MARK: Record<string, string> = {
-	good: "",
-	"needs-improvement": "△",
-	poor: "▲",
-	unmeasured: "",
-};
 
-const BAND_MEANING: Record<string, string> = {
-	"needs-improvement": "needs improvement",
-	poor: "poor",
-};
-
-function BandMark({ band }: { band: string }) {
+function BandMark({ band }: { band: Band }) {
 	const mark = BAND_MARK[band];
 	if (!mark) return null;
 
