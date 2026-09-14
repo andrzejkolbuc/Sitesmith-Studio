@@ -747,33 +747,33 @@ entrypoint is designed for.
 
 #### Automated
 
-- [x] 1.1 Migrations generate without error
-- [x] 1.2 Schema applies to an empty database
-- [x] 1.3 Unit tests pass
-- [x] 1.4 Integration tests pass against a migrated database
-- [x] 1.5 E2E tests pass against a migrated database
-- [x] 1.6 Type checking passes
-- [x] 1.7 Linting passes
-- [x] 1.8 No `drizzle-kit push` invocation remains
+- [x] 1.1 Migrations generate without error — 31a85f5
+- [x] 1.2 Schema applies to an empty database — 31a85f5
+- [x] 1.3 Unit tests pass — 31a85f5
+- [x] 1.4 Integration tests pass against a migrated database — 31a85f5
+- [x] 1.5 E2E tests pass against a migrated database — 31a85f5
+- [x] 1.6 Type checking passes — 31a85f5
+- [x] 1.7 Linting passes — 31a85f5
+- [x] 1.8 No `drizzle-kit push` invocation remains — 31a85f5
 
 #### Manual
 
-- [x] 1.9 Migrated schema matches the push-built schema
-- [x] 1.10 `npm run db:migrate` runs from PowerShell
-- [x] 1.11 A forgotten `db:generate` fails comprehensibly
+- [x] 1.9 Migrated schema matches the push-built schema — 31a85f5
+- [x] 1.10 `npm run db:migrate` runs from PowerShell — 31a85f5
+- [x] 1.11 A forgotten `db:generate` fails comprehensibly — 31a85f5
 
 ### Phase 2: The image
 
 #### Automated
 
-- [ ] 2.1 Image builds
-- [ ] 2.2 Chromium launches in the final image
-- [ ] 2.3 Static assets are present in the image
-- [ ] 2.4 The container-side scripts and `drizzle/` are present in the image
-- [ ] 2.5 `playwright` is present in `.next/standalone/node_modules` after the build
-- [ ] 2.6 Type checking passes
-- [ ] 2.7 Linting passes
-- [ ] 2.8 The host build still works
+- [x] 2.1 Image builds
+- [x] 2.2 Chromium launches in the final image
+- [x] 2.3 Static assets are present in the image
+- [x] 2.4 The container-side scripts and `drizzle/` are present in the image
+- [x] 2.5 `playwright` is present in `.next/standalone/node_modules` after the build
+- [x] 2.6 Type checking passes
+- [x] 2.7 Linting passes
+- [x] 2.8 The host build still works
 
 #### Manual
 

@@ -1,0 +1,45 @@
+# What must not reach the build context.
+#
+# Mirrors .gitignore where the reasoning is the same — host state that would be
+# stale or wrong inside an image — but it is a separate file with a separate
+# purpose. `context/` is committed and still has no business in a container.
+
+# Host dependency tree and build output. Both are installed and built inside the
+# image; copying the host's would carry the wrong platform's native binaries.
+node_modules
+.next
+out
+build
+
+# Secrets. The image gets its environment from the composition or the host, and
+# `.env` must never be baked into a layer.
+.env
+.env.*
+!.env.example
+
+# Version control and editor state.
+.git
+.gitignore
+.idea
+.vscode
+*.tsbuildinfo
+
+# The change/planning record. Committed, but not part of a running application.
+context
+
+# Test and report output.
+test-results
+playwright-report
+blob-report
+playwright/.cache
+coverage
+
+# Container definitions themselves — nothing in the image reads them.
+Dockerfile
+.dockerignore
+compose.yaml
+
+# Misc
+.DS_Store
+*.pem
+npm-debug.log*
