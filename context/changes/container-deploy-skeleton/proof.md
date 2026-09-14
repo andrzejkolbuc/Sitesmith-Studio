@@ -228,3 +228,122 @@ between query and schema — and it now asserts that against a database compose
 defined rather than one a hand-rolled `docker run` produced. `CREATE DATABASE`
 against the `/postgres` maintenance database still works, which is why both
 suites can create their own databases in the same instance.
+
+## Phase 4 — proof and CI glue
+
+### One command, from clean, exits zero
+
+```
+$ npm run image:verify
+
+verify: building the image
+verify: chromium launches in the image
+  $ docker run --rm sitesmith-studio node scripts/check-browser.mjs
+entrypoint: DATABASE_URL is not set; skipping migrations.
+check-browser: chromium 151.0.7922.34 launched and rendered a page.
+
+verify: bringing up the composition
+  $ docker compose -p sitesmith-studio-verify --profile app up -d --wait
+ Container sitesmith-studio-verify-postgres-1 Healthy
+ Container sitesmith-studio-verify-app-1 Healthy
+
+verify: the app's render path reaches a browser
+  $ docker compose -p sitesmith-studio-verify --profile app exec -T app node scripts/smoke-container.mjs
+smoke: rendering http://localhost:3000/signin
+smoke: measured http://localhost:3000/signin — TTFB 8.8ms, LCP 64ms, CLS 0
+smoke: 0 first-party and 0 third-party console errors.
+
+verify: tearing down
+ Volume sitesmith-studio-verify_postgres-data Removed
+
+verify: the image builds, migrates, serves, and can open a browser.
+$ echo $?
+0
+```
+
+**A real measurement**, not an absence of errors — the browser's own navigation
+timing and its own `PerformanceObserver`, produced by the application's code
+inside the container against a page the composition served.
+
+### The verification runs in its own project, and that is load-bearing
+
+`image:verify` builds a database from nothing and must tear it down with
+`down -v`. On a developer's laptop that command is a loaded gun pointed at the
+database they work against, so the run gets its own compose project name
+(`sitesmith-studio-verify`) and its own ports (55432, 13100). The volume removed
+at teardown is `sitesmith-studio-verify_postgres-data`, which only this run ever
+touched.
+
+Observed during the run: `sitesmith-studio-postgres` stayed up and healthy
+throughout. Afterwards:
+
+```
+$ docker ps -a     --filter name=sitesmith-studio-verify   →  0
+$ docker volume ls --filter name=sitesmith-studio-verify   →  0
+$ docker network ls --filter name=sitesmith-studio-verify  →  0
+$ docker ps
+sitesmith-studio-postgres Up 18 minutes (healthy)
+```
+
+This is also why `container_name` was removed from `compose.yaml` in the same
+phase: a fixed container name is global to the Docker engine, so it would have
+made a second copy of the composition impossible.
+
+### The checks assert positively — demonstrated, not claimed
+
+The hazard is specific. `render.ts:289-297` catches a failed launch and returns
+`{ observations: [], complete: false }`, so a check built around thrown errors
+passes on a broken image. Pointing `PLAYWRIGHT_BROWSERS_PATH` at an empty
+directory reproduces exactly that state:
+
+```
+$ docker run --rm -e PLAYWRIGHT_BROWSERS_PATH=<empty dir> sitesmith-studio \
+    node scripts/smoke-container.mjs
+smoke: rendering http://localhost:3000/signin
+smoke: the browser was not usable.
+    `renderSample` returned complete: false, which it does when
+    `chromium.launch()` throws — a missing browser binary, a missing
+    system library, or a sandbox refusing to start.
+    The image can still boot, serve and crawl in this state; it just
+    measures nothing. That is the failure this check exists for.
+$ echo $?
+1
+```
+
+The same command against the same image with a **working** browser and nothing
+serving fails differently:
+
+```
+smoke: the page could not be rendered.
+    http://localhost:3000/signin: page.goto: net::ERR_CONNECTION_REFUSED
+```
+
+That contrast is the point. The check distinguishes "no browser" from "no page",
+so a failure names its own cause rather than leaving both open. `check-browser.mjs`
+under the same broken condition is equally explicit:
+
+```
+check-browser: chromium failed to launch.
+    The browser binary or its system libraries are missing from this image.
+    The final stage must be the Playwright base image — Chromium is a binary
+    and is never traced into the standalone output.
+browserType.launch: Executable doesn't exist at …/chrome-headless-shell
+$ echo $?
+1
+```
+
+### The workflow parses, and has never run
+
+```
+$ yq '{"name": .name, "on": (.on | keys), "jobs": (.jobs | keys),
+       "run": .jobs.verify.steps[2].run}' < .github/workflows/image.yml
+name: image
+on: [push, pull_request, workflow_dispatch]
+jobs: [verify]
+run: npm run image:verify
+```
+
+Valid YAML with every key intact, and it invokes the same command a developer
+runs. **That is the whole of the claim.** The repository has no git remote, so
+the workflow has never executed and cannot until one exists — which is the second
+of the two unmet clauses recorded in `change.md`, alongside the deferred host.

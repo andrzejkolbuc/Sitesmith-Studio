@@ -39,3 +39,35 @@ Open question inherited from the roadmap, still owned by the user and still
 unanswered: *which host, concretely?* The tech stack names a self-hosted container
 targeting Azure, but nothing is provisioned. Deferring the host is what makes it
 safe to leave that open for now.
+
+## What this slice delivered, and what it did not
+
+Recorded at implementation time so the archive decision about F-02 is made on
+facts rather than reconstruction.
+
+**Delivered.** Schema reaches a database by committed migration in every context
+— developer shell, integration harness, e2e harness, container entrypoint. A
+multi-stage image on the version-matched Playwright base, running as a non-root
+user, applying migrations before it serves. A local composition with Postgres
+behind a healthcheck and the app behind a profile. Two checks at different
+depths, both asserting positive facts: `check-browser.mjs` that a browser
+launches inside the image, `smoke-container.mjs` that the application's own
+render path reaches one. One command, `npm run image:verify`, that runs the whole
+sequence and tears down afterwards.
+
+**Two clauses are unmet, and both are reasons F-02 must not close as `done`:**
+
+1. **No persistent host.** Deferred to S-13 at kickoff, as recorded above. There
+   is no provisioned environment, no registry, no secrets management and no TLS
+   termination. `compose.yaml` is a local composition for development and
+   verification — it is not a deployment and must not be read as one.
+2. **The CI workflow ships unexecuted.** `.github/workflows/image.yml` is
+   committed and parses, but the repository has no git remote, so it has never
+   run and cannot run until one exists. Its correctness is asserted only as far
+   as "the YAML is valid and it invokes the same command a developer does".
+
+The roadmap's F-02 says "the application builds and runs as a container **on a
+persistent host**". The first half is now demonstrable. The second half is
+untouched. Either F-02 stays open with the container half recorded against it,
+or it is split — that decision belongs at archive time and this note exists so it
+can be made without reopening the question of what was actually built.

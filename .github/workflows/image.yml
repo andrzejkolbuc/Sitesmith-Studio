@@ -1,0 +1,43 @@
+# Build the container image and run its checks.
+#
+# **This workflow has never run.** The repository has no git remote, so nothing
+# has ever received a push — it is committed now so that the day a remote exists,
+# the image is verified from the first push with no further work. It must not be
+# reported as passing until it has actually run somewhere.
+#
+# It holds no verification logic of its own: it calls `npm run image:verify`, the
+# same command a developer runs, so CI and a laptop cannot drift apart. Changes
+# to what is verified belong in `scripts/verify-image.mjs`.
+#
+# No registry push and no secrets. Publishing an image needs a registry, which
+# needs the host decision this slice deliberately deferred.
+
+name: image
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # The Playwright base image is large and the app build is not quick; the
+    # default 360 minutes would let a hung run sit for six hours.
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Read from `engines.node` in package.json, so the floor is stated once.
+          node-version-file: package.json
+
+      # `image:verify` needs no dependency install of its own — it drives Docker,
+      # and the image builds its own dependencies inside the build stage. Nothing
+      # here reads `.env`: every variable the composition needs is defaulted in
+      # `compose.yaml`, which is why this works on a runner that has no secrets.
+      - name: Build the image and run the container checks
+        run: npm run image:verify

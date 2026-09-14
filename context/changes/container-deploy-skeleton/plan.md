@@ -786,13 +786,13 @@ entrypoint is designed for.
 
 #### Automated
 
-- [x] 3.1 Composition is valid
-- [x] 3.2 Postgres starts and reports healthy
-- [x] 3.3 Migrations apply against the compose database
-- [x] 3.4 Integration tests pass against the compose database
-- [x] 3.5 E2E tests pass against the compose database
-- [x] 3.6 The app profile starts and serves
-- [x] 3.7 Linting passes
+- [x] 3.1 Composition is valid — dc3ca3d
+- [x] 3.2 Postgres starts and reports healthy — dc3ca3d
+- [x] 3.3 Migrations apply against the compose database — dc3ca3d
+- [x] 3.4 Integration tests pass against the compose database — dc3ca3d
+- [x] 3.5 E2E tests pass against the compose database — dc3ca3d
+- [x] 3.6 The app profile starts and serves — dc3ca3d
+- [x] 3.7 Linting passes — dc3ca3d
 
 #### Manual
 
@@ -806,11 +806,11 @@ entrypoint is designed for.
 
 #### Automated
 
-- [ ] 4.1 Full verification passes from a clean state
-- [ ] 4.2 The smoke asserts positively
-- [ ] 4.3 Workflow YAML is syntactically valid
-- [ ] 4.4 Linting passes
-- [ ] 4.5 Type checking passes
+- [x] 4.1 Full verification passes from a clean state
+- [x] 4.2 The smoke asserts positively
+- [x] 4.3 Workflow YAML is syntactically valid
+- [x] 4.4 Linting passes
+- [x] 4.5 Type checking passes
 
 #### Manual
 

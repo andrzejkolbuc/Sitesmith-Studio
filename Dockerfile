@@ -65,7 +65,17 @@ COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/public ./public
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/drizzle ./drizzle
-COPY --from=build /app/scripts/migrate.mjs /app/scripts/check-browser.mjs ./scripts/
+COPY --from=build /app/scripts/migrate.mjs /app/scripts/check-browser.mjs /app/scripts/smoke-container.mjs ./scripts/
+
+# The one source module the smoke check imports.
+#
+# `scripts/smoke-container.mjs` asserts that the application's own render path
+# reaches a browser, which means it has to run the application's own code rather
+# than a copy of it. The standalone output is bundled, so `src/` is not otherwise
+# in the image. `render.ts` imports nothing but `playwright` and uses no TypeScript
+# that needs transforming, so Node's own type stripping runs the real file — no
+# wrapper, and no second implementation to drift from the first.
+COPY --from=build /app/src/server/crawl/render.ts ./src/server/crawl/render.ts
 
 # The migrate runner's dependencies, copied because nothing traces them.
 #

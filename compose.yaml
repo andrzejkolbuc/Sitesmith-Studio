@@ -21,7 +21,12 @@
 services:
   postgres:
     image: postgres:latest
-    container_name: sitesmith-studio-postgres
+    # Deliberately unnamed. A fixed `container_name` is global to the engine, so
+    # it would stop a second copy of this composition from existing — and
+    # `npm run image:verify` runs one under its own project name, on its own
+    # ports, precisely so it can build and tear down without touching the
+    # database someone is developing against. `scripts/db.mjs` addresses the
+    # service, not the container, so nothing depended on the name.
     # Discrete variables rather than a parsed DATABASE_URL: compose substitutes
     # whole values and cannot take a URL apart. `scripts/db.mjs:65-80` does that
     # in JavaScript, which is not available here — and discrete variables are
@@ -58,7 +63,6 @@ services:
     build:
       context: .
     image: sitesmith-studio
-    container_name: sitesmith-studio-app
     depends_on:
       postgres:
         condition: service_healthy
@@ -83,6 +87,20 @@ services:
     # normal development, and the point of this service is to run alongside it.
     ports:
       - "${APP_PORT:-3100}:3000"
+    # So `up --wait` means "serving", not merely "process started" — which is
+    # what lets the verification run exec a check against it without a sleep.
+    # Asked over Node's own fetch rather than curl, so the check depends on
+    # nothing the image is not already guaranteed to have.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/signin').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 15s
 
 volumes:
   postgres-data:

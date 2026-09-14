@@ -17,6 +17,7 @@
 		"db:stop": "node scripts/db.mjs stop",
 		"db:studio": "drizzle-kit studio",
 		"dev": "next dev --turbo",
+		"image:verify": "node scripts/verify-image.mjs",
 		"preview": "next build && next start",
 		"start": "next start",
 		"test": "npm run test:unit && npm run test:integration",
