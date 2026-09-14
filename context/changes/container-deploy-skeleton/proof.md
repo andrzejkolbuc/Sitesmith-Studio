@@ -463,3 +463,74 @@ Two rows are **not** covered by anything above and remain open:
   service runs production mode, publishes 3100 and bind-mounts nothing, so the
   collision the research observed should be structurally impossible — which is
   an argument, not an observation, and this file is for observations.
+
+### 3.12 — a host `next dev` and the app profile, running at once
+
+The reason this row exists is a specific observation from research: `next dev`
+guards on the **project directory** rather than the port, so a bind-mounted
+dev-mode compose service collides with a host dev server even on a different
+port. The symptom is nasty — the page renders, every build chunk 403s, React
+never hydrates, and the result looks like a working page that ignores clicks.
+So "both return 200" is not the assertion; "the client-side app is alive" is.
+
+Host `npm run dev` started on 3000, then the app profile brought up alongside it:
+
+```powershell
+PS> docker compose --profile app up -d --wait
+ Container sitesmith-studio-app-1 Healthy
+PS> docker compose ps -a --format "{{.Service}} {{.State}} {{.Health}}"
+app running healthy
+postgres running healthy
+```
+
+Both served at the same time, from different processes on different ports:
+
+```
+host  next dev  :3000/signin   HTTP 200  title=Sitesmith Studio  bytes=15942
+container app   :3100/signin   HTTP 200  title=Sitesmith Studio  bytes=10956
+
+LocalAddress LocalPort OwningProcess
+::                3000         35744
+::                3100         15672
+```
+
+The differing byte counts are the tell that these are genuinely two builds — dev
+output with its HMR client against a production build — and not one server
+answering twice.
+
+**Host dev server, with the container up** — 148 requests, every chunk, stylesheet
+and font `200 OK`, **no 403s anywhere**. Hydration confirmed by things only a
+live React client produces:
+
+```
+[log] [HMR] connected
+[log] [Fast Refresh] done in 83ms
+[log] [TRPC] project.list took 375ms to execute   Server
+```
+
+A tRPC query issued from the browser is proof the client bundle loaded, executed
+and is talking to the server — which is exactly what the 403 collision prevents.
+
+**Container app, at the same moment** — zero console errors, all assets 200,
+hashed production chunk names and no HMR client:
+
+```
+GET /signin                            → 200 OK
+GET /_next/static/chunks/1tkd3n0s0srjf.css → 200 OK
+GET /_next/static/media/*.woff2        → 200 OK  (×5)
+GET /_next/static/chunks/*.js          → 200 OK  (×7)
+```
+
+Both pages screenshotted and fully styled. That incidentally re-proves the
+Dockerfile's static-asset `COPY` destinations: the documented footgun there
+produces a site with no CSS rather than an error, and the container's page has
+its CSS.
+
+The dev server's log does carry `TRPCError: This account is not attached to a
+tenant` — that is a stale browser session for an account with no workspace being
+correctly refused, which is the product working, not a collision. It is noted
+here so a later reader does not mistake it for one.
+
+No collision. The app service runs production mode and bind-mounts nothing,
+which is what makes the research's failure mode structurally unreachable — and
+this is now the observation rather than the argument.
