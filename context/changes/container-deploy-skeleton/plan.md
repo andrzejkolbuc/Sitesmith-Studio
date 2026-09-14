@@ -777,10 +777,10 @@ entrypoint is designed for.
 
 #### Manual
 
-- [x] 2.9 Base image Node version satisfies the `engines` range
-- [x] 2.10 Removing the browsers directory makes the check fail
-- [x] 2.11 Image size recorded in proof
-- [x] 2.12 `docker build` succeeds from PowerShell
+- [x] 2.9 Base image Node version satisfies the `engines` range — a82248a
+- [x] 2.10 Removing the browsers directory makes the check fail — a82248a
+- [x] 2.11 Image size recorded in proof — a82248a
+- [x] 2.12 `docker build` succeeds from PowerShell — a82248a
 
 ### Phase 3: The composition
 
@@ -796,10 +796,10 @@ entrypoint is designed for.
 
 #### Manual
 
-- [x] 3.8 `db:start`, `db:stop`, `db:status` behave correctly from PowerShell
+- [x] 3.8 `db:start`, `db:stop`, `db:status` behave correctly from PowerShell — a82248a
 - [ ] 3.9 Engine-down diagnostic still friendly
-- [x] 3.10 Stop and restart preserves data
-- [x] 3.11 `docker compose up` alone does not start the app
+- [x] 3.10 Stop and restart preserves data — a82248a
+- [x] 3.11 `docker compose up` alone does not start the app — a82248a
 - [ ] 3.12 Host `next dev` and the app profile coexist
 
 ### Phase 4: Proof and CI glue
@@ -814,7 +814,7 @@ entrypoint is designed for.
 
 #### Manual
 
-- [x] 4.6 `npm run image:verify` succeeds from PowerShell
-- [x] 4.7 A deliberately broken image fails the smoke, naming the browser
-- [x] 4.8 Teardown leaves no stray containers or volumes
-- [x] 4.9 `change.md` states both unmet clauses plainly
+- [x] 4.6 `npm run image:verify` succeeds from PowerShell — a82248a
+- [x] 4.7 A deliberately broken image fails the smoke, naming the browser — a82248a
+- [x] 4.8 Teardown leaves no stray containers or volumes — a82248a
+- [x] 4.9 `change.md` states both unmet clauses plainly — a82248a
