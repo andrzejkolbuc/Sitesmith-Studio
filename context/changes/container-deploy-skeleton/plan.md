@@ -766,14 +766,14 @@ entrypoint is designed for.
 
 #### Automated
 
-- [x] 2.1 Image builds
-- [x] 2.2 Chromium launches in the final image
-- [x] 2.3 Static assets are present in the image
-- [x] 2.4 The container-side scripts and `drizzle/` are present in the image
-- [x] 2.5 `playwright` is present in `.next/standalone/node_modules` after the build
-- [x] 2.6 Type checking passes
-- [x] 2.7 Linting passes
-- [x] 2.8 The host build still works
+- [x] 2.1 Image builds — 6b65dae
+- [x] 2.2 Chromium launches in the final image — 6b65dae
+- [x] 2.3 Static assets are present in the image — 6b65dae
+- [x] 2.4 The container-side scripts and `drizzle/` are present in the image — 6b65dae
+- [x] 2.5 `playwright` is present in `.next/standalone/node_modules` after the build — 6b65dae
+- [x] 2.6 Type checking passes — 6b65dae
+- [x] 2.7 Linting passes — 6b65dae
+- [x] 2.8 The host build still works — 6b65dae
 
 #### Manual
 
@@ -786,13 +786,13 @@ entrypoint is designed for.
 
 #### Automated
 
-- [ ] 3.1 Composition is valid
-- [ ] 3.2 Postgres starts and reports healthy
-- [ ] 3.3 Migrations apply against the compose database
-- [ ] 3.4 Integration tests pass against the compose database
-- [ ] 3.5 E2E tests pass against the compose database
-- [ ] 3.6 The app profile starts and serves
-- [ ] 3.7 Linting passes
+- [x] 3.1 Composition is valid
+- [x] 3.2 Postgres starts and reports healthy
+- [x] 3.3 Migrations apply against the compose database
+- [x] 3.4 Integration tests pass against the compose database
+- [x] 3.5 E2E tests pass against the compose database
+- [x] 3.6 The app profile starts and serves
+- [x] 3.7 Linting passes
 
 #### Manual
 

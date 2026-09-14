@@ -1,0 +1,88 @@
+# The local composition: Postgres for the daily loop, the built image on request.
+#
+# `docker compose up` starts the database and nothing else, because that is what
+# a developer needs ninety-nine times out of a hundred and building the image
+# every time would make the fast path slow. The app runs only under its profile:
+#
+#   docker compose up -d                      the database, for `npm run dev`
+#   docker compose --profile app up --build   the database and the container
+#
+# **This is not a deployment.** No host is provisioned — that is S-13's job. This
+# composition exists so the container's central claim (it builds, it migrates, it
+# serves, it can open a browser) is demonstrable on a laptop and in CI with one
+# command and no second definition to drift.
+#
+# Every variable carries a default, so the composition is valid with no `.env` at
+# all — CI has none. `.env` overrides them for a developer whose database predates
+# this file; `scripts/db.mjs` checks that those overrides still agree with
+# DATABASE_URL, because two representations of one connection are two things that
+# can drift.
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: sitesmith-studio-postgres
+    # Discrete variables rather than a parsed DATABASE_URL: compose substitutes
+    # whole values and cannot take a URL apart. `scripts/db.mjs:65-80` does that
+    # in JavaScript, which is not available here — and discrete variables are
+    # what make `docker compose up` work when run directly rather than only
+    # through the npm script.
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local-not-a-secret}
+      POSTGRES_DB: ${POSTGRES_DB:-sitesmith-studio}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    # Mounted at the path the image itself declares as its volume, which on
+    # Postgres 18 is `/var/lib/postgresql` — PGDATA lives a level below it at
+    # `/var/lib/postgresql/18/docker`. Mounting the older `/data` convention
+    # would not error: Postgres would initialise into an anonymous volume and
+    # the database would quietly not survive a `docker compose down`.
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    # So dependants wait for readiness rather than racing it. `pg_isready` alone
+    # reports true while the entrypoint is still doing its first-run setup, so
+    # the database name is named explicitly.
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-sitesmith-studio}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  # Not started by a bare `docker compose up`. See the profile note above.
+  app:
+    profiles: ["app"]
+    build:
+      context: .
+    image: sitesmith-studio
+    container_name: sitesmith-studio-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # The app service carries its own environment, defined here.
+    #
+    # `src/env.js:12-25` requires AUTH_SECRET and DATABASE_URL at runtime —
+    # SKIP_ENV_VALIDATION covers the build only — and neither can come from
+    # `.env`, which is gitignored and excluded by `.dockerignore`, and which CI
+    # does not have at all.
+    environment:
+      # Reaches Postgres by service name on the compose network, so the internal
+      # port 5432 is correct here regardless of what POSTGRES_PORT publishes.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres-local-not-a-secret}@postgres:5432/${POSTGRES_DB:-sitesmith-studio}
+      # Verification only, and deliberately self-describing so nobody can mistake
+      # it for a real secret. It signs nothing that outlives the run — the same
+      # reasoning that lets `vitest.integration.config.ts:52` generate a random
+      # one for the integration suite. A deployed instance gets a real secret
+      # from its host, which this slice does not provision.
+      AUTH_SECRET: not-a-secret-container-verification-only
+      NODE_ENV: production
+    # Published off 3000 on purpose: a host `next dev` owns that port during
+    # normal development, and the point of this service is to run alongside it.
+    ports:
+      - "${APP_PORT:-3100}:3000"
+
+volumes:
+  postgres-data:

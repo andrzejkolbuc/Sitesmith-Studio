@@ -7,19 +7,26 @@
  * the Docker binary by absolute path rather than relying on it being on PATH
  * (it often is not in a shell opened before Docker was installed).
  *
- *   npm run db:start    create or start the container
+ *   npm run db:start    bring the database up
  *   npm run db:stop     stop it, keeping the data
  *   npm run db:status   what is actually running
  *
- * The container keeps its data in a Docker volume, so stopping is not
- * destructive. Removing the container is not something this script does.
+ * `compose.yaml` is now the definition — this file no longer hand-rolls a
+ * `docker run` argument list, it drives `docker compose` against the `postgres`
+ * service. The commands stay because they are the interface people have learned
+ * and because they carry the diagnostics a bare compose invocation does not: the
+ * binary discovery above, the engine-down hint below, and the agreement check
+ * between DATABASE_URL and the POSTGRES_* variables compose reads.
+ *
+ * The data lives in the `postgres-data` volume, so stopping is not destructive.
+ * Removing the volume is not something this script does.
  */
 
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 
-const CONTAINER = "sitesmith-studio-postgres";
-const IMAGE = "postgres:latest";
+/** The service in `compose.yaml`, not a container name. */
+const SERVICE = "postgres";
 
 /** Docker's own bin directory, then whatever PATH offers. */
 const CANDIDATES = [
@@ -44,6 +51,11 @@ function run(args, { quiet = false } = {}) {
 	}).trim();
 }
 
+/** `docker compose` is a subcommand, so every invocation shares this prefix. */
+function compose(args, options) {
+	return run(["compose", ...args], options);
+}
+
 function fail(message, hint) {
 	console.error(`db: ${message}`);
 	if (hint) console.error(`    ${hint}`);
@@ -61,87 +73,113 @@ function requireEngine() {
 	}
 }
 
-/** Reads DATABASE_URL without importing the app's env module, which uses a path alias. */
-function databaseSettings() {
+/** Reads the environment without importing the app's env module, which uses a path alias. */
+function loadEnv() {
 	try {
 		process.loadEnvFile(".env");
 	} catch {
-		// Absent .env is fine if the value is already in the environment.
+		// Absent .env is fine: `compose.yaml` defaults every variable it reads.
 	}
+}
 
+function databaseSettings() {
 	const url = process.env.DATABASE_URL;
 	if (!url) fail("DATABASE_URL is not set.", "Expected it in .env");
 
 	const parsed = new URL(url);
 	return {
+		user: decodeURIComponent(parsed.username),
 		password: decodeURIComponent(parsed.password),
 		port: parsed.port || "5432",
 		database: parsed.pathname.slice(1),
 	};
 }
 
-function containerState() {
-	const out = run(
-		["ps", "-a", "--filter", `name=^${CONTAINER}$`, "--format", "{{.State}}"],
-		{ quiet: true },
+/**
+ * The connection is stated twice — once as a URL the app reads, once as the
+ * discrete POSTGRES_* variables compose reads — because compose substitutes
+ * whole values and cannot take a URL apart.
+ *
+ * Two representations of one thing are two things that can drift, and the
+ * failure when they do is confusing rather than obvious: the database starts
+ * perfectly well with the credentials compose was given, and the app is refused
+ * by the credentials it was given. Checking here turns that into a sentence.
+ *
+ * Only variables actually present are compared. `.env` is allowed to say nothing
+ * and let compose's defaults stand; what it may not do is disagree.
+ */
+function checkAgreement({ user, password, port, database }) {
+	const expected = [
+		["POSTGRES_USER", user],
+		["POSTGRES_PASSWORD", password],
+		["POSTGRES_DB", database],
+		["POSTGRES_PORT", port],
+	];
+
+	const disagreements = expected.filter(
+		([name, fromUrl]) =>
+			process.env[name] !== undefined && process.env[name] !== fromUrl,
 	);
+
+	if (disagreements.length === 0) return;
+
+	console.error("db: DATABASE_URL and the POSTGRES_* variables disagree.");
+	for (const [name, fromUrl] of disagreements) {
+		console.error(
+			`    ${name} is "${process.env[name]}"; DATABASE_URL says "${fromUrl}".`,
+		);
+	}
+	console.error(
+		"    They describe the same database. Compose would start one the app cannot reach.",
+	);
+	process.exit(1);
+}
+
+/** What compose reports for the service: "running", "exited", or nothing at all. */
+function serviceState() {
+	const out = compose(["ps", "-a", "--format", "{{.State}}", SERVICE], {
+		quiet: true,
+	});
 	return out || "absent";
 }
 
 function start() {
 	requireEngine();
+	loadEnv();
+	checkAgreement(databaseSettings());
 
-	const state = containerState();
+	const { port, database } = databaseSettings();
 
-	if (state === "running") {
-		console.log(`db: ${CONTAINER} is already running.`);
+	if (serviceState() === "running") {
+		console.log(`db: ${database} is already running on localhost:${port}.`);
 		return;
 	}
 
-	if (state !== "absent") {
-		run(["start", CONTAINER], { quiet: true });
-		console.log(`db: started existing container ${CONTAINER}.`);
-		return;
-	}
-
-	const { password, port, database } = databaseSettings();
-	console.log(`db: creating ${CONTAINER} on port ${port}…`);
-
-	run(
-		[
-			"run",
-			"-d",
-			"--name",
-			CONTAINER,
-			"-e",
-			"POSTGRES_USER=postgres",
-			"-e",
-			`POSTGRES_PASSWORD=${password}`,
-			"-e",
-			`POSTGRES_DB=${database}`,
-			"-p",
-			`${port}:5432`,
-			IMAGE,
-		],
-		{ quiet: true },
-	);
-
-	console.log(`db: created ${CONTAINER}. Run \`npm run db:push\` next.`);
+	console.log(`db: starting ${database} on port ${port}…`);
+	// Only the postgres service: naming it is what keeps the `app` profile out,
+	// so the daily loop never waits for an image build.
+	compose(["up", "-d", SERVICE], { quiet: true });
+	console.log(`db: up. Run \`npm run db:migrate\` next.`);
 }
 
 function stop() {
 	requireEngine();
+	loadEnv();
 
-	if (containerState() !== "running") {
-		console.log(`db: ${CONTAINER} is not running.`);
+	if (serviceState() !== "running") {
+		console.log(`db: ${SERVICE} is not running.`);
 		return;
 	}
 
-	run(["stop", CONTAINER], { quiet: true });
-	console.log(`db: stopped ${CONTAINER}. Data is kept in its volume.`);
+	// `stop`, not `down`: `down` removes the containers and would invite the
+	// habit of adding `-v`, which discards the data.
+	compose(["stop", SERVICE], { quiet: true });
+	console.log("db: stopped. Data is kept in its volume.");
 }
 
 function status() {
+	loadEnv();
+
 	try {
 		const version = run(["info", "--format", "{{.ServerVersion}}"], {
 			quiet: true,
@@ -149,16 +187,19 @@ function status() {
 		console.log(`engine:    ${version}`);
 	} catch {
 		console.log("engine:    not running");
-		console.log(`container: unknown (engine is down)`);
+		console.log("container: unknown (engine is down)");
 		return;
 	}
 
-	const state = containerState();
+	const state = serviceState();
 	console.log(`container: ${state === "absent" ? "not created" : state}`);
 
 	if (state === "running") {
-		const { port, database } = databaseSettings();
-		console.log(`database:  ${database} on localhost:${port}`);
+		const settings = databaseSettings();
+		console.log(
+			`database:  ${settings.database} on localhost:${settings.port}`,
+		);
+		checkAgreement(settings);
 	}
 }
 
