@@ -534,3 +534,45 @@ here so a later reader does not mistake it for one.
 No collision. The app service runs production mode and bind-mounts nothing,
 which is what makes the research's failure mode structurally unreachable — and
 this is now the observation rather than the argument.
+
+### 3.9 — the engine-down diagnostic
+
+Exercised by pointing the Docker client at an unreachable daemon
+(`DOCKER_HOST=tcp://127.0.0.1:1`) rather than by stopping Docker Desktop, so the
+development database stayed up throughout.
+
+```powershell
+PS> $env:DOCKER_HOST = "tcp://127.0.0.1:1"
+
+PS> npm run db:status
+engine:    not running
+container: unknown (engine is down)
+STATUS_EXIT=0
+
+PS> npm run db:start
+db: the Docker engine is not running.
+    Start Docker Desktop and wait for the whale icon to settle, then retry.
+START_EXIT=1
+
+PS> npm run db:stop
+db: the Docker engine is not running.
+    Start Docker Desktop and wait for the whale icon to settle, then retry.
+STOP_EXIT=1
+```
+
+A friendly diagnostic in every case, no stack trace, and the exit codes are the
+right way round: `status` succeeds because reporting "the engine is down" **is**
+its job done, while `start` and `stop` fail because they were asked to do
+something and could not.
+
+**What this is and is not.** `scripts/db.mjs` decides the engine is down by one
+test — whether `docker info` succeeds — and an unreachable `DOCKER_HOST` makes it
+fail exactly as a stopped daemon does, reaching the same `catch`. The difference
+is the underlying transport error (a refused TCP connect rather than a missing
+named pipe), which the script never inspects. So this is a faithful exercise of
+the code path and a **proxy** for the literal scenario, not the literal scenario
+itself; it is recorded as a proxy so nobody later reads more into it than was
+tested.
+
+`DOCKER_HOST` was set for that shell only; `npm run db:status` afterwards
+reported the engine at 29.7.2 with the container running, unchanged.
