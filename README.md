@@ -15,6 +15,37 @@ If you are not familiar with the different technologies used in this project, pl
 - [Tailwind CSS](https://tailwindcss.com)
 - [tRPC](https://trpc.io)
 
+## Database
+
+The development database runs in Docker. From any shell, including PowerShell:
+
+```bash
+npm run db:start
+```
+
+Then apply the schema:
+
+```bash
+npm run db:migrate
+```
+
+`npm run db:status` reports what is running, and `npm run db:stop` stops the
+container without discarding its data.
+
+### Changing the schema
+
+Schema is delivered by **committed migrations**, not by pushing a schema at a
+database. After editing `src/server/db/schema.ts`:
+
+```bash
+npm run db:generate
+```
+
+Commit the generated files in `drizzle/` alongside the schema change, then run
+`npm run db:migrate` to apply them. A schema edit without a matching generate
+will fail the test suites rather than being silently absorbed — that is
+deliberate, because the same migrations are what reach a deployed container.
+
 ## Learn More
 
 To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:

@@ -6,6 +6,11 @@
 		"useIgnoreFile": true,
 		"clientKind": "git"
 	},
+	"files": {
+		// drizzle-kit generates these and rewrites them on every `db:generate`.
+		// Formatting them would be undone by the next schema change.
+		"includes": ["**", "!drizzle"]
+	},
 	"assist": {
 		"enabled": true,
 		"actions": {

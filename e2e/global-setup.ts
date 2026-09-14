@@ -1,8 +1,7 @@
-import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 import { hashPassword } from "../src/server/auth/password";
@@ -15,6 +14,9 @@ import {
 	users,
 } from "../src/server/db/schema";
 import { resetDatabase } from "../test/reset";
+
+/** Resolved from this file so the harness does not depend on the working directory. */
+const MIGRATIONS_FOLDER = fileURLToPath(new URL("../drizzle", import.meta.url));
 
 /**
  * Brings up a known world before any browser opens.
@@ -83,25 +85,23 @@ export default async function globalSetup() {
 		await admin.end();
 	}
 
-	/**
-	 * Apply the schema through Node rather than npx: since Node 20, spawning a
-	 * `.cmd` shim without a shell fails on Windows with EINVAL.
-	 */
-	const drizzleKit = resolve(process.cwd(), "node_modules/drizzle-kit/bin.cjs");
-	if (!existsSync(drizzleKit)) {
-		throw new Error(`drizzle-kit binary not found at ${drizzleKit}`);
-	}
-	execFileSync(process.execPath, [drizzleKit, "push", "--force"], {
-		stdio: "pipe",
-		env: process.env,
-	});
-
-	const connection = postgres(databaseUrl, { max: 1 });
+	// Applying the schema emits a truncation NOTICE for every foreign-key name
+	// over Postgres' 63-character limit. In a test run that is pure noise.
+	const connection = postgres(databaseUrl, { max: 1, onnotice: () => {} });
 	const db = drizzle(connection, {
 		schema: { findings, pages, projects, runs, tenants, users },
 	});
 
 	try {
+		/**
+		 * Apply the schema from the committed migrations in `drizzle/`, reusing the
+		 * connection opened for seeding rather than spawning a binary.
+		 *
+		 * The same migrator the container entrypoint runs, so these journeys exercise
+		 * the schema a deployment gets.
+		 */
+		await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+
 		await resetDatabase(connection);
 
 		const [tenant] = await db

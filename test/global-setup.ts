@@ -1,7 +1,10 @@
-import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { drizzle } from "drizzle-orm/postgres-js";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
+
+/** Resolved from this file so the harness does not depend on the working directory. */
+const MIGRATIONS_FOLDER = fileURLToPath(new URL("../drizzle", import.meta.url));
 
 /**
  * Creates the test database if it does not exist, then applies the current schema
@@ -46,21 +49,19 @@ export default async function setup() {
 	}
 
 	/**
-	 * Apply the schema. drizzle-kit reads DATABASE_URL from the environment, which
-	 * already points at the test database by the time this runs.
+	 * Apply the schema from the committed migrations in `drizzle/`.
 	 *
-	 * Runs the binary through Node rather than through `npx`: since Node 20,
-	 * spawning a `.cmd` shim without a shell fails on Windows with EINVAL, and
-	 * enabling a shell to work around it would mean quoting arguments correctly on
-	 * two platforms.
+	 * The same migrator the container entrypoint runs, so the schema these tests
+	 * validate is the schema a deployment gets. Previously this spawned the
+	 * drizzle-kit binary, which worked here but could never work in a production
+	 * image — drizzle-kit is a devDependency.
 	 */
-	const drizzleKit = resolve(process.cwd(), "node_modules/drizzle-kit/bin.cjs");
-	if (!existsSync(drizzleKit)) {
-		throw new Error(`drizzle-kit binary not found at ${drizzleKit}`);
+	// Applying the schema emits a truncation NOTICE for every foreign-key name
+	// over Postgres' 63-character limit. In a test run that is pure noise.
+	const connection = postgres(testUrl, { max: 1, onnotice: () => {} });
+	try {
+		await migrate(drizzle(connection), { migrationsFolder: MIGRATIONS_FOLDER });
+	} finally {
+		await connection.end();
 	}
-
-	execFileSync(process.execPath, [drizzleKit, "push", "--force"], {
-		stdio: "pipe",
-		env: process.env,
-	});
 }
