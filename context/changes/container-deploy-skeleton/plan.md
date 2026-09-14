@@ -797,7 +797,7 @@ entrypoint is designed for.
 #### Manual
 
 - [x] 3.8 `db:start`, `db:stop`, `db:status` behave correctly from PowerShell — a82248a
-- [x] 3.9 Engine-down diagnostic still friendly
+- [x] 3.9 Engine-down diagnostic still friendly — 6368eb2
 - [x] 3.10 Stop and restart preserves data — a82248a
 - [x] 3.11 `docker compose up` alone does not start the app — a82248a
 - [x] 3.12 Host `next dev` and the app profile coexist — 062e221
