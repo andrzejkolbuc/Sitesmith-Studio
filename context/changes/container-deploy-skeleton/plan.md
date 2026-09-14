@@ -806,11 +806,11 @@ entrypoint is designed for.
 
 #### Automated
 
-- [x] 4.1 Full verification passes from a clean state
-- [x] 4.2 The smoke asserts positively
-- [x] 4.3 Workflow YAML is syntactically valid
-- [x] 4.4 Linting passes
-- [x] 4.5 Type checking passes
+- [x] 4.1 Full verification passes from a clean state — 871d532
+- [x] 4.2 The smoke asserts positively — 871d532
+- [x] 4.3 Workflow YAML is syntactically valid — 871d532
+- [x] 4.4 Linting passes — 871d532
+- [x] 4.5 Type checking passes — 871d532
 
 #### Manual
 
