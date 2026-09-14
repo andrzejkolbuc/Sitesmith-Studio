@@ -249,6 +249,26 @@ export const projects = createTable(
 		 */
 		baselineRunId: d.varchar({ length: 255 }),
 		baselinePinnedAt: d.timestamp({ withTimezone: true }),
+		/**
+		 * When the owner removed this project, or null while it is live.
+		 *
+		 * A soft delete, and the first thing in this schema that a user can
+		 * destroy. `retention.ts` sets out why nothing here deletes rows — an
+		 * absent row cannot say whether it was never written or thrown away — and
+		 * a project is the strongest case for that rule rather than an exception
+		 * to it: its runs, findings and snapshots all reference it, so removing
+		 * the row would either cascade a year of history into nothing or fail on a
+		 * foreign key while the user watched.
+		 *
+		 * The column is the whole mechanism. Everything else is read paths
+		 * agreeing to ignore it — `assertProjectAccess` for the project-scoped
+		 * procedures, and `project.list` for the one that takes no identifier.
+		 *
+		 * Nullable rather than a boolean because *when* is the question an owner
+		 * actually asks of a project that vanished, and a timestamp answers both
+		 * that and "is it gone" while a flag answers only the second.
+		 */
+		archivedAt: d.timestamp({ withTimezone: true }),
 		createdAt: d
 			.timestamp({ withTimezone: true })
 			.$defaultFn(() => /* @__PURE__ */ new Date())

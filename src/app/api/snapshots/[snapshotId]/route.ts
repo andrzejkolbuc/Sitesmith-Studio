@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { auth } from "~/server/auth";
 import { isOwner } from "~/server/auth/roles";
@@ -146,6 +146,26 @@ export async function GET(
 		});
 		if (!assignment) return notFound();
 	}
+
+	/**
+	 * A deleted project's pictures are deleted too.
+	 *
+	 * The same reasoning as the assignment check above, and the same reason it is
+	 * written out rather than composed: this handler inherits no middleware, so
+	 * the refusal `assertProjectAccess` gives every procedure has to be repeated
+	 * here or it does not apply here. Without it the one surface that serves
+	 * bytes rather than JSON would keep serving full-page screenshots of a
+	 * project the owner removed.
+	 */
+	const live = await db.query.projects.findFirst({
+		columns: { id: true },
+		where: and(
+			eq(projects.tenantId, user.tenantId),
+			eq(projects.id, run.projectId),
+			isNull(projects.archivedAt),
+		),
+	});
+	if (!live) return notFound();
 
 	if (view === "current") {
 		const image = await ownImage();

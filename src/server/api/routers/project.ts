@@ -1,5 +1,14 @@
 import { TRPCError } from "@trpc/server";
-import { and, count, desc, eq, inArray, isNotNull, lt } from "drizzle-orm";
+import {
+	and,
+	count,
+	desc,
+	eq,
+	inArray,
+	isNotNull,
+	isNull,
+	lt,
+} from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -12,7 +21,7 @@ import {
 import { canRunChecks } from "~/server/auth/roles";
 import { comparability, compareFindings } from "~/server/crawl/comparison";
 import { MAX_MASKS, MAX_SELECTOR_LENGTH } from "~/server/crawl/masks";
-import { RunAlreadyActiveError, startRun } from "~/server/crawl/run";
+import { ACTIVE, RunAlreadyActiveError, startRun } from "~/server/crawl/run";
 import {
 	findings,
 	pageObservations,
@@ -58,14 +67,19 @@ export const projectRouter = createTRPCRouter({
 		const assigned = ctx.assignedProjectIds;
 		if (assigned !== null && assigned.length === 0) return [];
 
+		/**
+		 * The one read path `assertProjectAccess` does not cover, because it takes
+		 * no identifier to check. So the archived predicate is written out here —
+		 * and this is the only place in the codebase where it has to be.
+		 */
+		const live = and(
+			tenantScope(projects, ctx.tenantId),
+			isNull(projects.archivedAt),
+		);
+
 		return ctx.db.query.projects.findMany({
 			where:
-				assigned === null
-					? tenantScope(projects, ctx.tenantId)
-					: and(
-							tenantScope(projects, ctx.tenantId),
-							inArray(projects.id, assigned),
-						),
+				assigned === null ? live : and(live, inArray(projects.id, assigned)),
 			orderBy: (project, { asc }) => [asc(project.name)],
 		});
 	}),
@@ -120,6 +134,83 @@ export const projectRouter = createTRPCRouter({
 				throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 			}
 			return project;
+		}),
+
+	/**
+	 * Remove a project.
+	 *
+	 * A soft delete: the row survives carrying `archivedAt`, and every read path
+	 * stops returning it. See the column in `schema.ts` for why the history
+	 * hanging off a project makes an actual `DELETE` the worse of the two.
+	 *
+	 * Owner-only, alongside `create`. The requirements reserve project
+	 * configuration to the Owner, and a Team-member who could delete the project
+	 * they were assigned would hold the one capability that cannot be undone
+	 * from the interface.
+	 *
+	 * No `restore`. The row is recoverable by whoever holds the database, which
+	 * is the point of soft-deleting it, but an undo surface is a product decision
+	 * nobody has made yet — and shipping the half of it that hides projects is
+	 * honest in a way that shipping a bin nobody empties is not.
+	 */
+	archive: ownerProcedure
+		.input(z.object({ projectId: z.string() }))
+		.mutation(async ({ ctx, input }) => {
+			/**
+			 * Refuses an already-archived project as `NOT_FOUND`, because that is
+			 * what `assertProjectAccess` now says about one. So this is not
+			 * idempotent, and that is the right answer rather than a limitation: a
+			 * second delete of something already deleted is a user looking at a
+			 * stale page, and telling them it is gone is the truth.
+			 */
+			await assertProjectAccess(ctx, input.projectId);
+
+			/**
+			 * A crawl in flight owns this project. Archiving underneath it would
+			 * leave a background process writing pages and findings against
+			 * something the user was just told is deleted, and the run would
+			 * surface again later as the stale sweep marked it interrupted.
+			 *
+			 * `CONFLICT` for the same reason `startRun` uses it: waiting for a run
+			 * to finish is an ordinary thing to be asked to do, not a fault.
+			 */
+			const active = await ctx.db.query.runs.findFirst({
+				columns: { id: true },
+				where: and(
+					tenantScope(runs, ctx.tenantId),
+					eq(runs.projectId, input.projectId),
+					inArray(runs.status, ACTIVE),
+				),
+			});
+			if (active) {
+				throw new TRPCError({
+					code: "CONFLICT",
+					message:
+						"A check is still running on this project. Wait for it to finish, then delete it.",
+				});
+			}
+
+			const [archived] = await ctx.db
+				.update(projects)
+				.set({ archivedAt: new Date() })
+				.where(
+					and(
+						tenantScope(projects, ctx.tenantId),
+						eq(projects.id, input.projectId),
+						/**
+						 * Re-stated on the write even though the read above already
+						 * refused an archived project. Two callers racing would both pass
+						 * that check; only one may set the timestamp, so the second gets
+						 * no row back and is told the project is gone rather than
+						 * silently overwriting when the first one deleted it.
+						 */
+						isNull(projects.archivedAt),
+					),
+				)
+				.returning({ id: projects.id, archivedAt: projects.archivedAt });
+
+			if (!archived) throw new TRPCError({ code: "NOT_FOUND" });
+			return archived;
 		}),
 
 	startRun: tenantProcedure

@@ -8,7 +8,7 @@
  */
 
 import { initTRPC, TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import superjson from "superjson";
 import { ZodError } from "zod";
@@ -299,6 +299,17 @@ export const ownerProcedure = tenantProcedure.use(({ ctx, next }) => {
  * This also closes a gap that predates roles — `latestRun`, `runs`, `trend` and
  * `runPages` took a project or run id and never checked the project existed at
  * all, returning an empty result either way.
+ *
+ * **An archived project is refused here, identically.** That is what makes the
+ * soft delete a delete rather than a flag on a list: `projects.archivedAt` is
+ * set in one place, and every procedure that resolves a project or a run
+ * inherits the refusal without knowing the column exists. Doing it per procedure
+ * would mean the next router to take a `projectId` is a router that still serves
+ * deleted projects, and the failure would be silent.
+ *
+ * The third condition is refused as `NOT_FOUND` alongside the other two, for the
+ * same reason and one more: a project the owner deleted is, to everyone who
+ * could still name it, gone.
  */
 export const assertProjectAccess = async (
 	ctx: {
@@ -317,7 +328,11 @@ export const assertProjectAccess = async (
 
 	const project = await ctx.db.query.projects.findFirst({
 		columns: { id: true },
-		where: and(tenantScope(projects, ctx.tenantId), eq(projects.id, projectId)),
+		where: and(
+			tenantScope(projects, ctx.tenantId),
+			eq(projects.id, projectId),
+			isNull(projects.archivedAt),
+		),
 	});
 
 	if (!project) throw new TRPCError({ code: "NOT_FOUND" });

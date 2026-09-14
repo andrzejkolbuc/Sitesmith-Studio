@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -74,11 +74,19 @@ export const inviteRouter = createTRPCRouter({
 			}
 
 			if (input.projectId) {
+				/**
+				 * Archived projects are excluded here, as everywhere. Inviting a
+				 * client viewer to a deleted project would mint a working credential
+				 * for an account whose only reason to exist has been removed — the
+				 * partial state this router refuses two checks above, arrived at from
+				 * the other direction.
+				 */
 				const project = await ctx.db.query.projects.findFirst({
 					columns: { id: true },
 					where: and(
 						tenantScope(projects, ctx.tenantId),
 						eq(projects.id, input.projectId),
+						isNull(projects.archivedAt),
 					),
 				});
 				if (!project) throw new TRPCError({ code: "NOT_FOUND" });
@@ -218,11 +226,13 @@ export const inviteRouter = createTRPCRouter({
 				});
 			}
 
+			/** Archived projects are not assignable, for the reason `issue` gives. */
 			const project = await ctx.db.query.projects.findFirst({
 				columns: { id: true },
 				where: and(
 					tenantScope(projects, ctx.tenantId),
 					eq(projects.id, input.projectId),
+					isNull(projects.archivedAt),
 				),
 			});
 			if (!project) throw new TRPCError({ code: "NOT_FOUND" });

@@ -49,8 +49,16 @@ export const RUN_STATUS = {
 
 export type RunStatus = (typeof RUN_STATUS)[keyof typeof RUN_STATUS];
 
-/** Statuses that mean the run is still owned by a live process. */
-const ACTIVE: RunStatus[] = [RUN_STATUS.QUEUED, RUN_STATUS.RUNNING];
+/**
+ * Statuses that mean the run is still owned by a live process.
+ *
+ * Exported because callers outside this module need to ask "is work happening
+ * on this project right now" — archiving does — and the note above is the
+ * reason they must ask with *this* list rather than one spelled out locally. A
+ * second copy would be a second definition of what "active" means, and the
+ * first status added to one and not the other would be the bug.
+ */
+export const ACTIVE: RunStatus[] = [RUN_STATUS.QUEUED, RUN_STATUS.RUNNING];
 
 /** Ceiling on pages per run, so a misconfigured scope cannot run away. */
 const MAX_PAGES = 2_000;

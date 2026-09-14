@@ -1,0 +1,1 @@
+ALTER TABLE "sitesmith-studio_project" ADD COLUMN "archivedAt" timestamp with time zone;

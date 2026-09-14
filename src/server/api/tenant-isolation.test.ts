@@ -238,6 +238,16 @@ const CASES: Record<string, Case> = {
 		kind: "foreign-id",
 		input: (victim) => ({ projectId: victim.project.id }),
 	},
+	/**
+	 * The destructive one, and so the sharpest case in this table: a leak here
+	 * would not be another tenant reading a row, it would be another tenant
+	 * deleting a project. The generated case only proves nothing comes *back*, so
+	 * the test below also proves the victim's project is still there afterwards.
+	 */
+	"project.archive": {
+		kind: "foreign-id",
+		input: (victim) => ({ projectId: victim.project.id }),
+	},
 	"project.startRun": {
 		kind: "foreign-id",
 		input: (victim) => ({ projectId: victim.project.id }),
@@ -444,6 +454,31 @@ describe("a caller holding another tenant's identifier", () => {
 		});
 		expect(victimRuns).toHaveLength(1);
 		expect(victimRuns[0]?.id).toBe(victim.run.id);
+	});
+
+	/**
+	 * The same shape of assertion, for the one procedure that destroys something.
+	 *
+	 * The generated case above proves `archive` returns nothing about the victim.
+	 * It cannot prove the call had no effect — a procedure that archived the row
+	 * and *then* threw would pass it, and the victim's projects would start
+	 * disappearing while every leak assertion stayed green. So the refusal is
+	 * checked against the row itself.
+	 */
+	it("cannot archive another tenant's project", async () => {
+		const victim = await seedTenant("victim");
+		const intruder = await seedTenant("intruder");
+
+		await expect(
+			callerFor(intruder.owner.id, intruder.tenant.id).project.archive({
+				projectId: victim.project.id,
+			}),
+		).rejects.toThrow();
+
+		const stillThere = await db.query.projects.findFirst({
+			where: (project, { eq }) => eq(project.id, victim.project.id),
+		});
+		expect(stillThere?.archivedAt).toBeNull();
 	});
 });
 

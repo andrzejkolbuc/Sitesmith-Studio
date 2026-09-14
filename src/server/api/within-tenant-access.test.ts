@@ -273,6 +273,36 @@ describe("writes", () => {
 		}).toEqual({ member: "FORBIDDEN", viewer: "FORBIDDEN" });
 	});
 
+	/**
+	 * Deletion is Owner-only, and the member here is assigned to `alpha` — so
+	 * this is a capability refusal, not a reachability one. That distinction is
+	 * the whole point of the case: a member who can open a project and run checks
+	 * on it still may not delete it, and `FORBIDDEN` rather than `NOT_FOUND` is
+	 * what says so.
+	 *
+	 * The row is checked afterwards for the same reason the isolation suite
+	 * checks it: a refusal that had already written would be a passing test and a
+	 * deleted project.
+	 */
+	it("refuses project deletion to anyone but the owner", async () => {
+		const { member, viewer } = callers();
+
+		expect({
+			member: await codeOf(
+				member.project.archive({ projectId: seed.alpha.project.id }),
+			),
+			viewer: await codeOf(
+				viewer.project.archive({ projectId: seed.beta.project.id }),
+			),
+		}).toEqual({ member: "FORBIDDEN", viewer: "FORBIDDEN" });
+
+		const rows = await db.query.projects.findMany({
+			where: (project, { inArray }) =>
+				inArray(project.id, [seed.alpha.project.id, seed.beta.project.id]),
+		});
+		expect(rows.map((row) => row.archivedAt)).toEqual([null, null]);
+	});
+
 	it("refuses project configuration to anyone but the owner", async () => {
 		const { member, viewer } = callers();
 

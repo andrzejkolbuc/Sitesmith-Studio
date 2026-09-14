@@ -4,6 +4,7 @@ import { auth, signOut } from "~/server/auth";
 import { currentAccount } from "~/server/auth/account";
 import { isOwner } from "~/server/auth/roles";
 import { api } from "~/trpc/server";
+import { ArchiveProject } from "./archive-project";
 
 export default async function ProjectsPage() {
 	/**
@@ -109,9 +110,18 @@ export default async function ProjectsPage() {
 				) : (
 					<ul className="mt-2">
 						{projects.map((project) => (
-							<li className="border-rule-soft border-b" key={project.id}>
+							<li
+								className="flex items-center gap-4 border-rule-soft border-b"
+								key={project.id}
+							>
+								{/**
+								 * The link no longer spans the row. An owner's delete control
+								 * is a sibling of it rather than a descendant, because a button
+								 * inside an anchor is invalid markup and every click on it
+								 * would navigate before it did anything.
+								 */}
 								<Link
-									className="-mx-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 rounded-sm px-3 py-5 transition-colors hover:bg-sheet"
+									className="-mx-3 flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-6 gap-y-1 rounded-sm px-3 py-5 transition-colors hover:bg-sheet"
 									href={`/projects/${project.id}`}
 								>
 									<span className="min-w-0">
@@ -140,6 +150,19 @@ export default async function ProjectsPage() {
 										</span>
 									)}
 								</Link>
+
+								{/**
+								 * Hidden from everyone but the Owner, and refused for them
+								 * server-side regardless — `project.archive` is an
+								 * `ownerProcedure`. Hiding it only stops the product offering
+								 * an action it would then reject.
+								 */}
+								{owner ? (
+									<ArchiveProject
+										projectId={project.id}
+										projectName={project.name}
+									/>
+								) : null}
 							</li>
 						))}
 					</ul>
