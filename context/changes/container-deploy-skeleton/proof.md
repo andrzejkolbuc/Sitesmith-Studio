@@ -347,3 +347,119 @@ Valid YAML with every key intact, and it invokes the same command a developer
 runs. **That is the whole of the claim.** The repository has no git remote, so
 the workflow has never executed and cannot until one exists — which is the second
 of the two unmet clauses recorded in `change.md`, alongside the deferred host.
+
+## Manual verification
+
+Run on 2026-09-14 in **Windows PowerShell 5.1** (`$PSVersionTable.PSVersion` →
+5.1.26100.9444), which is the shell the PowerShell rows exist to check. Everything
+above this section was run from Git Bash, so these are the rows that could not be
+inferred from it.
+
+### The three PowerShell rows
+
+```powershell
+PS> npm run db:status
+engine:    29.7.2
+container: running
+database:  sitesmith-studio on localhost:5432
+
+PS> npm run db:stop
+db: stopped. Data is kept in its volume.
+PS> npm run db:status
+container: exited
+
+PS> npm run db:start
+db: starting sitesmith-studio on port 5432…
+db: up. Run `npm run db:migrate` next.
+
+PS> docker build -t sitesmith-studio .
+BUILD_EXIT=0
+
+PS> npm run image:verify
+smoke: measured http://localhost:3000/signin — TTFB 9.3ms, LCP 68ms, CLS 0
+verify: the image builds, migrates, serves, and can open a browser.
+VERIFY_EXIT=0
+```
+
+### The volume actually persists
+
+Checked across both things that could lose it — a stop/start, and a full
+container removal and recreate:
+
+```
+BEFORE                          AFTER stop→start        AFTER rm→up
+__drizzle_migrations: 1         (same)                  (same)
+sitesmith-studio_project: 1     (same)                  (same)
+sitesmith-studio_tenant: 1      (same)                  (same)
+sitesmith-studio_user: 1        (same)                  (same)
+                                owner: owner@sitesmith.test
+                                project: Demo Site
+```
+
+Row counts alone would be a weak assertion — four tables with one row each is
+also what a freshly migrated and re-seeded database looks like. The owner's email
+and the project's name are read back as well, because those are values only the
+original rows carry.
+
+### A bare `docker compose up` starts only the database
+
+From a genuinely clean state — the postgres container stopped and removed first,
+so `compose ps -a` listed nothing at all:
+
+```powershell
+PS> docker compose up -d
+ Container sitesmith-studio-postgres-1 Created
+ Container sitesmith-studio-postgres-1 Started
+PS> docker compose ps -a --format "{{.Service}} {{.State}}"
+postgres running
+```
+
+No app service, no image build. The daily loop stays fast.
+
+### Teardown after a failing run — fault injected, not assumed
+
+The first attempt at this was wrong and is recorded because the mistake is
+instructive: occupying host port 13100 with a local listener was expected to make
+`compose up` fail, and **the run passed anyway** — Docker Desktop published the
+port regardless. A test that does not produce the failure it is testing for proves
+nothing, and it would have been easy to read that passing run as evidence.
+
+The fault was then injected where it actually bites: `smoke-container.mjs`'s
+target was temporarily pointed at `http://localhost:59999/deliberately-unreachable`.
+
+```powershell
+PS> npm run image:verify
+smoke: rendering http://localhost:59999/deliberately-unreachable
+smoke: the page could not be rendered.
+    page.goto: net::ERR_CONNECTION_REFUSED
+
+verify: tearing down
+ Container sitesmith-studio-verify-app-1 Removed
+ Container sitesmith-studio-verify-postgres-1 Removed
+ Volume sitesmith-studio-verify_postgres-data Removed
+ Network sitesmith-studio-verify_default Removed
+verify: FAILED.
+VERIFY_EXIT=1
+
+PS> # stray artifacts after the failing run
+containers=0 volumes=0 networks=0
+PS> docker ps
+sitesmith-studio-postgres-1 Up About a minute (healthy)
+```
+
+Teardown ran on the failure path, removed everything it created, and the
+development database was untouched throughout. The temporary edit was reverted
+with `git checkout` and the image rebuilt, so the tagged image carries the real
+target again.
+
+### Still unverified
+
+Two rows are **not** covered by anything above and remain open:
+
+- **3.9 — the engine-down diagnostic.** Requires stopping Docker Desktop, which
+  no check here did. The code path is unchanged from before this slice, but
+  unchanged is not the same as exercised.
+- **3.12 — a host `next dev` on 3000 coexisting with the app profile.** The app
+  service runs production mode, publishes 3100 and bind-mounts nothing, so the
+  collision the research observed should be structurally impossible — which is
+  an argument, not an observation, and this file is for observations.

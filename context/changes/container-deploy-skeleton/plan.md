@@ -777,10 +777,10 @@ entrypoint is designed for.
 
 #### Manual
 
-- [ ] 2.9 Base image Node version satisfies the `engines` range
-- [ ] 2.10 Removing the browsers directory makes the check fail
-- [ ] 2.11 Image size recorded in proof
-- [ ] 2.12 `docker build` succeeds from PowerShell
+- [x] 2.9 Base image Node version satisfies the `engines` range
+- [x] 2.10 Removing the browsers directory makes the check fail
+- [x] 2.11 Image size recorded in proof
+- [x] 2.12 `docker build` succeeds from PowerShell
 
 ### Phase 3: The composition
 
@@ -796,10 +796,10 @@ entrypoint is designed for.
 
 #### Manual
 
-- [ ] 3.8 `db:start`, `db:stop`, `db:status` behave correctly from PowerShell
+- [x] 3.8 `db:start`, `db:stop`, `db:status` behave correctly from PowerShell
 - [ ] 3.9 Engine-down diagnostic still friendly
-- [ ] 3.10 Stop and restart preserves data
-- [ ] 3.11 `docker compose up` alone does not start the app
+- [x] 3.10 Stop and restart preserves data
+- [x] 3.11 `docker compose up` alone does not start the app
 - [ ] 3.12 Host `next dev` and the app profile coexist
 
 ### Phase 4: Proof and CI glue
@@ -814,7 +814,7 @@ entrypoint is designed for.
 
 #### Manual
 
-- [ ] 4.6 `npm run image:verify` succeeds from PowerShell
-- [ ] 4.7 A deliberately broken image fails the smoke, naming the browser
-- [ ] 4.8 Teardown leaves no stray containers or volumes
-- [ ] 4.9 `change.md` states both unmet clauses plainly
+- [x] 4.6 `npm run image:verify` succeeds from PowerShell
+- [x] 4.7 A deliberately broken image fails the smoke, naming the browser
+- [x] 4.8 Teardown leaves no stray containers or volumes
+- [x] 4.9 `change.md` states both unmet clauses plainly
