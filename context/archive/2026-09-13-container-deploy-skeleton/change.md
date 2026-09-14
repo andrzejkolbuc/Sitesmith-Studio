@@ -1,10 +1,10 @@
 ---
 change_id: container-deploy-skeleton
 title: Container deploy skeleton — image and local composition, host deferred
-status: implemented
+status: archived
 created: 2026-09-13
 updated: 2026-09-14
-archived_at: null
+archived_at: 2026-09-14T19:15:46Z
 ---
 
 ## Notes

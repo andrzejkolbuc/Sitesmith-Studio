@@ -3,7 +3,7 @@ project: "Sitesmith-Studio"
 version: 1
 status: draft
 created: 2026-08-21
-updated: 2026-09-13
+updated: 2026-09-14
 prd_version: 1
 main_goal: market-feedback
 top_blocker: capacity
@@ -51,7 +51,7 @@ works.
 | ID   | Change ID                       | Outcome (user can …)                                                          | Prerequisites    | PRD refs                                                                             | Status   |
 | ---- | ------------------------------- | ----------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------ | -------- |
 | F-01 | tenant-scoped-owner-signin      | (foundation) records are tenant-scoped and an Owner can sign in                | —                | FR-002, FR-009, NFR-2                                                                | done     |
-| F-02 | container-deploy-skeleton       | (foundation) the app runs as a container on a persistent host                  | —                | NFR-3                                                                                | ready    |
+| F-02 | container-deploy-skeleton       | (foundation) the app runs as a container on a persistent host                  | —                | NFR-3                                                                                | built    |
 | S-01 | first-multilingual-crawl        | define a project, crawl it, and see pages missing a language variant           | F-01             | US-01, FR-006, FR-007, FR-008, FR-011, FR-012, FR-013, FR-014, FR-024, FR-036, NFR-1 | built    |
 | S-02 | hreflang-and-variant-parity     | see hreflang graph problems and variants that regressed while siblings did not | S-01             | US-01, FR-025, FR-026                                                                | done     |
 | S-03 | cross-variant-content-drift     | see content drift between language variants                                    | S-02             | FR-027                                                                               | done     |
@@ -119,7 +119,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Unknowns:**
   - Which host, concretely? The stack hand-off says a self-hosted container targeting Azure, but nothing is provisioned. — Owner: user. Block: no.
 - **Risk:** Listed as ready because it depends on nothing, but deliberately not recommended first: it unlocks only a nice-to-have. Doing it early means maintaining a deployment through months of change before anything needs deploying. Sequenced here so it is visible, not urgent.
-- **Status:** ready
+- **Status:** built
 
 ## Slices
 
